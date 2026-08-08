@@ -13,7 +13,7 @@ st.set_page_config(
     layout="wide"
 )
 
-DEEPSEEK_API_KEY = "sk-0447faee1bc448eb9ebf40f0c05fe9e6"  # API Key DeepSeek kamu
+DEEPSEEK_API_KEY = "sk-863ad8cd0fbb4f6a9a379d0a31a8292a"  # API Key DeepSeek kamu
 
 # ==========================================
 # 2. FUNGSI UTAMA (FETCH NEWS & AI ANALYZER)
