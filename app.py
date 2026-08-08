@@ -42,12 +42,11 @@ with st.sidebar:
     st.markdown("### 3. Jadwal Official")
     tanggal_rilis = st.number_input("Tanggal Rilis:", value=7, min_value=1, max_value=31)
     
-    # Pilihan Bulan Lengkap (All Data: Januari - Desember)
     daftar_bulan = [
         "Januari", "Februari", "Maret", "April", "Mei", "Juni",
         "Juli", "Agustus", "September", "Oktober", "November", "Desember"
     ]
-    bulan_rilis = st.selectbox("Bulan Rilis:", daftar_bulan, index=7) # Default Agustus
+    bulan_rilis = st.selectbox("Bulan Rilis:", daftar_bulan, index=7)
     tahun_rilis = st.number_input("Tahun Rilis:", value=2026)
     
     jam_input = st.text_input("Jam Rilis (Default WIB):", value="19:30")
@@ -111,7 +110,7 @@ with col_sync1:
     sync1 = st.checkbox("Auto-Sync", value=True, key="sync_1")
 
 if sync1:
-    st.markdown("`[ ✅ SOURCE: AUTO DEEPSEEK AI ]`")
+    st.markdown("`[ ✅ SOURCE: AUTO GROQ AI ]`")
 
 c1, c2, c3 = st.columns(3)
 with c1:
@@ -131,6 +130,9 @@ with col_i2:
 with col_sync2:
     sync2 = st.checkbox("Auto-Sync", value=False, key="sync_2")
 
+if sync2:
+    st.markdown("`[ ✅ SOURCE: AUTO GROQ AI ]`")
+
 c4, c5, c6 = st.columns(3)
 with c4:
     val_act2 = st.text_input("Actual (Indikator 2)", value=default_act2, key="v_act2")
@@ -148,6 +150,9 @@ with col_i3:
     st.caption(ind3_sched)
 with col_sync3:
     sync3 = st.checkbox("Auto-Sync", value=False, key="sync_3")
+
+if sync3:
+    st.markdown("`[ ✅ SOURCE: AUTO GROQ AI ]`")
 
 c7, c8, c9 = st.columns(3)
 with c7:
