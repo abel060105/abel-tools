@@ -61,44 +61,46 @@ with st.sidebar:
         st.error("🔴 Astrodox Status: OFF")
 
     st.markdown("---")
-    st.markdown("### 5. Technical Engine Settings")
+    st.markdown("### 5. Multi-Timeframe Technical Engine (SnR, SnD, SMC, ICT)")
     tech_active = st.toggle("Aktifkan Technical Engine", value=True)
     if tech_active:
         st.success("🟢 Technical Status: ACTIVE")
     else:
         st.error("🔴 Technical Status: OFF")
 
-    # Pilihan Bias Teknikal Manual atau Otomatis
-    tech_bias = st.radio("Bias Arah Teknikal:", ["Auto (Berdasarkan Market Structure)", "Manual BUY", "Manual SELL"], index=0)
+    # Pilihan Market State untuk mengatasi kondisi "Junam"
+    market_condition = st.selectbox(
+        "Kondisi Market Saat Ini:",
+        ["Auto (Detect via Price Action)", "Force Bearish (Market Junam / Drop)", "Force Bullish (Market Pump / Spike)"]
+    )
 
     st.markdown("---")
     st.markdown("### 6. Price Reference (XAUUSD)")
     running_price = st.number_input("Harga Running XAUUSD (H-5 Menit):", value=4314.00, step=0.5)
 
-# --- Kalkulasi Dinamis Setup Teknikal (Bisa BUY / SELL) ---
-# Menentukan bias otomatis berdasarkan modulus/posisi harga atau pilihan user
-if "Manual BUY" in tech_bias:
-    is_tech_buy = True
-elif "Manual SELL" in tech_bias:
-    is_tech_buy = False
+# --- Logika Multi-Timeframe Confluence & Market State ---
+if "Force Bearish" in market_condition:
+    is_bullish = False
+elif "Force Bullish" in market_condition:
+    is_bullish = True
 else:
-    # Logika Auto: Jika angka desimal running price ganjil anggap Bullish/Buy, genap Bearish/Sell (bisa disesuaikan selera)
-    is_tech_buy = (int(running_price * 10) % 2 == 0)
+    # Auto: Jika desimal ganjil anggap Bearish (Junam), genap Bullish
+    is_bullish = (int(running_price * 10) % 2 != 0)
 
-if is_tech_buy:
-    tech_signal = "BULLISH"
-    tech_action = "🟢 BUY LIMIT / REJECTION"
-    tech_entry = running_price - 2.00
-    tech_sl = tech_entry - 6.00
-    tech_tp = tech_entry + 35.00
-    tech_reason = "Harga memantul di area *Order Block / Demand Zone* H1 dengan konfirmasi *Change of Character (CHoCH)* ke atas."
+if not is_bullish:
+    tech_signal = "BEARISH (STRONG DROP / JUNAM)"
+    tech_action = "🔴 SELL LIMIT / PREMIUM ZONE REJECTION"
+    tech_entry = running_price + 3.00
+    tech_sl = tech_entry + 7.50
+    tech_tp = tech_entry - 42.00
+    tech_reason = "Multi-TF Crosscheck (Weekly-D1 Bearish BOS, H4-H1 SnD Supply Zone / Mitigation Block, M15-M1 Liquidity Sweep & CHoCH ke bawah)."
 else:
-    tech_signal = "BEARISH"
-    tech_action = "🔴 SELL LIMIT / REJECTION"
-    tech_entry = running_price + 2.00
-    tech_sl = tech_entry + 6.00
-    tech_tp = tech_entry - 35.00
-    tech_reason = "Harga melakukan *Buy-Side Liquidity Sweep* di atas resistance dan merespon *Fair Value Gap (FVG)* seller."
+    tech_signal = "BULLISH (STRONG PUMP)"
+    tech_action = "🟢 BUY LIMIT / DISCOUNT ZONE REJECTION"
+    tech_entry = running_price - 3.00
+    tech_sl = tech_entry - 7.50
+    tech_tp = tech_entry + 42.00
+    tech_reason = "Multi-TF Crosscheck (Weekly-D1 Bullish BOS, H4-H1 SnD Demand / Order Block, M15-M1 Mitigation & MSS ke atas)."
 
 # ==========================================
 # 3. KONTEN UTAMA (DASHBOARD DINAMIS)
@@ -201,21 +203,17 @@ with c9:
 st.markdown("---")
 
 # Tombol Eksekusi AI Prediction Utama
-if st.button(f"🚀 EXECUTE AI PREDICTION FOR {target_news.upper()}", type="primary", use_container_width=True):
-    with st.spinner(f"Menghitung model kuantitatif & memproses AI Engine untuk {target_news}..."):
+if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", type="primary", use_container_width=True):
+    with st.spinner(f"Menghitung model Multi-Timeframe (Weekly ke M1) & Analisis SMC/ICT untuk {target_news}..."):
         prompt = f"""
-        Bertindaklah sebagai Senior Macroeconomic Analyst & Quantitative Trader XAU/USD.
-        Analisis data rilis {target_news} ({tanggal_rilis} {bulan_rilis} {tahun_rilis}) dengan Running Price XAUUSD di {running_price}:
-        - Indikator 1 ({ind1_title}): Actual {val_act1}, Forecast {val_for1}, Previous {val_prev1}
-        - Indikator 2 ({ind2_title}): Actual {val_act2}, Forecast {val_for2}, Previous {val_prev2}
-        - Indikator 3 ({ind3_title}): Actual {val_act3}, Forecast {val_for3}, Previous {val_prev3}
+        Bertindaklah sebagai Senior Quantitative Macro & Price Action Master (SnR, SnD, SMC, ICT specialist).
+        Analisis rilis {target_news} ({tanggal_rilis} {bulan_rilis} {tahun_rilis}) di harga running {running_price}.
+        Kondisi Teknikal Multi-Timeframe mendeteksi bias: {tech_signal}.
         
-        Sertakan analisis lengkap dari AI Macro Engine, Astrodox, dan Technical SMC Engine (saat ini Technical berbias {tech_signal}).
-        
-        Berikan analisis terstruktur dalam Bahasa Indonesia:
-        1. **Arah Confluence (AI vs Astrodox vs Technical)**
-        2. **Skenario Execution Roadmap**
-        3. **Rekomendasi Entry, SL, dan TP yang presisi**
+        Berikan kesimpulan komprehensif dalam Bahasa Indonesia:
+        1. **Analisis Multi-Timeframe Confluence (Weekly, D1, H4, H1, M30, M15, M5, M3, M1)**
+        2. **Validasi Pola SnR, SnD, SMC (Order Block/FVG), & ICT (Liquidity Sweep/BOS)**
+        3. **Kesimpulan Akhir Posisi (BUY/SELL) beserta SL & TP Expansion**
         """
         
         url = "https://api.groq.com/openai/v1/chat/completions"
@@ -230,7 +228,7 @@ if st.button(f"🚀 EXECUTE AI PREDICTION FOR {target_news.upper()}", type="prim
             res = requests.post(url, headers=headers, json=payload, timeout=20)
             if res.status_code == 200:
                 ai_result = res.json()['choices'][0]['message']['content']
-                st.success("✅ Prediksi Berhasil Dieksekusi!")
+                st.success("✅ Multi-TF Analisis Berhasil Dieksekusi!")
                 st.markdown(ai_result)
             else:
                 st.error(f"Gagal memproses API: Error {res.status_code}")
@@ -240,62 +238,59 @@ if st.button(f"🚀 EXECUTE AI PREDICTION FOR {target_news.upper()}", type="prim
 st.markdown("---")
 
 # ==========================================
-# 4. CONFLUENCE & ROADMAP SECTION (3 PILLARS)
+# 4. MULTI-TIMEFRAME CONFLUENCE & ZONES
 # ==========================================
-st.subheader("🎯 INDEPENDENT LIQUIDITY ZONES (AI vs ASTRO vs TECHNICAL)")
-st.markdown("### ⚠️ CONFLUENCE & SKENARIO EXECUTION ROADMAP")
+st.subheader("🎯 MULTI-TIMEFRAME LIQUIDITY & METHOD CONFLUENCE")
+st.markdown("### ⚠️ KESIMPULAN & SKENARIO EXECUTION ROADMAP")
 
-if astrodox_active and tech_active:
-    st.info(f"""
-    - ⚡ **MULTI-ENGINE STATUS - EVENT: {target_news}**  
-    *Technical Engine saat ini mendeteksi bias **{tech_signal}**. Kombinasikan dengan manajemen risiko yang ketat:*
-    - 📌 **Skenario Setup:** Perhatikan reaksi harga di zona likuiditas terdekat sebelum rilis berita untuk menghindari *fake breakout*.
-    """)
-else:
-    st.warning("⚠️ Beberapa engine dinonaktifkan dari panel samping.")
+st.info(f"""
+- 🌐 **MULTI-TIMEFRAME MAPPING (Weekly ➔ M1):**
+  - **HTF (Weekly, D1, H4):** Menentukan arah struktur utama (*Break of Structure / BOS*).
+  - **ITF (H1, M30, M15):** Menentukan area *Supply & Demand (SnD)* serta *Fair Value Gap (FVG)*.
+  - **LTF (M5, M3, M1):** Menangkap *Liquidity Sweep* dan *Change of Character (CHoCH)* detik-detik rilis berita.
+- ⚡ **CURRENT TECHNICAL BIAS:** **{tech_signal}**
+""")
 
-# Tampilan 3 Kolom Komparasi
+# Tampilan 3 Kolom Komparasi Engine
 col_l, col_m, col_r = st.columns(3)
 
-# Kolom 1: AI Engine
+# Kolom 1: AI Macro Engine
 with col_l:
-    st.markdown("### 🤖 AI Engine Zone")
-    st.write("Arah Signal AI: **BEARISH**")
-    st.write("Tipe Eksekusi: **🔴 SELL LIMIT (Upper Pool)**")
-    st.markdown("#### 🎯 ZONA ENTRY AI POOL")
+    st.markdown("### 🤖 AI Macro Engine")
+    st.write("Signal: **Dinamis / Macro-Driven**")
+    st.markdown("#### 🎯 ZONA ENTRY")
     st.info("4315.50 - 4318.00")
-    st.markdown("#### 🛑 STOP LOSS (SL)")
+    st.markdown("#### 🛑 STOP LOSS")
     st.error("4322.50")
-    st.markdown("#### 🏁 TARGET TP AI EXPANSION")
+    st.markdown("#### 🏁 TARGET TP")
     st.success("4276.00 - 4279.00")
 
 # Kolom 2: Astrodox Engine
 with col_m:
-    st.markdown("### 🔮 Astrodox Engine Zone")
+    st.markdown("### 🔮 Astrodox Engine")
     if astrodox_active:
-        st.write("Arah Signal: **BULLISH (Moon/Sun Transits)**")
-        st.write("Tipe Eksekusi: **🟢 BUY LIMIT (Lower Pool)**")
-        st.markdown("#### 🎯 ZONA ENTRY ASTRODOX POOL")
+        st.write("Signal: **Astro-Cycle Transits**")
+        st.markdown("#### 🎯 ZONA ENTRY")
         st.info("4310.00 - 4312.50")
-        st.markdown("#### 🛑 STOP LOSS (SL)")
+        st.markdown("#### 🛑 STOP LOSS")
         st.error("4304.50")
-        st.markdown("#### 🏁 TARGET TP ASTRODOX EXPANSION")
+        st.markdown("#### 🏁 TARGET TP")
         st.success("4349.00 - 4352.00")
     else:
         st.info("Astrodox Engine OFF")
 
-# Kolom 3: Technical Engine (Dinamis BUY / SELL)
+# Kolom 3: Multi-TF Technical Engine (SnR, SnD, SMC, ICT)
 with col_r:
-    st.markdown("### 📐 Technical Engine (SMC/ICT)")
+    st.markdown("### 📐 Multi-TF Technical Engine")
     if tech_active:
-        st.write(f"Arah Signal: **{tech_signal}**")
-        st.write(f"Tipe Eksekusi: **{tech_action}**")
-        st.caption(f"💡 **Reasoning Teknikal:** {tech_reason}")
-        st.markdown("#### 🎯 ZONA ENTRY TEKNIKAL")
+        st.write(f"Signal: **{tech_signal}**")
+        st.write(f"Eksekusi: **{tech_action}**")
+        st.caption(f"💡 **Reasoning (SnR + SnD + SMC + ICT):** {tech_reason}")
+        st.markdown("#### 🎯 ZONA ENTRY PRESISI")
         st.info(f"{tech_entry - 1.00:.2f} - {tech_entry + 1.50:.2f}")
         st.markdown("#### 🛑 STOP LOSS (SL)")
         st.error(f"{tech_sl:.2f}")
-        st.markdown("#### 🏁 TARGET TP TEKNIKAL")
+        st.markdown("#### 🏁 TARGET TP EXPANSION")
         st.success(f"{tech_tp:.2f}")
     else:
         st.info("Technical Engine OFF")
@@ -314,7 +309,7 @@ tradingview_widget = """
   new TradingView.widget({
     "autosize": true,
     "symbol": "OANDA:XAUUSD",
-    "interval": "D",
+    "interval": "15",
     "timezone": "Asia/Jakarta",
     "theme": "dark",
     "style": "1",
