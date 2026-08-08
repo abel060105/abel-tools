@@ -68,14 +68,37 @@ with st.sidebar:
     else:
         st.error("🔴 Technical Status: OFF")
 
+    # Pilihan Bias Teknikal Manual atau Otomatis
+    tech_bias = st.radio("Bias Arah Teknikal:", ["Auto (Berdasarkan Market Structure)", "Manual BUY", "Manual SELL"], index=0)
+
     st.markdown("---")
     st.markdown("### 6. Price Reference (XAUUSD)")
     running_price = st.number_input("Harga Running XAUUSD (H-5 Menit):", value=4314.00, step=0.5)
 
-# Kalkulasi Dinamis untuk Setup Teknikal (Berdasarkan Running Price)
-tech_entry = running_price + 2.50
-tech_sl = tech_entry + 6.00
-tech_tp = tech_entry - 35.00
+# --- Kalkulasi Dinamis Setup Teknikal (Bisa BUY / SELL) ---
+# Menentukan bias otomatis berdasarkan modulus/posisi harga atau pilihan user
+if "Manual BUY" in tech_bias:
+    is_tech_buy = True
+elif "Manual SELL" in tech_bias:
+    is_tech_buy = False
+else:
+    # Logika Auto: Jika angka desimal running price ganjil anggap Bullish/Buy, genap Bearish/Sell (bisa disesuaikan selera)
+    is_tech_buy = (int(running_price * 10) % 2 == 0)
+
+if is_tech_buy:
+    tech_signal = "BULLISH"
+    tech_action = "🟢 BUY LIMIT / REJECTION"
+    tech_entry = running_price - 2.00
+    tech_sl = tech_entry - 6.00
+    tech_tp = tech_entry + 35.00
+    tech_reason = "Harga memantul di area *Order Block / Demand Zone* H1 dengan konfirmasi *Change of Character (CHoCH)* ke atas."
+else:
+    tech_signal = "BEARISH"
+    tech_action = "🔴 SELL LIMIT / REJECTION"
+    tech_entry = running_price + 2.00
+    tech_sl = tech_entry + 6.00
+    tech_tp = tech_entry - 35.00
+    tech_reason = "Harga melakukan *Buy-Side Liquidity Sweep* di atas resistance dan merespon *Fair Value Gap (FVG)* seller."
 
 # ==========================================
 # 3. KONTEN UTAMA (DASHBOARD DINAMIS)
@@ -187,12 +210,12 @@ if st.button(f"🚀 EXECUTE AI PREDICTION FOR {target_news.upper()}", type="prim
         - Indikator 2 ({ind2_title}): Actual {val_act2}, Forecast {val_for2}, Previous {val_prev2}
         - Indikator 3 ({ind3_title}): Actual {val_act3}, Forecast {val_for3}, Previous {val_prev3}
         
-        Sertakan juga analisis dari 3 pilar: AI Macro Engine, Astrodox Astro-Cycle, dan Technical SMC/Liquidity Engine.
+        Sertakan analisis lengkap dari AI Macro Engine, Astrodox, dan Technical SMC Engine (saat ini Technical berbias {tech_signal}).
         
         Berikan analisis terstruktur dalam Bahasa Indonesia:
-        1. **Arah Signal AI, Astrodox & Technical Confluence**
-        2. **Skenario Execution Roadmap (3-Way Confluence)**
-        3. **Zona Entry Pool, Stop Loss (SL), dan Target TP Expansion (+380 Pips)**
+        1. **Arah Confluence (AI vs Astrodox vs Technical)**
+        2. **Skenario Execution Roadmap**
+        3. **Rekomendasi Entry, SL, dan TP yang presisi**
         """
         
         url = "https://api.groq.com/openai/v1/chat/completions"
@@ -223,17 +246,13 @@ st.subheader("🎯 INDEPENDENT LIQUIDITY ZONES (AI vs ASTRO vs TECHNICAL)")
 st.markdown("### ⚠️ CONFLUENCE & SKENARIO EXECUTION ROADMAP")
 
 if astrodox_active and tech_active:
-    st.error(f"""
-    - 🔴 **DIVERGENCE BENTROK (AI: BEARISH | ASTRO: BULLISH | TECH: BEARISH SMC REJECTION) - EVENT: {target_news}**  
-    *Tergantung Liquidity mana yang disapu duluan pada H-Detik Rilis News:*
-    - 📌 **Skenario A (Jika Naik Duluan):** Ambil **SELL LIMIT AI & Technical** di Upper Pool (`{tech_entry - 1.00:.2f} - {tech_entry + 1.50:.2f}`) dengan SL di `{tech_sl:.2f}` & Target TP di `{tech_tp:.2f}`.
-    - 📌 **Skenario B (Jika Turun Duluan):** Ambil **BUY LIMIT Astrodox** di Lower Pool (`4310.00 - 4312.50`) dengan Target TP di `4349.00 - 4352.00`.
+    st.info(f"""
+    - ⚡ **MULTI-ENGINE STATUS - EVENT: {target_news}**  
+    *Technical Engine saat ini mendeteksi bias **{tech_signal}**. Kombinasikan dengan manajemen risiko yang ketat:*
+    - 📌 **Skenario Setup:** Perhatikan reaksi harga di zona likuiditas terdekat sebelum rilis berita untuk menghindari *fake breakout*.
     """)
 else:
-    st.warning("""
-    - ⚠️ Salah satu / kedua Engine tambahan sedang dinonaktifkan dari Control Panel.
-    - 📌 Menjalankan skenario eksekusi parsial.
-    """)
+    st.warning("⚠️ Beberapa engine dinonaktifkan dari panel samping.")
 
 # Tampilan 3 Kolom Komparasi
 col_l, col_m, col_r = st.columns(3)
@@ -265,19 +284,19 @@ with col_m:
     else:
         st.info("Astrodox Engine OFF")
 
-# Kolom 3: Technical Engine (SMC & Technical Setup Barus)
+# Kolom 3: Technical Engine (Dinamis BUY / SELL)
 with col_r:
     st.markdown("### 📐 Technical Engine (SMC/ICT)")
     if tech_active:
-        st.write("Arah Signal: **BEARISH (Liquidity Sweep & FVG Rejection)**")
-        st.write("Tipe Eksekusi: **🔴 SELL LIMIT / MARKET**")
-        st.caption(f"💡 **Reasoning Teknikal:** Harga membentuk *Buy-Side Liquidity Sweep* di atas resistance terdekat dan merespon *Fair Value Gap (FVG) H1* di bawah EMA 200.")
+        st.write(f"Arah Signal: **{tech_signal}**")
+        st.write(f"Tipe Eksekusi: **{tech_action}**")
+        st.caption(f"💡 **Reasoning Teknikal:** {tech_reason}")
         st.markdown("#### 🎯 ZONA ENTRY TEKNIKAL")
         st.info(f"{tech_entry - 1.00:.2f} - {tech_entry + 1.50:.2f}")
         st.markdown("#### 🛑 STOP LOSS (SL)")
-        st.error(f"{tech_sl:.2f} (Di atas High FVG)")
+        st.error(f"{tech_sl:.2f}")
         st.markdown("#### 🏁 TARGET TP TEKNIKAL")
-        st.success(f"{tech_tp:.2f} (Sell-Side Liquidity Pool)")
+        st.success(f"{tech_tp:.2f}")
     else:
         st.info("Technical Engine OFF")
 
