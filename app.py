@@ -13,8 +13,8 @@ st.set_page_config(
     layout="wide"
 )
 
-# API Key Gemini yang diberikan
-GEMINI_API_KEY = "AQ.Ab8RN6KECAro03DXeXEdO_pHhORwDWq-Q5svAinyIcuPI5O7xg"
+# Token/API Key kamu yang berawalan AQ...
+GEMINI_API_KEY = "AQ.Ab8RN6Iyjjqaqzfp6rhWyLesW1CNBzvgAI1aPC89V2Is_8Cm9w"
 
 # ==========================================
 # 2. FUNGSI UTAMA (FETCH NEWS & AI ANALYZER)
@@ -55,12 +55,16 @@ def fetch_economic_calendar():
     return pd.DataFrame(sample_data)
 
 def analyze_news_with_gemini(news_text):
-    """Mengirim data berita ke Gemini API untuk analisis sentimen & dampaknya"""
+    """Mengirim data berita ke Gemini API menggunakan Bearer Token Auth"""
     if not GEMINI_API_KEY:
-        return "⚠️ API Key Gemini tidak terdeteksi."
+        return "⚠️ API Key / Token tidak terdeteksi."
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-    headers = {'Content-Type': 'application/json'}
+    # Menggunakan endpoint v1 dengan Header Authorization Bearer (cocok untuk token berawalan AQ...)
+    url = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent"
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {GEMINI_API_KEY}'
+    }
 
     prompt = f"""
     SISTEM: Kamu adalah seorang Senior Macroeconomic Analyst & Quantitative Trader berpengalaman di pasar Forex & Gold (XAU/USD) yang analitis dan presisi.
