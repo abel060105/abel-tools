@@ -13,14 +13,14 @@ st.set_page_config(
     layout="wide"
 )
 
-DEEPSEEK_API_KEY = "sk-863ad8cd0fbb4f6a9a379d0a31a8292a"  # API Key DeepSeek kamu
+# API Key Gemini yang diberikan
+GEMINI_API_KEY = "AQ.Ab8RN6KECAro03DXeXEdO_pHhORwDWq-Q5svAinyIcuPI5O7xg"
 
 # ==========================================
 # 2. FUNGSI UTAMA (FETCH NEWS & AI ANALYZER)
 # ==========================================
 def fetch_economic_calendar():
     """Mengambil data berita/kalender ekonomi dari API publik Forex Factory yang stabil"""
-    # Menggunakan endpoint publik Forex Factory JSON yang stabil
     url = "https://nfp.ourfx.workers.dev/"
     fallback_url = "https://nfp-calendar.pages.dev/api/calendar"
     
@@ -28,7 +28,6 @@ def fetch_economic_calendar():
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 
-    # Percobaan 1: Mengambil dari Worker/API utama
     try:
         response = requests.get(url, headers=headers, timeout=6)
         if response.status_code == 200:
@@ -38,7 +37,6 @@ def fetch_economic_calendar():
     except Exception:
         pass
 
-    # Percobaan 2: Fallback ke endpoint cadangan publik
     try:
         response = requests.get(fallback_url, headers=headers, timeout=6)
         if response.status_code == 200:
@@ -48,7 +46,6 @@ def fetch_economic_calendar():
     except Exception:
         pass
 
-    # Percobaan 3: Dummy Data/Placeholder jika kedua API server sedang maintenance
     st.info("ℹ️ Menampilkan sampel data struktur berita (API utama sedang dipelihara/offline).")
     sample_data = [
         {"title": "USD Non-Farm Employment Change", "country": "USD", "date": "2026-08-07T12:30:00Z", "impact": "High", "forecast": "175K", "previous": "143K"},
@@ -57,20 +54,18 @@ def fetch_economic_calendar():
     ]
     return pd.DataFrame(sample_data)
 
-def analyze_news_with_deepseek(news_text):
-    """Mengirim data berita ke DeepSeek API untuk analisis sentimen & dampaknya terhadap USD/XAUUSD"""
-    if not DEEPSEEK_API_KEY:
-        return "⚠️ Silakan pastikan DeepSeek API Key sudah terpasang."
+def analyze_news_with_gemini(news_text):
+    """Mengirim data berita ke Gemini API untuk analisis sentimen & dampaknya"""
+    if not GEMINI_API_KEY:
+        return "⚠️ API Key Gemini tidak terdeteksi."
 
-    url = "https://api.deepseek.com/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
-        "Content-Type": "application/json"
-    }
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    headers = {'Content-Type': 'application/json'}
 
     prompt = f"""
-    Kamu adalah seorang Senior Macroeconomic Analyst & Quantitative Trader berpengalaman di pasar Forex & Gold (XAU/USD).
-    Analisis data kalender ekonomi berikut:
+    SISTEM: Kamu adalah seorang Senior Macroeconomic Analyst & Quantitative Trader berpengalaman di pasar Forex & Gold (XAU/USD) yang analitis dan presisi.
+    
+    TUGAS: Analisis data kalender ekonomi berikut:
 
     {news_text}
 
@@ -82,23 +77,19 @@ def analyze_news_with_deepseek(news_text):
     """
 
     payload = {
-        "model": "deepseek-chat",
-        "messages": [
-            {"role": "system", "content": "Kamu adalah analis pasar makroekonomi terkemuka yang presisi dan analitis."},
-            {"role": "user", "content": prompt}
-        ],
-        "temperature": 0.3
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.3}
     }
 
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=30)
         if response.status_code == 200:
             result = response.json()
-            return result['choices'][0]['message']['content']
+            return result['candidates'][0]['content']['parts'][0]['text']
         else:
             return f"❌ Gagal memproses AI: Error Code {response.status_code} - {response.text}"
     except Exception as e:
-        return f"❌ Gagal menghubungi DeepSeek API: {e}"
+        return f"❌ Gagal menghubungi Gemini API: {e}"
 
 # ==========================================
 # 3. DASHBOARD STREAMLIT (UI/UX)
@@ -121,12 +112,12 @@ with tab1:
         st.dataframe(df_news, use_container_width=True, height=300)
         
         st.markdown("---")
-        st.subheader("🤖 AI Market Analysis (DeepSeek V3)")
+        st.subheader("🤖 AI Market Analysis (Google Gemini Flash)")
         
         if st.button("🚀 Jalankan Analisis AI Terhadap Berita", type="primary"):
-            with st.spinner("DeepSeek AI sedang menganalisis dampak makroekonomi..."):
+            with st.spinner("Gemini AI sedang menganalisis dampak makroekonomi..."):
                 news_summary = df_news.to_string()
-                analysis_result = analyze_news_with_deepseek(news_summary)
+                analysis_result = analyze_news_with_gemini(news_summary)
                 st.markdown(analysis_result)
     else:
         st.warning("Data berita belum dapat dimuat. Pastikan koneksi internet stabil atau coba tekan tombol reload.")
@@ -134,7 +125,6 @@ with tab1:
 with tab2:
     st.subheader("📉 Chart Live TradingView (XAUUSD)")
     
-    # Widget Live TradingView HTML
     tradingview_widget = """
     <!-- TradingView Widget BEGIN -->
     <div class="tradingview-widget-container" style="height:100%;width:100%">
