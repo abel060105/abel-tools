@@ -257,7 +257,10 @@ col_l, col_m, col_r = st.columns(3)
 # Kolom 1: AI Macro Engine
 with col_l:
     st.markdown("### 🤖 AI Macro Engine")
-    st.write("Signal: **Dinamis / Macro-Driven**")
+    st.write("Signal: Dinamis / Macro-Driven")
+    # Penambahan Indikator Arah Jelas (Badge / Poin)
+    st.markdown("🔴 **ARAH BIAS: BEARISH (TURUN / SELL)**")
+    
     st.markdown("#### 🎯 ZONA ENTRY")
     st.info("4315.50 - 4318.00")
     st.markdown("#### 🛑 STOP LOSS")
@@ -269,7 +272,10 @@ with col_l:
 with col_m:
     st.markdown("### 🔮 Astrodox Engine")
     if astrodox_active:
-        st.write("Signal: **Astro-Cycle Transits**")
+        st.write("Signal: Astro-Cycle Transits")
+        # Penambahan Indikator Arah Jelas (Badge / Poin)
+        st.markdown("🟢 **ARAH BIAS: BULLISH (NAIK / BUY)**")
+        
         st.markdown("#### 🎯 ZONA ENTRY")
         st.info("4310.00 - 4312.50")
         st.markdown("#### 🛑 STOP LOSS")
@@ -283,7 +289,13 @@ with col_m:
 with col_r:
     st.markdown("### 📐 Multi-TF Technical Engine")
     if tech_active:
-        st.write(f"Signal: **{tech_signal}**")
+        st.write("Signal: Multi-TF Price Action")
+        # Indikator Arah Mengikuti Kondisi Market
+        if not is_bullish:
+            st.markdown("🔴 **ARAH BIAS: BEARISH (STRONG DROP / JUNAM)**")
+        else:
+            st.markdown("🟢 **ARAH BIAS: BULLISH (STRONG PUMP)**")
+            
         st.write(f"Eksekusi: **{tech_action}**")
         st.caption(f"💡 **Reasoning (SnR + SnD + SMC + ICT):** {tech_reason}")
         st.markdown("#### 🎯 ZONA ENTRY PRESISI")
