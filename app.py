@@ -43,7 +43,10 @@ with st.sidebar:
     tanggal_rilis = st.number_input("Tanggal Rilis:", value=7, min_value=1, max_value=31)
     bulan_rilis = st.selectbox("Bulan Rilis:", ["Agustus 2026", "September 2026", "Oktober 2026"])
     tahun_rilis = st.number_input("Tahun Rilis:", value=2026)
-    jam_rilis = st.selectbox("Jam Rilis (WIB):", ["19:30 WIB", "20:30 WIB", "01:00 WIB"])
+    
+    # Input Jam Kustom (Bebas ketik, default WIB tanpa tulisan WIB di input)
+    jam_input = st.text_input("Jam Rilis (Default WIB):", value="19:30")
+    jam_rilis_formatted = f"{jam_input} WIB"
 
     st.markdown("---")
     st.markdown("### 4. Astrodox Engine Settings")
@@ -61,7 +64,7 @@ with st.sidebar:
 # 3. KONTEN UTAMA (DASHBOARD)
 # ==========================================
 st.title("📈 ABEL FX - NFP & Macro Predictor Engine")
-st.markdown(f"### 📌 TARGET EVENT: Non-Farm Payrolls (NFP) - {tanggal_rilis} {bulan_rilis} ({jam_rilis}) &nbsp;&nbsp;&nbsp;&nbsp; **{status_text}**")
+st.markdown(f"### 📌 TARGET EVENT: Non-Farm Payrolls (NFP) - {tanggal_rilis} {bulan_rilis} ({jam_rilis_formatted}) &nbsp;&nbsp;&nbsp;&nbsp; **{status_text}**")
 
 st.markdown("---")
 col_title, col_ai_btn = st.columns([3, 1])
