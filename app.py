@@ -41,7 +41,13 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### 3. Jadwal Official")
     tanggal_rilis = st.number_input("Tanggal Rilis:", value=7, min_value=1, max_value=31)
-    bulan_rilis = st.selectbox("Bulan Rilis:", ["Agustus 2026", "September 2026", "Oktober 2026"])
+    
+    # Pilihan Bulan Lengkap (All Data: Januari - Desember)
+    daftar_bulan = [
+        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ]
+    bulan_rilis = st.selectbox("Bulan Rilis:", daftar_bulan, index=7) # Default Agustus
     tahun_rilis = st.number_input("Tahun Rilis:", value=2026)
     
     jam_input = st.text_input("Jam Rilis (Default WIB):", value="19:30")
@@ -63,7 +69,7 @@ with st.sidebar:
 # 3. KONTEN UTAMA (DASHBOARD DINAMIS)
 # ==========================================
 st.title("📈 ABEL FX - Macro Predictor Engine")
-st.markdown(f"### 📌 TARGET EVENT: {target_news} - {tanggal_rilis} {bulan_rilis} ({jam_rilis_formatted}) &nbsp;&nbsp;&nbsp;&nbsp; **{status_text}**")
+st.markdown(f"### 📌 TARGET EVENT: {target_news} - {tanggal_rilis} {bulan_rilis} {tahun_rilis} ({jam_rilis_formatted}) &nbsp;&nbsp;&nbsp;&nbsp; **{status_text}**")
 
 st.markdown("---")
 col_title, col_ai_btn = st.columns([3, 1])
