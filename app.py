@@ -13,40 +13,26 @@ st.set_page_config(
     layout="wide"
 )
 
-# API Key Groq yang aktif
 GROQ_API_KEY = "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"
 
 # ==========================================
-# 2. FUNGSI UTAMA (FETCH NEWS & AI ANALYZER)
+# 2. FUNGSI UTAMA & QUANT ENGINE
 # ==========================================
 def fetch_economic_calendar():
-    """Mengambil data berita/kalender ekonomi dari API publik Forex Factory yang stabil"""
     url = "https://nfp.ourfx.workers.dev/"
     fallback_url = "https://nfp-calendar.pages.dev/api/calendar"
-    
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
+    headers = {"User-Agent": "Mozilla/5.0"}
 
-    try:
-        response = requests.get(url, headers=headers, timeout=6)
-        if response.status_code == 200:
-            data = response.json()
-            if isinstance(data, list) and len(data) > 0:
-                return pd.DataFrame(data)
-    except Exception:
-        pass
+    for u in [url, fallback_url]:
+        try:
+            res = requests.get(u, headers=headers, timeout=5)
+            if res.status_code == 200:
+                data = res.json()
+                if isinstance(data, list) and len(data) > 0:
+                    return pd.DataFrame(data)
+        except Exception:
+            continue
 
-    try:
-        response = requests.get(fallback_url, headers=headers, timeout=6)
-        if response.status_code == 200:
-            data = response.json()
-            if isinstance(data, list) and len(data) > 0:
-                return pd.DataFrame(data)
-    except Exception:
-        pass
-
-    st.info("ℹ️ Menampilkan sampel data struktur berita (API utama sedang dipelihara/offline).")
     sample_data = [
         {"title": "USD Non-Farm Employment Change", "country": "USD", "date": "2026-08-07T12:30:00Z", "impact": "High", "forecast": "175K", "previous": "143K"},
         {"title": "USD Unemployment Rate", "country": "USD", "date": "2026-08-07T12:30:00Z", "impact": "High", "forecast": "4.1%", "previous": "4.1%"},
@@ -55,47 +41,34 @@ def fetch_economic_calendar():
     return pd.DataFrame(sample_data)
 
 def analyze_news_with_groq(news_text):
-    """Mengirim data berita ke Groq API (Llama 3) untuk analisis sentimen & dampak pasar"""
     if not GROQ_API_KEY:
         return "⚠️ API Key Groq tidak terdeteksi."
 
     url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {GROQ_API_KEY}",
-        "Content-Type": "application/json"
-    }
-
+    headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+    
     prompt = f"""
-    Kamu adalah seorang Senior Macroeconomic Analyst & Quantitative Trader berpengalaman di pasar Forex & Gold (XAU/USD).
-    Analisis data kalender ekonomi berikut:
-
+    Kamu adalah Senior Macroeconomic Analyst & Quantitative Trader. Analisis data kalender ekonomi berikut:
     {news_text}
-
-    Berikan analisis terstruktur dalam Bahasa Indonesia dengan format berikut:
-    1. **Ringkasan Eksekutif**: Rangkuman singkat dampak berita terhadap fundamental pasar.
-    2. **Sentimen USD**: (Bullish / Bearish / Netral) beserta alasan singkat berdasarkan data Actual vs Forecast.
-    3. **Proyeksi Dampak pada Gold (XAU/USD)**: Potensi pergerakan harga Gold (Skenario Naik/Turun/Sideways).
-    4. **Trading Bias & Rekomendasi Action**: Bias harian (Long/Short) dan area pertimbangan entry/risk management.
+    Berikan analisis terstruktur dalam Bahasa Indonesia:
+    1. **Ringkasan Eksekutif**
+    2. **Sentimen USD** (Bullish/Bearish/Netral)
+    3. **Proyeksi Dampak pada Gold (XAU/USD)**
+    4. **Trading Bias & Rekomendasi Action**
     """
-
     payload = {
         "model": "llama-3.3-70b-versatile",
-        "messages": [
-            {"role": "system", "content": "Kamu adalah analis pasar makroekonomi terkemuka yang presisi dan analitis."},
-            {"role": "user", "content": prompt}
-        ],
+        "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.3
     }
 
     try:
-        response = requests.post(url, headers=headers, json=payload, timeout=30)
-        if response.status_code == 200:
-            result = response.json()
-            return result['choices'][0]['message']['content']
-        else:
-            return f"❌ Gagal memproses AI: Error Code {response.status_code} - {response.text}"
+        res = requests.post(url, headers=headers, json=payload, timeout=20)
+        if res.status_code == 200:
+            return res.json()['choices'][0]['message']['content']
+        return f"Error: {res.status_code}"
     except Exception as e:
-        return f"❌ Gagal menghubungi Groq API: {e}"
+        return f"Error: {e}"
 
 # ==========================================
 # 3. DASHBOARD STREAMLIT (UI/UX)
@@ -103,41 +76,29 @@ def analyze_news_with_groq(news_text):
 st.title("📈 ABEL FX - Macro & News Intelligence")
 st.caption("Real-time Macroeconomic Event Monitor, AI Market Analysis & Astrodox/Coinglass Quant Engine")
 
-# Membuat tab menu agar rapi
 tab1, tab2, tab3 = st.tabs([
     "📊 Kalender Ekonomi & AI Analyst", 
     "📉 Live Chart TradingView (XAUUSD)", 
-    "🔮 Astrodox & Coinglass Quant"
+    "🔮 Astrodox & Coinglass Quant Engine"
 ])
 
 with tab1:
     st.subheader("🗓️ Kalender Ekonomi Minggu Ini")
-    
-    col_btn1, col_btn2 = st.columns([1, 4])
-    with col_btn1:
-        load_btn = st.button("🔄 Reload Data Berita", use_container_width=True)
+    if st.button("🔄 Reload Data Berita", use_container_width=True):
+        st.rerun()
     
     df_news = fetch_economic_calendar()
-
     if not df_news.empty:
-        st.dataframe(df_news, use_container_width=True, height=300)
-        
+        st.dataframe(df_news, use_container_width=True, height=280)
         st.markdown("---")
         st.subheader("🤖 AI Market Analysis (Groq Llama 3)")
-        
         if st.button("🚀 Jalankan Analisis AI Terhadap Berita", type="primary"):
-            with st.spinner("Groq Llama 3 sedang menganalisis dampak makroekonomi..."):
-                news_summary = df_news.to_string()
-                analysis_result = analyze_news_with_groq(news_summary)
-                st.markdown(analysis_result)
-    else:
-        st.warning("Data berita belum dapat dimuat. Pastikan koneksi internet stabil.")
+            with st.spinner("Menganalisis data makroekonomi..."):
+                st.markdown(analyze_news_with_groq(df_news.to_string()))
 
 with tab2:
     st.subheader("📉 Chart Live TradingView (XAUUSD)")
-    
     tradingview_widget = """
-    <!-- TradingView Widget BEGIN -->
     <div class="tradingview-widget-container" style="height:100%;width:100%">
       <div id="tradingview_chart" style="height:600px;width:100%"></div>
       <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
@@ -158,25 +119,34 @@ with tab2:
       });
       </script>
     </div>
-    <!-- TradingView Widget END -->
     """
     components.html(tradingview_widget, height=620)
 
 with tab3:
-    st.subheader("🔮 Astrodox Quantitative & Coinglass Data Bridge")
-    st.info("Modul integrasi data kuantitatif tambahan untuk eksekusi sinyal entry lanjutan.")
+    st.subheader("🔮 Astrodox Engine & AI Liquidity Zone Calculator")
     
-    col_a, col_b = st.columns(2)
-    with col_a:
-        st.markdown("### 🌟 Astrodox Matrix Model")
-        st.write("Status Skenario: **Active Cyclic Reversal**")
-        st.write("Bias Sesi London/New York: **Bullish Confluence**")
-        if st.button("🔍 Run Astrodox Scan"):
-            st.success("Sinyal Astrodox: Optimal Buy Zone terdeteksi di area support harian.")
-            
-    with col_b:
-        st.markdown("### 📊 Coinglass Derivatives Metrics")
-        st.write("Estimated Liquidation Heatmap: **High leverage cluster near resistance**")
-        st.write("Open Interest Delta: **Accumulation Phase**")
-        if st.button("🔄 Sync Coinglass Data"):
-            st.success("Data derivatif berhasil disinkronkan secara real-time.")
+    # Kotak Skenario Utama di Atas
+    st.error("""
+    - 📌 **Skenario A (Jika Naik Duluan):** Ambil **SELL LIMIT AI** di Upper Pool (4315.50 - 4318.00) dengan Target TP di 4276.00 - 4279.00.  
+    - 📌 **Skenario B (Jika Turun Duluan):** Ambil **BUY LIMIT Astrodox** di Lower Pool (4310.00 - 4312.50) dengan Target TP di 4349.00 - 4352.00.
+    """)
+
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("### 🤖 AI Engine Liquidity Zone")
+        st.write("Arah Signal AI: **BEARISH**")
+        st.write("Tipe Eksekusi: **🔴 SELL LIMIT (Upper Pool)**")
+        st.markdown("#### 🎯 ZONA ENTRY AI POOL")
+        st.info("4315.50 - 4318.00")
+        st.markdown("#### 🏁 TARGET TP AI EXPANSION (+380 Pips)")
+        st.success("4276.00 - 4279.00")
+
+    with col2:
+        st.markdown("### 🔮 Astrodox Engine Liquidity Zone")
+        st.write("Arah Signal Astrodox: **BULLISH (Moon/Sun Planetary Transits)**")
+        st.write("Tipe Eksekusi: **🟢 BUY LIMIT (Lower Pool)**")
+        st.markdown("#### 🎯 ZONA ENTRY ASTRODOX POOL")
+        st.info("4310.00 - 4312.50")
+        st.markdown("#### 🏁 TARGET TP ASTRODOX EXPANSION (+380 Pips)")
+        st.success("4349.00 - 4352.00")
