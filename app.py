@@ -1,13 +1,3 @@
-# ==============================================================================
-# 1. INSTALL LIBRARY UTAMA
-# ==============================================================================
-!pip install -q streamlit pandas requests
-
-# ==============================================================================
-# 2. TULIS FILE DASHBOARD (app.py)
-# ==============================================================================
-with open("app.py", "w", encoding="utf-8") as f:
-    f.write(r'''import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 import datetime
