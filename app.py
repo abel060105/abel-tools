@@ -13,8 +13,8 @@ st.set_page_config(
     layout="wide"
 )
 
-# Token/API Key kamu yang berawalan AQ...
-GEMINI_API_KEY = "AQ.Ab8RN6Iyjjqaqzfp6rhWyLesW1CNBzvgAI1aPC89V2Is_8Cm9w"
+# API Key Groq yang kamu berikan
+GROQ_API_KEY = "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"
 
 # ==========================================
 # 2. FUNGSI UTAMA (FETCH NEWS & AI ANALYZER)
@@ -54,22 +54,20 @@ def fetch_economic_calendar():
     ]
     return pd.DataFrame(sample_data)
 
-def analyze_news_with_gemini(news_text):
-    """Mengirim data berita ke Gemini API menggunakan Bearer Token Auth"""
-    if not GEMINI_API_KEY:
-        return "⚠️ API Key / Token tidak terdeteksi."
+def analyze_news_with_groq(news_text):
+    """Mengirim data berita ke Groq API (Llama 3) untuk analisis sentimen & dampak pasar"""
+    if not GROQ_API_KEY:
+        return "⚠️ API Key Groq tidak terdeteksi."
 
-    # Menggunakan endpoint v1 dengan Header Authorization Bearer (cocok untuk token berawalan AQ...)
-    url = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent"
+    url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
-        'Content-Type': 'application/json',
-        'Authorization': f'Bearer {GEMINI_API_KEY}'
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
     }
 
     prompt = f"""
-    SISTEM: Kamu adalah seorang Senior Macroeconomic Analyst & Quantitative Trader berpengalaman di pasar Forex & Gold (XAU/USD) yang analitis dan presisi.
-    
-    TUGAS: Analisis data kalender ekonomi berikut:
+    Kamu adalah seorang Senior Macroeconomic Analyst & Quantitative Trader berpengalaman di pasar Forex & Gold (XAU/USD).
+    Analisis data kalender ekonomi berikut:
 
     {news_text}
 
@@ -81,19 +79,23 @@ def analyze_news_with_gemini(news_text):
     """
 
     payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.3}
+        "model": "llama-3.3-70b-versatile",
+        "messages": [
+            {"role": "system", "content": "Kamu adalah analis pasar makroekonomi terkemuka yang presisi dan analitis."},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.3
     }
 
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=30)
         if response.status_code == 200:
             result = response.json()
-            return result['candidates'][0]['content']['parts'][0]['text']
+            return result['choices'][0]['message']['content']
         else:
             return f"❌ Gagal memproses AI: Error Code {response.status_code} - {response.text}"
     except Exception as e:
-        return f"❌ Gagal menghubungi Gemini API: {e}"
+        return f"❌ Gagal menghubungi Groq API: {e}"
 
 # ==========================================
 # 3. DASHBOARD STREAMLIT (UI/UX)
@@ -116,12 +118,12 @@ with tab1:
         st.dataframe(df_news, use_container_width=True, height=300)
         
         st.markdown("---")
-        st.subheader("🤖 AI Market Analysis (Google Gemini Flash)")
+        st.subheader("🤖 AI Market Analysis (Groq Llama 3)")
         
         if st.button("🚀 Jalankan Analisis AI Terhadap Berita", type="primary"):
-            with st.spinner("Gemini AI sedang menganalisis dampak makroekonomi..."):
+            with st.spinner("Groq Llama 3 sedang menganalisis dampak makroekonomi..."):
                 news_summary = df_news.to_string()
-                analysis_result = analyze_news_with_gemini(news_summary)
+                analysis_result = analyze_news_with_groq(news_summary)
                 st.markdown(analysis_result)
     else:
         st.warning("Data berita belum dapat dimuat. Pastikan koneksi internet stabil atau coba tekan tombol reload.")
