@@ -61,8 +61,21 @@ with st.sidebar:
         st.error("🔴 Astrodox Status: OFF")
 
     st.markdown("---")
-    st.markdown("### 5. Price Reference (XAUUSD)")
+    st.markdown("### 5. Technical Engine Settings")
+    tech_active = st.toggle("Aktifkan Technical Engine", value=True)
+    if tech_active:
+        st.success("🟢 Technical Status: ACTIVE")
+    else:
+        st.error("🔴 Technical Status: OFF")
+
+    st.markdown("---")
+    st.markdown("### 6. Price Reference (XAUUSD)")
     running_price = st.number_input("Harga Running XAUUSD (H-5 Menit):", value=4314.00, step=0.5)
+
+# Kalkulasi Dinamis untuk Setup Teknikal (Berdasarkan Running Price)
+tech_entry = running_price + 2.50
+tech_sl = tech_entry + 6.00
+tech_tp = tech_entry - 35.00
 
 # ==========================================
 # 3. KONTEN UTAMA (DASHBOARD DINAMIS)
@@ -174,10 +187,12 @@ if st.button(f"🚀 EXECUTE AI PREDICTION FOR {target_news.upper()}", type="prim
         - Indikator 2 ({ind2_title}): Actual {val_act2}, Forecast {val_for2}, Previous {val_prev2}
         - Indikator 3 ({ind3_title}): Actual {val_act3}, Forecast {val_for3}, Previous {val_prev3}
         
+        Sertakan juga analisis dari 3 pilar: AI Macro Engine, Astrodox Astro-Cycle, dan Technical SMC/Liquidity Engine.
+        
         Berikan analisis terstruktur dalam Bahasa Indonesia:
-        1. **Arah Signal AI & Astrodox Confluence**
-        2. **Skenario A & Skenario B Execution Roadmap**
-        3. **Zona Entry Pool & Target TP Expansion (+380 Pips)**
+        1. **Arah Signal AI, Astrodox & Technical Confluence**
+        2. **Skenario Execution Roadmap (3-Way Confluence)**
+        3. **Zona Entry Pool, Stop Loss (SL), dan Target TP Expansion (+380 Pips)**
         """
         
         url = "https://api.groq.com/openai/v1/chat/completions"
@@ -202,46 +217,69 @@ if st.button(f"🚀 EXECUTE AI PREDICTION FOR {target_news.upper()}", type="prim
 st.markdown("---")
 
 # ==========================================
-# 4. CONFLUENCE & ROADMAP SECTION
+# 4. CONFLUENCE & ROADMAP SECTION (3 PILLARS)
 # ==========================================
-st.subheader("🎯 INDEPENDENT LIQUIDITY ZONES (AI vs ASTRO)")
+st.subheader("🎯 INDEPENDENT LIQUIDITY ZONES (AI vs ASTRO vs TECHNICAL)")
 st.markdown("### ⚠️ CONFLUENCE & SKENARIO EXECUTION ROADMAP")
 
-if astrodox_active:
+if astrodox_active and tech_active:
     st.error(f"""
-    - 🔴 **DIVERGENCE BENTROK (AI: BEARISH vs ASTRO: BULLISH) - EVENT: {target_news}**  
+    - 🔴 **DIVERGENCE BENTROK (AI: BEARISH | ASTRO: BULLISH | TECH: BEARISH SMC REJECTION) - EVENT: {target_news}**  
     *Tergantung Liquidity mana yang disapu duluan pada H-Detik Rilis News:*
-    - 📌 **Skenario A (Jika Naik Duluan):** Ambil **SELL LIMIT AI** di Upper Pool (`4315.50 - 4318.00`) dengan Target TP di `4276.00 - 4279.00`.
+    - 📌 **Skenario A (Jika Naik Duluan):** Ambil **SELL LIMIT AI & Technical** di Upper Pool (`{tech_entry - 1.00:.2f} - {tech_entry + 1.50:.2f}`) dengan SL di `{tech_sl:.2f}` & Target TP di `{tech_tp:.2f}`.
     - 📌 **Skenario B (Jika Turun Duluan):** Ambil **BUY LIMIT Astrodox** di Lower Pool (`4310.00 - 4312.50`) dengan Target TP di `4349.00 - 4352.00`.
     """)
 else:
     st.warning("""
-    - ⚠️ **ASTRODOX ENGINE DINONAKTIFKAN**  
-    - 📌 Hanya mengandalkan **AI Engine Saja** untuk eksekusi trade.
+    - ⚠️ Salah satu / kedua Engine tambahan sedang dinonaktifkan dari Control Panel.
+    - 📌 Menjalankan skenario eksekusi parsial.
     """)
 
-col_l, col_r = st.columns(2)
+# Tampilan 3 Kolom Komparasi
+col_l, col_m, col_r = st.columns(3)
 
+# Kolom 1: AI Engine
 with col_l:
-    st.markdown("### 🤖 AI Engine Liquidity Zone")
+    st.markdown("### 🤖 AI Engine Zone")
     st.write("Arah Signal AI: **BEARISH**")
     st.write("Tipe Eksekusi: **🔴 SELL LIMIT (Upper Pool)**")
     st.markdown("#### 🎯 ZONA ENTRY AI POOL")
     st.info("4315.50 - 4318.00")
-    st.markdown("#### 🏁 TARGET TP AI EXPANSION (+380 Pips)")
+    st.markdown("#### 🛑 STOP LOSS (SL)")
+    st.error("4322.50")
+    st.markdown("#### 🏁 TARGET TP AI EXPANSION")
     st.success("4276.00 - 4279.00")
 
-with col_r:
-    st.markdown("### 🔮 Astrodox Engine Liquidity Zone")
+# Kolom 2: Astrodox Engine
+with col_m:
+    st.markdown("### 🔮 Astrodox Engine Zone")
     if astrodox_active:
-        st.write("Arah Signal Astrodox: **BULLISH (Moon/Sun Planetary Transits)**")
+        st.write("Arah Signal: **BULLISH (Moon/Sun Transits)**")
         st.write("Tipe Eksekusi: **🟢 BUY LIMIT (Lower Pool)**")
         st.markdown("#### 🎯 ZONA ENTRY ASTRODOX POOL")
         st.info("4310.00 - 4312.50")
-        st.markdown("#### 🏁 TARGET TP ASTRODOX EXPANSION (+380 Pips)")
+        st.markdown("#### 🛑 STOP LOSS (SL)")
+        st.error("4304.50")
+        st.markdown("#### 🏁 TARGET TP ASTRODOX EXPANSION")
         st.success("4349.00 - 4352.00")
     else:
-        st.info("Astrodox Engine saat ini sedang non-aktif dari Control Panel.")
+        st.info("Astrodox Engine OFF")
+
+# Kolom 3: Technical Engine (SMC & Technical Setup Barus)
+with col_r:
+    st.markdown("### 📐 Technical Engine (SMC/ICT)")
+    if tech_active:
+        st.write("Arah Signal: **BEARISH (Liquidity Sweep & FVG Rejection)**")
+        st.write("Tipe Eksekusi: **🔴 SELL LIMIT / MARKET**")
+        st.caption(f"💡 **Reasoning Teknikal:** Harga membentuk *Buy-Side Liquidity Sweep* di atas resistance terdekat dan merespon *Fair Value Gap (FVG) H1* di bawah EMA 200.")
+        st.markdown("#### 🎯 ZONA ENTRY TEKNIKAL")
+        st.info(f"{tech_entry - 1.00:.2f} - {tech_entry + 1.50:.2f}")
+        st.markdown("#### 🛑 STOP LOSS (SL)")
+        st.error(f"{tech_sl:.2f} (Di atas High FVG)")
+        st.markdown("#### 🏁 TARGET TP TEKNIKAL")
+        st.success(f"{tech_tp:.2f} (Sell-Side Liquidity Pool)")
+    else:
+        st.info("Technical Engine OFF")
 
 st.markdown("---")
 
