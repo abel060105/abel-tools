@@ -92,7 +92,7 @@ def generate_astrodox_unified_image(target_date: datetime, ai_result_data=None):
     dt_utc = target_date - timedelta(hours=7)
     planet_degrees, planet_positions = compute_planetary_positions(dt_utc)
 
-    fig = plt.figure(figsize=(15, 8.5), facecolor='#0e1117')
+    fig = plt.figure(figsize=(16.5, 9.2), facecolor='#0e1117')
     
     # 1. POLAR ASTRODOX WHEEL
     ax = fig.add_subplot(121, polar=True, facecolor='#0e1117')
@@ -112,7 +112,7 @@ def generate_astrodox_unified_image(target_date: datetime, ai_result_data=None):
         )
         ax.text(
             (theta_start + theta_end)/2, 0.88, ZODIAC_SYMBOLS[i], 
-            color='white', fontsize=12, ha='center', va='center', fontweight='bold'
+            color='white', fontsize=13, ha='center', va='center', fontweight='bold'
         )
 
     planets_keys = list(planet_degrees.keys())
@@ -151,64 +151,62 @@ def generate_astrodox_unified_image(target_date: datetime, ai_result_data=None):
                 aspect_counts["kuning"] += 1
 
     ax.set_title(
-        f"ASTRODOX TRANSIT WHEEL CHART\n{target_date.strftime('%d.%m.%Y %H:%M WIB')}", 
-        color='white', fontsize=12, pad=15, fontweight='bold'
+        f"{target_date.strftime('%d.%m.%Y %H:%M WIB')}", 
+        color='white', fontsize=13, pad=15, fontweight='bold'
     )
 
-    # 2. DETAIL POSISI & INTEGRASI AI PROYEKSI RANGE DI KOLOM RODA ASTRODOX
+    # 2. DETAIL POSISI & AI PROYEKSI RANGE
     ax_text = fig.add_subplot(122, facecolor='#0e1117')
     ax_text.axis('off')
 
-    info_text = f"📜 POSISI PLANET TRANSIT ({target_date.strftime('%d %b %Y %H:%M WIB')}):\n"
-    info_text += "─" * 52 + "\n"
+    info_text = f"POSISI PLANET TRANSIT ({target_date.strftime('%d %b %Y %H:%M WIB')}):\n"
+    info_text += "─" * 58 + "\n"
     
     pos_items = list(planet_positions.items())
     for idx in range(0, len(pos_items), 2):
         p1, v1 = pos_items[idx]
         if idx + 1 < len(pos_items):
             p2, v2 = pos_items[idx+1]
-            info_text += f"• {p1:<12}: {v1:<14} | • {p2:<12}: {v2}\n"
+            info_text += f"• {p1:<12}: {v1:<16} | • {p2:<12}: {v2}\n"
         else:
             info_text += f"• {p1:<12}: {v1}\n"
 
-    info_text += "\n" + "─" * 52 + "\n"
-    info_text += "💡 REKAP GARIS ASPEK GEOMETRI ASTRODOX:\n"
-    info_text += "─" * 52 + "\n"
-    info_text += f"🔴 MERAH (Square 90°/Opp 180°) : {aspect_counts['merah']} Garis (Volatilitas/Tension)\n"
-    info_text += f"🟢 HIJAU (Trine 120°)          : {aspect_counts['hijau']} Garis (Expansion Trend/Flow)\n"
-    info_text += f"🔵 BIRU  (Sextile 60°)         : {aspect_counts['biru']} Garis (Harmonis/Retest Zone)\n"
-    info_text += f"🟡 KUNING (Conjunction 0°)     : {aspect_counts['kuning']} Garis (Turning Point/Extreme)\n"
+    info_text += "\n" + "─" * 58 + "\n"
+    info_text += "REKAP GARIS ASPEK GEOMETRI ASTRODOX:\n"
+    info_text += "─" * 58 + "\n"
+    info_text += f"• MERAH (Square 90°/Opp 180°) : {aspect_counts['merah']} Garis (Volatilitas Tinggi)\n"
+    info_text += f"• HIJAU (Trine 120°)          : {aspect_counts['hijau']} Garis (Expansion Trend)\n"
+    info_text += f"• BIRU  (Sextile 60°)         : {aspect_counts['biru']} Garis (Retest Zone)\n"
+    info_text += f"• KUNING (Conjunction 0°)     : {aspect_counts['kuning']} Garis (Turning Point)\n"
 
-    # Masukkan Data AI Proyeksi Range Pips ke dalam Kolom Astrodox
-    info_text += "\n" + "─" * 52 + "\n"
-    info_text += "⚡ AI PROYEKSI RANGE & EXECUTION SETUP (INTEGRATED):\n"
-    info_text += "─" * 52 + "\n"
+    info_text += "\n" + "─" * 58 + "\n"
+    info_text += "AI PROYEKSI RANGE PIPS (CONFLUENCE ASTRO + TECHNICALS):\n"
+    info_text += "─" * 58 + "\n"
     
     if ai_result_data:
         pips = ai_result_data.get("proyeksi_pips", {})
         setup = ai_result_data.get("setup_spesifik", {})
-        info_text += f"• Arah Bias Utama : {ai_result_data.get('arah_bias', '-')}\n"
-        info_text += f"• Whipsaw Alert   : {ai_result_data.get('peringatan_whipsaw', 'Waspada lonjakan dua arah!')}\n"
-        info_text += f"• Sweep Range     : {pips.get('sweep_pips', '-')}\n"
-        info_text += f"• Trend Range     : {pips.get('trend_pips', '-')}\n"
-        info_text += f"• Reversal Range  : {pips.get('reversal_pips', '-')}\n"
-        info_text += f"• Zona Buy Demand : {setup.get('zona_buy_demand', '-')}\n"
-        info_text += f"• Zona Sell Supply: {setup.get('zona_sell_supply', '-')}\n"
-        info_text += f"• Stop Loss (SL)  : Buy ({setup.get('sl_buy', '-')}) | Sell ({setup.get('sl_sell', '-')})\n"
-        info_text += f"• Take Profit (TP): Buy ({setup.get('tp_buy', '-')}) | Sell ({setup.get('tp_sell', '-')})\n"
+        info_text += f"• Bias Utama  : {ai_result_data.get('arah_bias', '-')}\n"
+        info_text += f"• Whipsaw     : {ai_result_data.get('peringatan_whipsaw', '-')[:50]}...\n"
+        info_text += f"• Sweep Range : {pips.get('sweep_pips', '-')}\n"
+        info_text += f"• Trend Range : {pips.get('trend_pips', '-')}\n"
+        info_text += f"• Reversal    : {pips.get('reversal_pips', '-')}\n"
+        info_text += f"• Zona Entry  : Buy({setup.get('zona_buy_demand', '-')}) | Sell({setup.get('zona_sell_supply', '-')})\n"
+        info_text += f"• Stop Loss   : Buy({setup.get('sl_buy', '-')}) | Sell({setup.get('sl_sell', '-')})\n"
+        info_text += f"• Take Profit : Buy({setup.get('tp_buy', '-')}) | Sell({setup.get('tp_sell', '-')})\n"
     else:
-        info_text += "[ Menunggu Eksekusi Tombol AI Prediction di Dashboard atas ]\n"
+        info_text += "[ Menunggu Eksekusi AI Prediction di Dashboard ]\n"
 
     ax_text.text(
-        0.01, 0.98, info_text, color='#e0e0e0', fontsize=8.2, 
+        0.00, 0.98, info_text, color='#e0e0e0', fontsize=9.2, 
         fontfamily='monospace', va='top', ha='left',
-        bbox=dict(boxstyle='round,pad=0.8', facecolor='#161b22', edgecolor='#30363d')
+        bbox=dict(boxstyle='round,pad=1.0', facecolor='#161b22', edgecolor='#30363d')
     )
 
     plt.tight_layout()
     
     img_buf = io.BytesIO()
-    plt.savefig(img_buf, format='png', dpi=200, bbox_inches='tight', facecolor='#0e1117')
+    plt.savefig(img_buf, format='png', dpi=220, bbox_inches='tight', facecolor='#0e1117')
     img_buf.seek(0)
 
     return fig, img_buf, aspect_counts
@@ -627,7 +625,6 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
         
         _, astro_positions_dict = compute_planetary_positions(event_datetime - timedelta(hours=7))
 
-        # Dummy aspect count calculation first to feed AI
         fig_temp, _, temp_counts = generate_astrodox_unified_image(event_datetime, None)
         plt.close(fig_temp)
 
@@ -651,7 +648,7 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
 
         [INSTRUKSI ENGINE AI]
         1. Baca Garis Astro Dominan:
-           - Jika Garis Merah/Kuning Tinggi: Proyeksikan Sweep Liquidity Pips & Whipsaw Warning yang TINGGI. Berikan peringatan whipsaw spesifik (misal: "Awas False Breakout dua arah sebelum arah tren utama divalidasi").
+           - Jika Garis Merah/Kuning Tinggi: Proyeksikan Sweep Liquidity Pips & Whipsaw Warning yang TINGGI. Berikan peringatan whipsaw spesifik.
            - Jika Garis Hijau Dominan: Proyeksikan Trend Expansion Pips yang LEBIH BESAR.
         2. Tentukan Bias Trend, Zona Entry Presisi, SL, dan TP berdasarkan konvergensi Astro + SMC.
         3. Berikan jawaban HANYA dalam format JSON MURNI tanpa markdown tambahan:
@@ -708,7 +705,7 @@ if st.session_state["ai_result"]:
     st.markdown(st.session_state["rekap_text"])
     st.info(f"⚖️ **Kesimpulan Bias Makro:** {st.session_state['macro_bias_result']} (Score Net: {st.session_state['score_val']})")
 
-    st.markdown("### ⚡ AI PROYEKSI RANGE PIPS & WHIPSAW WARNING")
+    st.markdown("### ⚡ AI PROYEKSI RANGE PIPS (CONFLUENCE ASTRO + TECHNICALS)")
     
     p1, p2, p3, p4 = st.columns(4)
     with p1:
@@ -755,7 +752,6 @@ if st.session_state["ai_result"]:
 
 st.markdown("---")
 
-# Generate Astrodox Unified Section with AI Data integrated inside the wheel column box
 fig_astro_unified, img_astro_buf, aspect_counts = generate_astrodox_unified_image(
     event_datetime, 
     st.session_state["ai_result"]
@@ -777,16 +773,16 @@ with col_l:
         st.markdown(f"• **Bias Utama:** `{ai_bias}`")
         if "NEUTRAL" in str(ai_bias).upper() or "WHIPSAW" in str(ai_bias).upper():
             st.warning("⚠️ **Waspada Whipsaw Dua Arah**")
-            st.markdown("#### 🟢 ZONA BUY")
-            st.info(f"{ai_setup.get('zona_buy_demand')}")
-            st.markdown("#### 🔴 ZONA SELL")
-            st.error(f"{ai_setup.get('zona_sell_supply')}")
+            st.markdown("#### 🟢 ZONA BUY & SETUP")
+            st.info(f"Entry: {ai_setup.get('zona_buy_demand')}\nSL: {ai_setup.get('sl_buy')} | TP: {ai_setup.get('tp_buy')}")
+            st.markdown("#### 🔴 ZONA SELL & SETUP")
+            st.error(f"Entry: {ai_setup.get('zona_sell_supply')}\nSL: {ai_setup.get('sl_sell')} | TP: {ai_setup.get('tp_sell')}")
         elif "BULLISH" in str(ai_bias).upper():
-            st.markdown("🟢 **ZONA BUY DEMAND**")
-            st.info(f"{ai_setup.get('zona_buy_demand')}")
+            st.markdown("🟢 **ZONA BUY DEMAND & SETUP**")
+            st.info(f"Entry: {ai_setup.get('zona_buy_demand')}\nSL: {ai_setup.get('sl_buy')} | TP: {ai_setup.get('tp_buy')}")
         else:
-            st.markdown("🔴 **ZONA SELL SUPPLY**")
-            st.error(f"{ai_setup.get('zona_sell_supply')}")
+            st.markdown("🔴 **ZONA SELL SUPPLY & SETUP**")
+            st.error(f"Entry: {ai_setup.get('zona_sell_supply')}\nSL: {ai_setup.get('sl_sell')} | TP: {ai_setup.get('tp_sell')}")
     else:
         st.caption("Klik tombol 'EXECUTE MULTI-TF AI PREDICTION' untuk mengaktifkan AI Range Engine.")
 
@@ -797,8 +793,29 @@ with col_m:
         st.markdown(f"• Hijau (Trine)     : **{aspect_counts['hijau']}**")
         st.markdown(f"• Biru (Sextile)    : **{aspect_counts['biru']}**")
         st.markdown(f"• Kuning (Conjn)    : **{aspect_counts['kuning']}**")
+        
         st.markdown("#### 🎯 ZONA BIAS ASTRO")
-        st.info(f"{running_price - 3.00:.2f} - {running_price + 3.00:.2f}")
+        astro_entry_zone = f"{running_price - 3.00:.2f} - {running_price + 3.00:.2f}"
+        st.info(astro_entry_zone)
+        
+        # Disederhanakan: Menampilkan satu sisi yang relevan (mengikuti arah AI / Default Buy)
+        if st.session_state["ai_result"]:
+            ast_setup = st.session_state["ai_result"].get("setup_spesifik", {})
+            ai_b_check = str(st.session_state["ai_result"].get("arah_bias", "")).upper()
+            
+            if "BEARISH" in ai_b_check:
+                st.markdown("#### 🛑 STOP LOSS ASTRO (SELL)")
+                st.error(f"{ast_setup.get('sl_sell')}")
+                st.markdown("#### 🏁 TARGET TP ASTRO (SELL)")
+                st.success(f"{ast_setup.get('tp_sell')}")
+            else:
+                st.markdown("#### 🛑 STOP LOSS ASTRO (BUY)")
+                st.error(f"{ast_setup.get('sl_buy')}")
+                st.markdown("#### 🏁 TARGET TP ASTRO (BUY)")
+                st.success(f"{ast_setup.get('tp_buy')}")
+        else:
+            st.markdown("#### 🛑 STOP LOSS & TP")
+            st.caption("Menunggu hasil AI Proyeksi Range...")
     else:
         st.info("Astrodox Engine OFF")
 
@@ -868,3 +885,4 @@ tradingview_widget = """
 </div>
 """
 components.html(tradingview_widget, height=620)
+```[cite: 4]
