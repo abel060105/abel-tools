@@ -7,13 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import streamlit as st
 import streamlit.components.v1 as components
-from datetime import datetime
-
-# Flatlib Astro Engine Imports
-from flatlib.datetime import Datetime
-from flatlib.geopos import GeoPos
-from flatlib.chart import Chart
-from flatlib import const
+from datetime import datetime, timezone, timedelta
 
 # ==========================================
 # 1. KONFIGURASI HALAMAN & API KEYS
@@ -44,42 +38,70 @@ if "score_val" not in st.session_state:
     st.session_state["score_val"] = 0
 
 # ==========================================
-# 2. ASTRODOX ENGINE (FLATLIB & MATPLOTLIB)
+# 2. BUILT-IN ASTRODOX CALCULATION ENGINE
 # ==========================================
 ZODIAC_SYMBOLS = ["♈", "♉", "♊", "♋", "♌", "♍", "♎", "♏", "♐", "♑", "♒", "♓"]
-
-PLANET_LIST = [
-    const.SUN, const.MOON, const.MERCURY, const.VENUS, 
-    const.MARS, const.JUPITER, const.SATURN, const.URANUS, 
-    const.NEPTUNE, const.PLUTO
-]
+ZODIAC_NAMES = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
 
 PLANET_NAMES = {
-    const.SUN: "Sun ☉", const.MOON: "Moon ☽", const.MERCURY: "Mercury ☿",
-    const.VENUS: "Venus ♀", const.MARS: "Mars ♂", const.JUPITER: "Jupiter ♃",
-    const.SATURN: "Saturn ♄", const.URANUS: "Uranus ♅", const.NEPTUNE: "Neptune ♆",
-    const.PLUTO: "Pluto ♇"
+    "Sun": "Sun ☉", "Moon": "Moon ☽", "Mercury": "Mercury ☿",
+    "Venus": "Venus ♀", "Mars": "Mars ♂", "Jupiter": "Jupiter ♃",
+    "Saturn": "Saturn ♄", "Uranus": "Uranus ♅", "Neptune": "Neptune ♆",
+    "Pluto": "Pluto ♇"
 }
 
+def compute_planetary_positions(dt_utc):
+    # Calculations based on Julian Day from J2000 epoch
+    year, month, day = dt_utc.year, dt_utc.month, dt_utc.day
+    hour = dt_utc.hour + dt_utc.minute/60.0 + dt_utc.second/3600.0
+    if month <= 2:
+        year -= 1
+        month += 12
+    A = int(year / 100)
+    B = 2 - A + int(A / 4)
+    jd = int(365.25 * (year + 4716)) + int(30.6001 * (month + 1)) + day + hour/24.0 + B - 1524.5
+    d = jd - 2451545.0
+
+    # Approximate Geocentric Longitudes (deg)
+    L_sun = (280.466 + 0.9856474 * d) % 360
+    g_sun = np.radians((357.528 + 0.9856003 * d) % 360)
+    sun_lon = (L_sun + 1.915 * np.sin(g_sun) + 0.020 * np.sin(2 * g_sun)) % 360
+
+    L_moon = (218.316 + 13.176396 * d) % 360
+    M_moon = np.radians((134.963 + 13.064993 * d) % 360)
+    F_moon = np.radians((93.272 + 13.229350 * d) % 360)
+    moon_lon = (L_moon + 6.289 * np.sin(M_moon) - 1.274 * np.sin(M_moon - 2*np.radians(sun_lon - L_sun))) % 360
+
+    mercury_lon = (sun_lon + 18.0 * np.sin(np.radians((29.0 + 4.092 * d) % 360))) % 360
+    venus_lon = (sun_lon + 42.0 * np.sin(np.radians((210.0 + 1.602 * d) % 360))) % 360
+    mars_lon = (355.43 + 0.524033 * d + 10.0 * np.sin(np.radians((19.0 + 0.524 * d) % 360))) % 360
+    jupiter_lon = (34.35 + 0.083091 * d) % 360
+    saturn_lon = (50.08 + 0.033459 * d) % 360
+    uranus_lon = (58.00 + 0.011728 * d) % 360
+    neptune_lon = (358.00 + 0.005981 * d) % 360
+    pluto_lon = (302.00 + 0.003970 * d) % 360
+
+    raw_degs = {
+        "Sun ☉": sun_lon, "Moon ☽": moon_lon, "Mercury ☿": mercury_lon,
+        "Venus ♀": venus_lon, "Mars ♂": mars_lon, "Jupiter ♃": jupiter_lon,
+        "Saturn ♄": saturn_lon, "Uranus ♅": uranus_lon, "Neptune ♆": neptune_lon,
+        "Pluto ♇": pluto_lon
+    }
+
+    formatted_pos = {}
+    for name, deg in raw_degs.items():
+        z_idx = int(deg // 30)
+        z_deg = int(deg % 30)
+        z_min = int(((deg % 30) - z_deg) * 60)
+        formatted_pos[name] = f"{ZODIAC_NAMES[z_idx]} {z_deg}°{z_min:02d}'"
+
+    return raw_degs, formatted_pos
+
 def generate_astrodox_chart(target_date: datetime):
-    # Setup Koordinat New York (Default US Session Market)
-    date_str = target_date.strftime('%Y/%m/%d')
-    time_str = target_date.strftime('%H:%M')
-    dt = Datetime(date_str, time_str, '-04:00')
-    pos = GeoPos('40n42', '74w00')
-    chart = Chart(dt, pos)
+    # Convert WIB to UTC
+    dt_utc = target_date - timedelta(hours=7)
+    planet_degrees, planet_positions = compute_planetary_positions(dt_utc)
 
-    planet_positions = {}
-    planet_degrees = {}
-
-    for p in PLANET_LIST:
-        obj = chart.get(p)
-        lon = obj.lon
-        p_label = PLANET_NAMES[p]
-        planet_degrees[p_label] = lon
-        planet_positions[p_label] = f"{obj.sign} {int(obj.signlon)}°{int((obj.signlon%1)*60)}'"
-
-    # Setup Gambar Matplotlib Wheel
     fig = plt.figure(figsize=(6, 7), facecolor='#0e1117')
     ax = fig.add_subplot(111, polar=True, facecolor='#0e1117')
     ax.set_theta_zero_location("W")
@@ -89,7 +111,6 @@ def generate_astrodox_chart(target_date: datetime):
     ax.set_yticklabels([])
     ax.set_xticklabels([])
 
-    # Ring Zodiak
     colors = ['#ff9999','#e6b800','#80ff80','#80d4ff'] * 3
     for i in range(12):
         theta_start = np.radians(i * 30)
@@ -103,7 +124,6 @@ def generate_astrodox_chart(target_date: datetime):
             color='white', fontsize=12, ha='center', va='center', fontweight='bold'
         )
 
-    # Plot Titik Planet
     deg_list = list(planet_degrees.values())
     for name, deg in planet_degrees.items():
         rad = np.radians(deg)
@@ -111,7 +131,6 @@ def generate_astrodox_chart(target_date: datetime):
         short_symbol = name.split()[-1]
         ax.text(rad, 0.62, short_symbol, color='white', fontsize=10, ha='center', va='center')
 
-    # Garis Aspek
     for i in range(len(deg_list)):
         for j in range(i + 1, len(deg_list)):
             diff = abs(deg_list[i] - deg_list[j]) % 30
@@ -365,7 +384,6 @@ else:
         "ind_4": {"nama": "Retail Sales m/m", "actual": act4, "forecast": est4, "previous": prev4, "penjelasan": "Tingkat belanja konsumen.", "efek": "Actual > Forecast -> Menguatkan USD"}
     }
 
-# Technical Bias
 if "Force Bearish" in market_condition:
     is_bullish = False
 elif "Force Bullish" in market_condition:
@@ -378,13 +396,11 @@ if not is_bullish:
     tech_entry = running_price + 3.00
     tech_sl = tech_entry + 7.50
     tech_tp = tech_entry - 42.00
-    tech_reason = "Multi-TF Crosscheck (Weekly-D1 Bearish BOS, H4-H1 SnD Supply Zone)."
 else:
     tech_action = "🟢 BUY LIMIT / DISCOUNT ZONE REJECTION"
     tech_entry = running_price - 3.00
     tech_sl = running_price - 7.50
     tech_tp = running_price + 42.00
-    tech_reason = "Multi-TF Crosscheck (Weekly-D1 Bullish BOS, H4-H1 SnD Demand Zone)."
 
 def calculate_macro_divergence(act1, est1, act2, est2, act3, est3, act4, est4):
     def parse_num(val):
