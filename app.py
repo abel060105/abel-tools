@@ -11,7 +11,7 @@ import streamlit.components.v1 as components
 from datetime import datetime, timezone, timedelta
 
 # ==========================================
-# 1. KONFIGURASI HALAMAN & API KEYS (DENGAN CADANGAN)
+# 1. KONFIGURASI HALAMAN & API KEYS
 # ==========================================
 st.set_page_config(
     page_title="ABEL FX - Macro & Astrodox Predictor",
@@ -21,14 +21,9 @@ st.set_page_config(
 
 FMP_API_KEY = "Wr5uNw4BQAo5syaNYXylIqcg8908kPd5"
 FINNHUB_TOKEN = "d9saqq9r01qopv46igd9saqq9r01qopv46gkj0"
+GROQ_API_KEY = "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"
 
-# Konfigurasi API Key Utama & API Key Cadangan untuk Groq / OpenRouter
-PRIMARY_API_KEY = "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"
-BACKUP_API_KEY = "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"
-
-# URL Endpoint masing-masing provider
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 DATA_CACHE_DIR = "news_history_data"
 if not os.path.exists(DATA_CACHE_DIR):
@@ -42,67 +37,6 @@ if "macro_bias_result" not in st.session_state:
     st.session_state["macro_bias_result"] = ""
 if "score_val" not in st.session_state:
     st.session_state["score_val"] = 0
-
-# ==========================================
-# 1.5. ROBUST API CALL DENGAN FAILOVER (AUTO CADANGAN)
-# ==========================================
-def call_ai_with_failover(system_prompt, is_json_format=True):
-    """
-    Fungsi cerdas untuk memanggil API utama (Groq). Jika terkena limit (429/Error),
-    otomatis beralih ke API Cadangan (OpenRouter).
-    """
-    # 1. Percobaan Pertama Menggunakan Groq (Utama)
-    headers_primary = {
-        "Authorization": f"Bearer {PRIMARY_API_KEY}", 
-        "Content-Type": "application/json"
-    }
-    payload_primary = {
-        "model": "llama-3.3-70b-versatile",
-        "messages": [{"role": "user", "content": system_prompt}],
-        "temperature": 0.15,
-    }
-    if is_json_format:
-        payload_primary["response_format"] = {"type": "json_object"}
-
-    try:
-        res = requests.post(GROQ_URL, headers=headers_primary, json=payload_primary, timeout=25)
-        if res.status_code == 200:
-            content = res.json()['choices'][0]['message']['content']
-            return json.loads(content) if is_json_format else content
-        elif res.status_code == 429:
-            st.toast("⚠️ API Utama (Groq) terkena Limit. Beralih ke API Cadangan (OpenRouter)...", icon="🔄")
-        else:
-            st.toast(f"⚠️ API Utama merespons status {res.status_code}. Mencoba API Cadangan...", icon="🔄")
-    except Exception as e:
-        st.toast(f"⚠️ Koneksi API Utama Gagal ({e}). Beralih ke API Cadangan...", icon="🔄")
-
-    # 2. Percobaan Kedua (Failover) Menggunakan OpenRouter (Cadangan)
-    headers_backup = {
-        "Authorization": f"Bearer {BACKUP_API_KEY}", 
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://streamlit.io",
-        "X-Title": "ABEL FX Predictor"
-    }
-    payload_backup = {
-        "model": "google/gemini-2.5-flash", # Model stabil & cepat di OpenRouter
-        "messages": [{"role": "user", "content": system_prompt}],
-        "temperature": 0.15,
-    }
-    if is_json_format:
-        payload_backup["response_format"] = {"type": "json_object"}
-
-    try:
-        res_backup = requests.post(OPENROUTER_URL, headers=headers_backup, json=payload_backup, timeout=30)
-        if res_backup.status_code == 200:
-            content = res_backup.json()['choices'][0]['message']['content']
-            st.toast("✅ Berhasil terhubung menggunakan API Cadangan (OpenRouter)!", icon="🚀")
-            return json.loads(content) if is_json_format else content
-        else:
-            st.error(f"❌ Kedua API gagal merespons. Status Code Cadangan: {res_backup.status_code} - {res_backup.text}")
-            return None
-    except Exception as err:
-        st.error(f"❌ Kegagalan total pada API Cadangan: {err}")
-        return None
 
 # ==========================================
 # 2. BUILT-IN ASTRODOX CALCULATION & CHART ENGINE
@@ -591,9 +525,19 @@ def fetch_geopolitical_analysis(event_name, actual_val, forecast_val):
         "dampak_xau": "XAUUSD sangat kuat didukung oleh lonjakan permintaan hedging safe-haven."
     }}
     """
-    result = call_ai_with_failover(prompt, is_json_format=True)
-    if result:
-        return result
+    headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.2,
+        "response_format": {"type": "json_object"}
+    }
+    try:
+        res = requests.post(GROQ_URL, headers=headers, json=payload, timeout=12)
+        if res.status_code == 200:
+            return json.loads(res.json()['choices'][0]['message']['content'])
+    except Exception:
+        pass
 
     return {
         "isu_utama": "Ketegangan Selat Hormuz & Eskalasi Perang Timur Tengah",
@@ -732,13 +676,25 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
         }}
         """
 
-        parsed_json = call_ai_with_failover(system_prompt, is_json_format=True)
-        if parsed_json:
-            st.session_state["ai_result"] = parsed_json
-            st.session_state["rekap_text"] = rekap_text
-            st.session_state["macro_bias_result"] = macro_bias_result
-            st.session_state["score_val"] = score_val
-            st.success("✅ AI & Astrodox Synthesis Success!")
+        headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+        payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "user", "content": system_prompt}],
+            "temperature": 0.15,
+            "response_format": {"type": "json_object"}
+        }
+        
+        try:
+            res = requests.post(GROQ_URL, headers=headers, json=payload, timeout=25)
+            if res.status_code == 200:
+                parsed_json = json.loads(res.json()['choices'][0]['message']['content'])
+                st.session_state["ai_result"] = parsed_json
+                st.session_state["rekap_text"] = rekap_text
+                st.session_state["macro_bias_result"] = macro_bias_result
+                st.session_state["score_val"] = score_val
+                st.success("✅ AI & Astrodox Synthesis Success!")
+        except Exception as e:
+            st.error(f"Error Koneksi AI Engine: {e}")
 
 if st.session_state["ai_result"]:
     res_ai = st.session_state["ai_result"]
@@ -842,6 +798,7 @@ with col_m:
         astro_entry_zone = f"{running_price - 3.00:.2f} - {running_price + 3.00:.2f}"
         st.info(astro_entry_zone)
         
+        # Disederhanakan: Menampilkan satu sisi yang relevan (mengikuti arah AI / Default Buy)
         if st.session_state["ai_result"]:
             ast_setup = st.session_state["ai_result"].get("setup_spesifik", {})
             ai_b_check = str(st.session_state["ai_result"].get("arah_bias", "")).upper()
