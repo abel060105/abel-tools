@@ -1,5 +1,6 @@
 import os
 import json
+import io
 import calendar
 import requests
 import numpy as np
@@ -38,20 +39,12 @@ if "score_val" not in st.session_state:
     st.session_state["score_val"] = 0
 
 # ==========================================
-# 2. BUILT-IN ASTRODOX CALCULATION ENGINE
+# 2. BUILT-IN ASTRODOX CALCULATION & CHART ENGINE
 # ==========================================
 ZODIAC_SYMBOLS = ["♈", "♉", "♊", "♋", "♌", "♍", "♎", "♏", "♐", "♑", "♒", "♓"]
 ZODIAC_NAMES = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
 
-PLANET_NAMES = {
-    "Sun": "Sun ☉", "Moon": "Moon ☽", "Mercury": "Mercury ☿",
-    "Venus": "Venus ♀", "Mars": "Mars ♂", "Jupiter": "Jupiter ♃",
-    "Saturn": "Saturn ♄", "Uranus": "Uranus ♅", "Neptune": "Neptune ♆",
-    "Pluto": "Pluto ♇"
-}
-
 def compute_planetary_positions(dt_utc):
-    # Calculations based on Julian Day from J2000 epoch
     year, month, day = dt_utc.year, dt_utc.month, dt_utc.day
     hour = dt_utc.hour + dt_utc.minute/60.0 + dt_utc.second/3600.0
     if month <= 2:
@@ -62,14 +55,12 @@ def compute_planetary_positions(dt_utc):
     jd = int(365.25 * (year + 4716)) + int(30.6001 * (month + 1)) + day + hour/24.0 + B - 1524.5
     d = jd - 2451545.0
 
-    # Approximate Geocentric Longitudes (deg)
     L_sun = (280.466 + 0.9856474 * d) % 360
     g_sun = np.radians((357.528 + 0.9856003 * d) % 360)
     sun_lon = (L_sun + 1.915 * np.sin(g_sun) + 0.020 * np.sin(2 * g_sun)) % 360
 
     L_moon = (218.316 + 13.176396 * d) % 360
     M_moon = np.radians((134.963 + 13.064993 * d) % 360)
-    F_moon = np.radians((93.272 + 13.229350 * d) % 360)
     moon_lon = (L_moon + 6.289 * np.sin(M_moon) - 1.274 * np.sin(M_moon - 2*np.radians(sun_lon - L_sun))) % 360
 
     mercury_lon = (sun_lon + 18.0 * np.sin(np.radians((29.0 + 4.092 * d) % 360))) % 360
@@ -97,56 +88,125 @@ def compute_planetary_positions(dt_utc):
 
     return raw_degs, formatted_pos
 
-def generate_astrodox_chart(target_date: datetime):
-    # Convert WIB to UTC
+def generate_astrodox_unified_image(target_date: datetime):
     dt_utc = target_date - timedelta(hours=7)
     planet_degrees, planet_positions = compute_planetary_positions(dt_utc)
 
-    fig = plt.figure(figsize=(6, 7), facecolor='#0e1117')
-    ax = fig.add_subplot(111, polar=True, facecolor='#0e1117')
+    # Combined Figure: Left = Wheel, Right = Posisi Planet & Keterangan Impact XAUUSD
+    fig = plt.figure(figsize=(14, 7), facecolor='#0e1117')
+    
+    # 1. POLAR ASTRODOX WHEEL (Sebelah Kiri)
+    ax = fig.add_subplot(121, polar=True, facecolor='#0e1117')
     ax.set_theta_zero_location("W")
     ax.set_theta_direction(-1)
-    
     ax.grid(False)
     ax.set_yticklabels([])
     ax.set_xticklabels([])
 
-    colors = ['#ff9999','#e6b800','#80ff80','#80d4ff'] * 3
+    colors = ['#4a2e2b','#3e3b26','#1e3a2b','#1e2b3a'] * 3
     for i in range(12):
         theta_start = np.radians(i * 30)
         theta_end = np.radians((i + 1) * 30)
         ax.bar(
             x=(theta_start + theta_end)/2, height=0.25, width=np.radians(30), 
-            bottom=0.75, color=colors[i], alpha=0.35, edgecolor='white'
+            bottom=0.75, color=colors[i], alpha=0.6, edgecolor='#555555'
         )
         ax.text(
             (theta_start + theta_end)/2, 0.88, ZODIAC_SYMBOLS[i], 
             color='white', fontsize=12, ha='center', va='center', fontweight='bold'
         )
 
+    # Plot Planet & Hitung Aspek
+    planets_keys = list(planet_degrees.keys())
     deg_list = list(planet_degrees.values())
+    
     for name, deg in planet_degrees.items():
         rad = np.radians(deg)
-        ax.plot(rad, 0.70, marker='o', color='#00ffff', markersize=5)
+        ax.plot(rad, 0.70, marker='o', color='#00ffff', markersize=6)
         short_symbol = name.split()[-1]
-        ax.text(rad, 0.62, short_symbol, color='white', fontsize=10, ha='center', va='center')
+        ax.text(rad, 0.61, short_symbol, color='white', fontsize=11, ha='center', va='center', fontweight='bold')
 
-    for i in range(len(deg_list)):
-        for j in range(i + 1, len(deg_list)):
-            diff = abs(deg_list[i] - deg_list[j]) % 30
-            if diff < 3.0: 
-                rad1 = np.radians(deg_list[i])
-                rad2 = np.radians(deg_list[j])
-                line_color = '#00ff00' if (i+j)%2 == 0 else '#ff3333'
-                ax.plot([rad1, rad2], [0.70, 0.70], color=line_color, alpha=0.6, linewidth=1)
+    aspect_counts = {"merah": 0, "hijau": 0, "biru": 0, "kuning": 0}
 
-    plt.title(
-        f"ASTRODOX WHEEL CHART\n{target_date.strftime('%d.%m.%Y %H:%M WIB')}", 
-        color='white', fontsize=11, pad=15, fontweight='bold'
+    for i in range(len(planets_keys)):
+        for j in range(i + 1, len(planets_keys)):
+            d1 = deg_list[i]
+            d2 = deg_list[j]
+            diff = abs(d1 - d2) % 360
+            if diff > 180:
+                diff = 360 - diff
+            
+            rad1 = np.radians(d1)
+            rad2 = np.radians(d2)
+
+            # Check Major Aspect Orbs
+            if abs(diff - 90) <= 4 or abs(diff - 180) <= 4:  # Square (90) / Opposite (180) -> MERAH
+                ax.plot([rad1, rad2], [0.70, 0.70], color='#ff3333', alpha=0.8, linewidth=1.5)
+                aspect_counts["merah"] += 1
+            elif abs(diff - 120) <= 4:  # Trine (120) -> HIJAU
+                ax.plot([rad1, rad2], [0.70, 0.70], color='#00ff66', alpha=0.8, linewidth=1.5)
+                aspect_counts["hijau"] += 1
+            elif abs(diff - 60) <= 3:  # Sextile (60) -> BIRU
+                ax.plot([rad1, rad2], [0.70, 0.70], color='#3399ff', alpha=0.7, linewidth=1.2)
+                aspect_counts["biru"] += 1
+            elif diff <= 4:  # Conjunction (0) -> KUNING
+                ax.plot([rad1, rad2], [0.70, 0.70], color='#ffff00', alpha=0.9, linewidth=2.0)
+                aspect_counts["kuning"] += 1
+
+    ax.set_title(
+        f"ASTRODOX TRANSIT WHEEL CHART\n{target_date.strftime('%d.%m.%Y %H:%M WIB')}", 
+        color='white', fontsize=12, pad=15, fontweight='bold'
+    )
+
+    # 2. DETAIL KETERANGAN DAN DAMPAK XAUUSD (Sebelah Kanan)
+    ax_text = fig.add_subplot(122, facecolor='#0e1117')
+    ax_text.axis('off')
+
+    info_text = f"📜 POSISI PLANET TRANSIT ({target_date.strftime('%d %b %Y %H:%M WIB')}):\n"
+    info_text += "─" * 48 + "\n"
+    
+    # Grid 2 kolom posisi planet
+    pos_items = list(planet_positions.items())
+    for idx in range(0, len(pos_items), 2):
+        p1, v1 = pos_items[idx]
+        if idx + 1 < len(pos_items):
+            p2, v2 = pos_items[idx+1]
+            info_text += f"• {p1:<12}: {v1:<15} | • {p2:<12}: {v2}\n"
+        else:
+            info_text += f"• {p1:<12}: {v1}\n"
+
+    info_text += "\n" + "─" * 48 + "\n"
+    info_text += "💡 DETEKSI ASPEK GEOMETRI & IMPACT KE XAUUSD:\n"
+    info_text += "─" * 48 + "\n"
+    
+    info_text += f"🔴 GARIS MERAH (Square 90° / Opposite 180° - Terdeteksi: {aspect_counts['merah']}):\n"
+    info_text += "   └─ Tensi Tinggi! Potensi KENAIKAN/PENURUNAN TAJAM mendadak\n"
+    info_text += "      (Whipsaw & Liquidity Sweep) sebelum pembalikan arah (Reversal).\n\n"
+
+    info_text += f"🟢 GARIS HIJAU (Trine 120° - Terdeteksi: {aspect_counts['hijau']}):\n"
+    info_text += "   └─ Harmoni Energi! Menunjukkan KENAIKAN / PENURUNAN KONTINU\n"
+    info_text += "      (Expansive Rally / Continuous Trend) tanpa koreksi berarti.\n\n"
+
+    info_text += f"🔵 GARIS BIRU (Sextile 60° - Terdeteksi: {aspect_counts['biru']}):\n"
+    info_text += "   └─ Peluang Entry Konsolidasi! Rejection halus di Support/Demand.\n\n"
+
+    info_text += f"🟡 GARIS KUNING (Conjunction 0° - Terdeteksi: {aspect_counts['kuning']}):\n"
+    info_text += "   └─ Penggabungan Energi Planet! Siklus Volatilitas Ekstrem dimula!"
+
+    ax_text.text(
+        0.02, 0.95, info_text, color='#e0e0e0', fontsize=9.5, 
+        fontfamily='monospace', va='top', ha='left',
+        bbox=dict(boxstyle='round,pad=0.8', facecolor='#161b22', edgecolor='#30363d')
     )
 
     plt.tight_layout()
-    return fig, planet_positions
+    
+    # Save Image to Memory Buffer for Download
+    img_buf = io.BytesIO()
+    plt.savefig(img_buf, format='png', dpi=200, bbox_inches='tight', facecolor='#0e1117')
+    img_buf.seek(0)
+
+    return fig, img_buf
 
 # ==========================================
 # 3. SIDEBAR & CONTROL PANEL
@@ -509,28 +569,6 @@ else:
     - **Sumber Feed Data:** {api_source}
     """)
 
-# ASTRODOX WHEEL CHART DISPLAY
-st.markdown("---")
-st.subheader("🔮 ASTRODOX ENGINE - TRANSIT WHEEL & ANALYSIS")
-
-fig_astro, astro_positions = generate_astrodox_chart(event_datetime)
-
-col_astro_img, col_astro_info = st.columns([1.1, 1])
-
-with col_astro_img:
-    st.pyplot(fig_astro)
-
-with col_astro_info:
-    st.markdown("#### 📜 Posisi Planet Transit (Astrodox Data)")
-    for p_name, p_pos in astro_positions.items():
-        st.write(f"• **{p_name}**: `{p_pos}`")
-        
-    st.info("""
-    💡 **Keterangan Astrodox Aspek:**
-    - 🟢 **Garis Hijau (Harmoni / Trine):** Menunjukkan fase ekspansi trend searah pada XAUUSD.
-    - 🔴 **Garis Merah (Gejolak / Square):** Menunjukkan potensi *Whipsaw* & *Liquidity Sweep* tinggi sebelum pembalikan arah.
-    """)
-
 st.markdown("---")
 st.subheader(f"📊 Data Indikator Pendukung Real-Time ({target_news})")
 st.caption(f"💡 Synchronized via {api_source} | Waktu Sistem: {now.strftime('%d-%m-%Y %H:%M:%S')} WIB")
@@ -582,6 +620,8 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
             final_act1, est1, final_act2, est2, final_act3, est3, final_act4, est4
         )
         
+        _, astro_positions_dict = compute_planetary_positions(event_datetime - timedelta(hours=7))
+
         system_prompt = f"""
         Kamu adalah Senior Quantitative Trader, Macro Analyst & Financial Astrologer spesialis XAUUSD.
         Sintesiskan Data Makro + Posisi Planet Astrodox + Geopolitik + Teknikal menjadi LOGIKA ENTRY PRESISI XAUUSD.
@@ -589,7 +629,7 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
         [INPUT DATA REAL-TIME]
         - Target Event: {target_news} ({status_text})
         - Running Price XAUUSD: {running_price}
-        - Posisi Planet Astrodox: {json.dumps(astro_positions)}
+        - Posisi Planet Astrodox: {json.dumps(astro_positions_dict)}
         - Rekap Data Pendukung:
         {rekap_text}
         - Bias Makro Kalkulasi: {macro_bias_result}
@@ -675,7 +715,7 @@ if st.session_state["ai_result"]:
 st.markdown("---")
 
 # ==========================================
-# 6. CONFLUENCE CARDS & LIVE CHART
+# 6. CONFLUENCE CARDS
 # ==========================================
 st.subheader("🎯 MULTI-TIMEFRAME LIQUIDITY & METHOD CONFLUENCE")
 
@@ -733,6 +773,31 @@ with col_r:
         st.info("Technical Engine OFF")
 
 st.markdown("---")
+
+# ==========================================
+# 7. ASTRODOX UNIFIED SECTION (DI ATAS CHART)
+# ==========================================
+st.subheader("🔮 ASTRODOX TRANSIT WHEEL & IMPACT ANALYSIS")
+
+fig_astro_unified, img_astro_buf = generate_astrodox_unified_image(event_datetime)
+
+# Display Unified Matplotlib Figure
+st.pyplot(fig_astro_unified)
+
+# Download Button for Unified Astrodox Chart
+st.download_button(
+    label="📥 Download Roda Astrodox & Analisis (.png)",
+    data=img_astro_buf,
+    file_name=f"Astrodox_Analysis_{event_datetime.strftime('%Y%m%d_%H%M')}.png",
+    mime="image/png",
+    use_container_width=True
+)
+
+st.markdown("---")
+
+# ==========================================
+# 8. LIVE CHART TRADINGVIEW
+# ==========================================
 st.subheader("📉 LIVE CHART TRADINGVIEW (INTERACTIVE)")
 
 tradingview_widget = """
