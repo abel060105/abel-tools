@@ -798,7 +798,6 @@ with col_m:
         astro_entry_zone = f"{running_price - 3.00:.2f} - {running_price + 3.00:.2f}"
         st.info(astro_entry_zone)
         
-        # Disederhanakan: Menampilkan satu sisi yang relevan (mengikuti arah AI / Default Buy)
         if st.session_state["ai_result"]:
             ast_setup = st.session_state["ai_result"].get("setup_spesifik", {})
             ai_b_check = str(st.session_state["ai_result"].get("arah_bias", "")).upper()
@@ -885,4 +884,3 @@ tradingview_widget = """
 </div>
 """
 components.html(tradingview_widget, height=620)
-```[cite: 4]
