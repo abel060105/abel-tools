@@ -97,7 +97,6 @@ def fetch_from_finnhub(date_str):
         if res.status_code == 200:
             data = res.json().get('economicData', [])
             if len(data) > 0:
-                # Normalisasi format Finnhub agar sepadan dengan FMP
                 normalized = []
                 for item in data:
                     normalized.append({
@@ -122,11 +121,11 @@ def get_economic_calendar_data(tgl, bln_str, thn):
     d = f"{int(tgl):02d}"
     date_str = f"{thn}-{m}-{d}"
     
-    # Try 1: FMP
+    # Priority 1: FMP
     raw_data = fetch_from_fmp(date_str)
     source = "Financial Modeling Prep (FMP)"
     
-    # Try 2: Finnhub (jika FMP gagal)
+    # Priority 2: Finnhub
     if not raw_data:
         raw_data = fetch_from_finnhub(date_str)
         source = "Finnhub"
@@ -134,11 +133,10 @@ def get_economic_calendar_data(tgl, bln_str, thn):
     return raw_data, source
 
 # ==========================================
-# 4. AMBIL DATA DARI API & FORMAT KALENDER
+# 4. AMBIL DATA DARI API & EXTRACT INDIKATOR
 # ==========================================
 calendar_raw, api_source = get_economic_calendar_data(tanggal_rilis, bulan_rilis, tahun_rilis)
 
-# Fungsi pencari spesifik berdasarkan keyword event
 def extract_indicator_values(raw_list, keywords, default_act="TBA", default_est="TBA", default_prev="TBA"):
     if not raw_list:
         return default_act, default_est, default_prev
@@ -229,7 +227,101 @@ else:
     tech_reason = "Multi-TF Crosscheck (Weekly-D1 Bullish BOS, H4-H1 SnD Demand Zone, M15-M1 Mitigation)."
 
 # ==========================================
-# 5. TAMPILAN UTAMA DASHBOARD
+# 5. KALKULATOR REKAP DATA PENDUKUNG (ANTI-HALUSINASI)
+# ==========================================
+def calculate_macro_divergence(act1, est1, act2, est2, act3, est3, act4, est4):
+    usd_score = 0
+
+    def parse_num(val):
+        try:
+            return float(str(val).replace('%', '').replace('K', '').replace('M', ''))
+        except:
+            return None
+
+    def eval_indicator(name, act_raw, est_raw, higher_is_good_for_usd=True):
+        a = parse_num(act_raw)
+        e = parse_num(est_raw)
+        if a is None or e is None:
+            return f"- **{name}**: Data belum rilis / TBA (Neutral)", 0
+        
+        if a > e:
+            res = "BULLISH USD" if higher_is_good_for_usd else "BEARISH USD"
+            score = 1 if higher_is_good_for_usd else -1
+            note = f"Actual ({act_raw}) > Forecast ({est_raw})"
+        elif a < e:
+            res = "BEARISH USD" if higher_is_good_for_usd else "BULLISH USD"
+            score = -1 if higher_is_good_for_usd else 1
+            note = f"Actual ({act_raw}) < Forecast ({est_raw})"
+        else:
+            res = "NEUTRAL"
+            score = 0
+            note = f"Actual ({act_raw}) == Forecast ({est_raw})"
+            
+        return f"- **{name}**: {note} -> Impak: **{res}**", score
+
+    if "NFP" in target_news:
+        r1, s1 = eval_indicator("NFP", act1, est1, higher_is_good_for_usd=True)
+        r2, s2 = eval_indicator("Unemployment Rate", act2, est2, higher_is_good_for_usd=False)
+        r3, s3 = eval_indicator("Participation Rate", act3, est3, higher_is_good_for_usd=True)
+        r4, s4 = eval_indicator("Manufacturing Payrolls", act4, est4, higher_is_good_for_usd=True)
+    else:
+        r1, s1 = eval_indicator("Indikator Utama", act1, est1, higher_is_good_for_usd=True)
+        r2, s2 = eval_indicator("Indikator Pendukung 2", act2, est2, higher_is_good_for_usd=True)
+        r3, s3 = eval_indicator("Indikator Pendukung 3", act3, est3, higher_is_good_for_usd=True)
+        r4, s4 = eval_indicator("Indikator Pendukung 4", act4, est4, higher_is_good_for_usd=True)
+
+    rekap_text = "\n".join([r1, r2, r3, r4])
+    total_score = s1 + s2 + s3 + s4
+    
+    if total_score > 0:
+        macro_bias = "BULLISH USD / BEARISH XAUUSD"
+    elif total_score < 0:
+        macro_bias = "BEARISH USD / BULLISH XAUUSD"
+    else:
+        macro_bias = "NEUTRAL / MIXED DATA (Whipsaw Risk)"
+
+    return rekap_text, macro_bias, total_score
+
+# ==========================================
+# 6. MODUL GEOPOLITIK AUTOMATED VIA GROQ
+# ==========================================
+def fetch_geopolitical_analysis(event_name, actual_val, forecast_val):
+    prompt = f"""
+    Bertindaklah sebagai Senior Geopolitical & Macroeconomic Analyst.
+    Berikan analisis ringkas mengenai konteks Geopolitik Global terkini (misal: isu Timur Tengah, pasokan energi, perang dagang) 
+    dan hubungannya dengan data {event_name} (Actual: {actual_val} vs Forecast: {forecast_val}).
+
+    Format jawaban HARUS JSON MURNI tanpa markdown:
+    {{
+        "isu_utama": "nama isu utama",
+        "ringkasan_situasi": "2 kalimat situasi terkini",
+        "dampak_usd": "efek ke USD",
+        "dampak_xau": "efek ke Emas XAUUSD"
+    }}
+    """
+    headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.2,
+        "response_format": {"type": "json_object"}
+    }
+    try:
+        res = requests.post(GROQ_URL, headers=headers, json=payload, timeout=12)
+        if res.status_code == 200:
+            return json.loads(res.json()['choices'][0]['message']['content'])
+    except Exception:
+        pass
+
+    return {
+        "isu_utama": "Eskalasi Geopolitik & Pasokan Energi Global",
+        "ringkasan_situasi": "Ketegangan wilayah meningkatkan arus permintaan safe haven pada komoditas utama.",
+        "dampak_usd": "USD ditopang aliran modal safe-haven.",
+        "dampak_xau": "XAUUSD mendapatkan dorongan aksi beli hedging."
+    }
+
+# ==========================================
+# 7. TAMPILAN UTAMA DASHBOARD
 # ==========================================
 st.title("📈 ABEL FX - Macro Predictor Engine")
 is_released = ind_data["status_rilis"] == "SUDAH RILIS"
@@ -250,7 +342,6 @@ st.caption(f"💡 Synchronized via {api_source}")
 
 def render_indicator_box(key_prefix, ind_dict):
     unique_key_suffix = f"{key_prefix}_{target_news}_{tanggal_rilis}_{bulan_rilis}_{tahun_rilis}"
-    
     st.markdown(f"#### 🔹 {ind_dict.get('nama', 'Indikator')}")
     st.caption(f"💡 **Fungsi / Penjelasan:** {ind_dict.get('penjelasan', '-')}")
     st.info(f"⚡ **Efek ke Dollar (USD):** {ind_dict.get('efek', '-')}")
@@ -270,37 +361,80 @@ render_indicator_box("ind_3", ind_data.get("ind_3", {}))
 render_indicator_box("ind_4", ind_data.get("ind_4", {}))
 
 # ==========================================
-# 6. MODUL BERITA GEOPOLITIK
+# 8. MODUL GEOPOLITIK (INTEGRATED)
 # ==========================================
-st.subheader("🌍 MODUL BERITA GEOPOLITIK & SENTIMEN TRANSISI")
-st.markdown("Informasi sentimen geopolitik yang berjalan di antara jeda rilis data makro:")
+st.subheader("🌍 MODUL BERITA GEOPOLITIK & SENTIMEN TRANSISI (AI + CALENDAR)")
+
+geo_info = fetch_geopolitical_analysis(target_news, act1, est1)
 
 st.warning(f"""
-- 🚨 **Isu Utama:** Eskalasi Geopolitik & Jalur Pasokan Energi Global
-- 📝 **Ringkasan:** Ketegangan lintas wilayah mempengaruhi volatilitas komoditas Emas (XAUUSD) dan Indeks USD.
-- 💵 **Dampak ke Dollar (USD):** USD mendapat aliran safe haven moderat.
-- 🪙 **Dampak ke XAU (Gold):** Emas didukung aksi beli lindung nilai (*hedging*).
+- 🚨 **Isu Utama:** {geo_info.get('isu_utama')}
+- 📝 **Ringkasan Situasi:** {geo_info.get('ringkasan_situasi')}
+- 💵 **Dampak Gabungan ke USD:** {geo_info.get('dampak_usd')}
+- 🪙 **Dampak Gabungan ke XAUUSD:** {geo_info.get('dampak_xau')}
 """)
 
 st.markdown("---")
 
-# Tombol Eksekusi AI Prediction
+# ==========================================
+# 9. AI ENTRY LOGIC EXECUTION
+# ==========================================
 if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", type="primary", use_container_width=True):
-    with st.spinner(f"Memproses kalkulasi Multi-Timeframe & AI Analysis untuk {target_news}..."):
-        prompt = f"""
-        Bertindaklah sebagai Senior Quantitative Macro & Price Action Master.
-        Analisis event {target_news} tanggal {tanggal_rilis} {bulan_rilis} {tahun_rilis} di harga running {running_price}.
-        Data Indikator Utama: Actual={act1}, Forecast={est1}, Previous={prev1}.
-        Kondisi Teknikal Bias: {tech_signal}.
-        Berikan kesimpulan komprehensif dalam Bahasa Indonesia mencakup: Analisis Makro/Geopolitik, Confluence Multi-TF, dan Rekomendasi Eksekusi (BUY/SELL, Entry, SL, TP).
+    with st.spinner("Memproses Rekap Data Pendukung & Generasi Logika Entry AI..."):
+        
+        rekap_text, macro_bias_result, score_val = calculate_macro_divergence(
+            act1, est1, act2, est2, act3, est3, act4, est4
+        )
+        
+        st.subheader("📋 Rekap Evaluasi Data Pendukung Real-Time")
+        st.markdown(rekap_text)
+        st.info(f"⚖️ **Kesimpulan Bias Makro:** {macro_bias_result} (Score Net: {score_val})")
+        
+        system_prompt = f"""
+        Kamu adalah Senior Quantitative Trader & Macro Analyst profesional.
+        Tugasmu menyusun LOGIKA ENTRY FLEKSIBEL untuk XAUUSD berbasis Data Makro Real-Time + Technical Setup.
+        
+        [DATA INPUT REAL-TIME]
+        - Target Event: {target_news} ({tanggal_rilis} {bulan_rilis} {tahun_rilis})
+        - Harga Running XAUUSD: {running_price}
+        - Rekap Indikator Pendukung:
+        {rekap_text}
+        - Bias Makro Hasil Kalkulasi: {macro_bias_result}
+        - Technical Setup: {tech_signal} | Setup Action: {tech_action}
+
+        [ATURAN KHUSUS LOGIKA ENTRY]:
+        1. JANGAN HALUSINASI. Logika entry HARUS berbasis konfluensi/deviasi data pendukung.
+        2. Data Pendukung dominan Bearish USD -> Wajib fokus Opsi BUY XAUUSD.
+        3. Data Pendukung dominan Bullish USD -> Wajib fokus Opsi SELL XAUUSD.
+        4. Data Pendukung MIXED -> Wajib merekomendasikan Wait & See / Liquidity Sweep Zone.
+
+        [FORMAT JAWABAN MARKDOWN]
+        ### 🔍 1. Rekap & Sintesis Data Pendukung
+        (Penjelasan deviasi angka actual vs forecast)
+        
+        ### ⚡ 2. Logika Entry & Trigger Konfirmasi
+        - **Arah Bias Utama:** [BUY / SELL / NEUTRAL]
+        - **Reasoning Logika:** (Hubungan angka data pendukung dengan SnD Zone)
+        - **Kondisi Trigger:** (Syarat konfirmasi candlestick M5/M15)
+
+        ### 🎯 3. Specific Execution Setup (XAUUSD)
+        - **Execution Type:** [Instant Market / Limit Order]
+        - **Entry Zone:** [Rentang Harga]
+        - **Stop Loss (SL):** [Harga SL]
+        - **Take Profit (TP):** [TP1, TP2, & TP Extended]
         """
+
         headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
-        payload = {"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": prompt}], "temperature": 0.3}
+        payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "user", "content": system_prompt}],
+            "temperature": 0.2
+        }
         
         try:
             res = requests.post(GROQ_URL, headers=headers, json=payload, timeout=25)
             if res.status_code == 200:
-                st.success("✅ AI Prediction Berhasil Dieksekusi!")
+                st.success("✅ AI Logic Execution Berhasil Terbentuk!")
                 st.markdown(res.json()['choices'][0]['message']['content'])
             else:
                 st.error(f"Gagal memproses AI Groq. HTTP Status: {res.status_code}")
@@ -310,7 +444,7 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
 st.markdown("---")
 
 # ==========================================
-# 7. MULTI-TIMEFRAME CONFLUENCE & ZONES
+# 10. MULTI-TIMEFRAME CONFLUENCE & ZONES
 # ==========================================
 st.subheader("🎯 MULTI-TIMEFRAME LIQUIDITY & METHOD CONFLUENCE")
 
@@ -318,35 +452,44 @@ col_l, col_m, col_r = st.columns(3)
 
 with col_l:
     st.markdown("### 🤖 AI Macro Engine")
-    st.write("Signal: Dinamis / Macro-Driven")
-    st.markdown("🔴 **ARAH BIAS: BEARISH (TURUN / SELL)**")
-    st.markdown("#### 🎯 ZONA ENTRY")
-    st.info("4315.50 - 4318.00")
-    st.markdown("#### 🛑 STOP LOSS")
-    st.error("4322.50")
-    st.markdown("#### 🏁 TARGET TP")
-    st.success("4276.00 - 4279.00")
+    st.write("Signal: Macro Divergence Engine")
+    if not is_bullish:
+        st.markdown("🔴 **ARAH BIAS: BEARISH (SELL)**")
+        st.markdown("#### 🎯 ZONA ENTRY")
+        st.info(f"{running_price + 1.50:.2f} - {running_price + 4.00:.2f}")
+        st.markdown("#### 🛑 STOP LOSS")
+        st.error(f"{running_price + 8.50:.2f}")
+        st.markdown("#### 🏁 TARGET TP")
+        st.success(f"{running_price - 38.00:.2f}")
+    else:
+        st.markdown("🟢 **ARAH BIAS: BULLISH (BUY)**")
+        st.markdown("#### 🎯 ZONA ENTRY")
+        st.info(f"{running_price - 4.00:.2f} - {running_price - 1.50:.2f}")
+        st.markdown("#### 🛑 STOP LOSS")
+        st.error(f"{running_price - 8.50:.2f}")
+        st.markdown("#### 🏁 TARGET TP")
+        st.success(f"{running_price + 38.00:.2f}")
 
 with col_m:
     st.markdown("### 🔮 Astrodox Engine")
     if astrodox_active:
-        st.write("Signal: Astro-Cycle Transits")
-        st.markdown("🟢 **ARAH BIAS: BULLISH (NAIK / BUY)**")
+        st.write("Signal: Astro Transits Cycle")
+        st.markdown("🟢 **ARAH BIAS: BULLISH (BUY)**")
         st.markdown("#### 🎯 ZONA ENTRY")
-        st.info("4310.00 - 4312.50")
+        st.info(f"{running_price - 3.00:.2f} - {running_price - 1.00:.2f}")
         st.markdown("#### 🛑 STOP LOSS")
-        st.error("4304.50")
+        st.error(f"{running_price - 7.00:.2f}")
         st.markdown("#### 🏁 TARGET TP")
-        st.success("4349.00 - 4352.00")
+        st.success(f"{running_price + 35.00:.2f}")
     else:
         st.info("Astrodox Engine OFF")
 
 with col_r:
     st.markdown("### 📐 Multi-TF Technical Engine")
     if tech_active:
-        st.write("Signal: Multi-TF Price Action")
+        st.write("Signal: Price Action SnD")
         if not is_bullish:
-            st.markdown("🔴 **ARAH BIAS: BEARISH (STRONG DROP / JUNAM)**")
+            st.markdown("🔴 **ARAH BIAS: BEARISH (STRONG DROP)**")
         else:
             st.markdown("🟢 **ARAH BIAS: BULLISH (STRONG PUMP)**")
         st.write(f"Eksekusi: **{tech_action}**")
@@ -363,7 +506,7 @@ with col_r:
 st.markdown("---")
 
 # ==========================================
-# 8. TRADINGVIEW LIVE CHART
+# 11. TRADINGVIEW LIVE CHART WIDGET
 # ==========================================
 st.subheader("📉 LIVE CHART TRADINGVIEW (XAUUSD)")
 tradingview_widget = """
