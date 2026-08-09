@@ -67,7 +67,6 @@ with st.sidebar:
     jam_input = st.text_input("Jam Rilis (WIB):", value="01:00" if "FOMC" in target_news else "19:30")
     jam_rilis_formatted = f"{jam_input} WIB"
 
-    # Validasi Presisi Waktu Main Event
     try:
         if ":" in jam_input:
             jam_str, menit_str = jam_input.strip().split(":")
@@ -116,7 +115,7 @@ with st.sidebar:
     running_price = st.number_input("Harga Running XAUUSD:", value=4314.00, step=0.5)
 
 # ==========================================
-# 3. MODUL DUAL-API ECONOMIC CALENDAR (1 BULAN FULL)
+# 3. MODUL DUAL-API ECONOMIC CALENDAR
 # ==========================================
 @st.cache_data(ttl=180)
 def fetch_full_month_calendar(bln_num, thn_num):
@@ -124,7 +123,7 @@ def fetch_full_month_calendar(bln_num, thn_num):
     from_date = f"{thn_num}-{bln_num:02d}-01"
     to_date = f"{thn_num}-{bln_num:02d}-{last_day:02d}"
     
-    # 1. Fetch Finnhub API (Primary API Free)
+    # 1. Fetch Finnhub API
     url_finn = f"https://finnhub.io/api/v1/economic?from={from_date}&to={to_date}&token={FINNHUB_TOKEN}"
     try:
         res = requests.get(url_finn, timeout=8)
@@ -146,7 +145,7 @@ def fetch_full_month_calendar(bln_num, thn_num):
     except Exception:
         pass
 
-    # 2. Fetch FMP API (Fallback)
+    # 2. Fetch FMP API
     url_fmp = f"https://financialmodelingprep.com/api/v3/economic_calendar?from={from_date}&to={to_date}&apikey={FMP_API_KEY}"
     try:
         res = requests.get(url_fmp, timeout=8)
@@ -163,10 +162,9 @@ bulan_int = bulan_dict.get(bulan_rilis, 8)
 calendar_raw, api_source = fetch_full_month_calendar(bulan_int, int(tahun_rilis))
 
 # ==========================================
-# 4. SMART INDIKATOR RESOLVER (PRESISI WAKTU INDIVIDUAL)
+# 4. SMART INDIKATOR RESOLVER
 # ==========================================
 def extract_indicator_smart(raw_list, keywords, default_act, default_est, default_prev, fallback_day, fallback_time="19:30", manual_val=""):
-    # Jika mode manual override diaktifkan dari sidebar
     if override_active and manual_val.strip() != "":
         return manual_val.strip(), str(default_est), str(default_prev), f"{fallback_day} {bulan_rilis[:3]} {tahun_rilis} {fallback_time} WIB"
 
@@ -206,7 +204,6 @@ def extract_indicator_smart(raw_list, keywords, default_act, default_est, defaul
 
         return act_str, est_str, prev_str, jadwal_str
 
-    # Fallback Cerdas jika indikator tidak ditemukan dari feed API
     ind_dt_fallback = datetime(int(tahun_rilis), bulan_int, fallback_day, int(fallback_time[:2]), int(fallback_time[3:]))
     jadwal_fallback_str = f"{fallback_day} {bulan_rilis[:3]} {tahun_rilis} {fallback_time} WIB"
     
@@ -215,12 +212,11 @@ def extract_indicator_smart(raw_list, keywords, default_act, default_est, defaul
     else:
         return f"OTW ({jadwal_fallback_str})", str(default_est), str(default_prev), jadwal_fallback_str
 
-
-# Masing-masing data pendukung memiliki tanggal rilis (fallback_day) dan jam rilis tersendiri!
+# UPDATE DATA PRESET SESUAI RILIS MYFXBOOK 7 AGUSTUS 2026
 if "NFP" in target_news:
-    act1, est1, prev1, j1 = extract_indicator_smart(calendar_raw, ["non farm payrolls", "nonfarm payrolls", "nfp"], "114K", "80K", "20K", fallback_day=7, fallback_time="19:30", manual_val=manual_act1)
-    act2, est2, prev2, j2 = extract_indicator_smart(calendar_raw, ["unemployment rate"], "4.3%", "4.2%", "4.1%", fallback_day=7, fallback_time="19:30", manual_val=manual_act2)
-    act3, est3, prev3, j3 = extract_indicator_smart(calendar_raw, ["participation rate"], "62.7%", "62.6%", "62.6%", fallback_day=7, fallback_time="19:30", manual_val=manual_act3)
+    act1, est1, prev1, j1 = extract_indicator_smart(calendar_raw, ["non farm payrolls", "nonfarm payrolls", "nfp"], "-23K", "80K", "20K", fallback_day=7, fallback_time="19:30", manual_val=manual_act1)
+    act2, est2, prev2, j2 = extract_indicator_smart(calendar_raw, ["unemployment rate"], "4.1%", "4.2%", "4.2%", fallback_day=7, fallback_time="19:30", manual_val=manual_act2)
+    act3, est3, prev3, j3 = extract_indicator_smart(calendar_raw, ["participation rate"], "61.4%", "61.6%", "61.5%", fallback_day=7, fallback_time="19:30", manual_val=manual_act3)
     act4, est4, prev4, j4 = extract_indicator_smart(calendar_raw, ["average hourly earnings", "hourly earnings"], "0.2%", "0.3%", "0.3%", fallback_day=7, fallback_time="19:30", manual_val=manual_act4)
     
     ind_data = {
@@ -233,7 +229,6 @@ if "NFP" in target_news:
         "ind_4": {"nama": "Average Hourly Earnings m/m", "actual": act4, "forecast": est4, "previous": prev4, "penjelasan": "Pertumbuhan rata-rata upah pekerja per jam.", "efek": "Actual > Forecast -> Menguatkan USD"}
     }
 elif "CPI" in target_news:
-    # CPI Utama rilis tgl 12, tapi PPI rilis tgl 13, Import Price tgl 14, Consumer Sentiment tgl 14 jam 21:00
     act1, est1, prev1, j1 = extract_indicator_smart(calendar_raw, ["cpi m/m", "cpi y/y", "consumer price index"], "0.2%", "0.2%", "0.1%", fallback_day=12, fallback_time="19:30", manual_val=manual_act1)
     act2, est2, prev2, j2 = extract_indicator_smart(calendar_raw, ["ppi m/m", "producer price"], "0.1%", "0.2%", "0.2%", fallback_day=13, fallback_time="19:30", manual_val=manual_act2)
     act3, est3, prev3, j3 = extract_indicator_smart(calendar_raw, ["import price"], "0.1%", "0.0%", "-0.1%", fallback_day=14, fallback_time="19:30", manual_val=manual_act3)
@@ -249,7 +244,6 @@ elif "CPI" in target_news:
         "ind_4": {"nama": "Michigan Consumer Sentiment", "actual": act4, "forecast": est4, "previous": prev4, "penjelasan": "Kepercayaan konsumen terhadap ekonomi.", "efek": "Actual > Forecast -> Menguatkan USD"}
     }
 else:
-    # FOMC rilis tgl 20, PCE rilis tgl 30, GDP tgl 29, Retail Sales tgl 15
     act1, est1, prev1, j1 = extract_indicator_smart(calendar_raw, ["fed interest rate", "fed rate decision"], "5.25%", "5.25%", "5.50%", fallback_day=20, fallback_time="01:00", manual_val=manual_act1)
     act2, est2, prev2, j2 = extract_indicator_smart(calendar_raw, ["core pce"], "0.2%", "0.2%", "0.2%", fallback_day=30, fallback_time="19:30", manual_val=manual_act2)
     act3, est3, prev3, j3 = extract_indicator_smart(calendar_raw, ["gdp"], "2.8%", "2.8%", "1.4%", fallback_day=29, fallback_time="19:30", manual_val=manual_act3)
@@ -265,7 +259,7 @@ else:
         "ind_4": {"nama": "Retail Sales m/m", "actual": act4, "forecast": est4, "previous": prev4, "penjelasan": "Tingkat belanja konsumen.", "efek": "Actual > Forecast -> Menguatkan USD"}
     }
 
-# Logic Bias Teknikal
+# Technical Bias Logic
 if "Force Bearish" in market_condition:
     is_bullish = False
 elif "Force Bullish" in market_condition:
