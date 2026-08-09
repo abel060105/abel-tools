@@ -483,9 +483,8 @@ else: # DAILY Mode
 # ==========================================
 st.title("📈 ABEL FX - Macro & Astrodox Predictor")
 
-status_text = ind_data.get("status_rilis", "")
 target_title_suffix = " Analysis" if "DAILY" in target_news else f" - {tanggal_rilis} {bulan_rilis} {tahun_rilis} ({jam_rilis_formatted})"
-status_text_display = f" &nbsp; **({status_text})**" if "DAILY" not in target_news else ""
+status_text_display = f" &nbsp; **{ind_data['status_rilis']}**" if "DAILY" not in target_news else ""
 
 st.markdown(f"### 📌 Target Analysis: {target_news}{target_title_suffix}{status_text_display}")
 
