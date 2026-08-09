@@ -5,7 +5,7 @@ import requests
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
-from datetime import datetime
+from datetime import datetime, date
 
 # ==========================================
 # 1. KONFIGURASI HALAMAN & API KEYS
@@ -22,6 +22,11 @@ GROQ_API_KEY = "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"
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
+# Buat folder penyimpanan histori lokal jika belum ada
+DATA_CACHE_DIR = "news_history_data"
+if not os.path.exists(DATA_CACHE_DIR):
+    os.makedirs(DATA_CACHE_DIR)
+
 # Session state initialization
 if "ai_result" not in st.session_state:
     st.session_state["ai_result"] = None
@@ -33,7 +38,7 @@ if "score_val" not in st.session_state:
     st.session_state["score_val"] = 0
 
 # ==========================================
-# 2. SIDEBAR - KONTROL INTERAKTIF & OVERRIDE
+# 2. SIDEBAR - KONTROL INTERAKTIF
 # ==========================================
 with st.sidebar:
     st.header("⚙️ ABEL FX Control Panel")
@@ -67,6 +72,7 @@ with st.sidebar:
     jam_input = st.text_input("Jam Rilis (WIB):", value="01:00" if "FOMC" in target_news else "19:30")
     jam_rilis_formatted = f"{jam_input} WIB"
 
+    bulan_num = bulan_dict.get(bulan_rilis, 8)
     try:
         if ":" in jam_input:
             jam_str, menit_str = jam_input.strip().split(":")
@@ -76,7 +82,6 @@ with st.sidebar:
             jam_num = 19
             menit_num = 30
             
-        bulan_num = bulan_dict.get(bulan_rilis, 8)
         event_datetime = datetime(
             int(tahun_rilis), 
             int(bulan_num), 
@@ -84,25 +89,16 @@ with st.sidebar:
             jam_num, 
             menit_num
         )
-        
         is_future_event = event_datetime > now
     except Exception:
+        event_datetime = datetime(int(tahun_rilis), bulan_num, int(tanggal_rilis), 19, 30)
         is_future_event = False
 
     st.markdown("---")
-    st.markdown("### ⚡ API Cache Control (Hemat Kuota)")
-    # Opsi Nomer 3: Tombol manual untuk clearing cache jika butuh update data mendadak
+    st.markdown("### ⚡ API Cache Control")
     if st.button("🔄 Force Refresh API Data", use_container_width=True):
         st.cache_data.clear()
-        st.toast("Cache API dibersihkan! Mengambil ulang data terbaru...", icon="✅")
-
-    st.markdown("---")
-    st.markdown("### 🛠️ Manual Data Override")
-    override_active = st.checkbox("Aktifkan Manual Input Actual", value=False)
-    manual_act1 = st.text_input("Actual Indikator 1:", value="")
-    manual_act2 = st.text_input("Actual Indikator 2:", value="")
-    manual_act3 = st.text_input("Actual Indikator 3:", value="")
-    manual_act4 = st.text_input("Actual Indikator 4:", value="")
+        st.toast("Cache API dibersihkan! Mengambil data terbaru dari API...", icon="✅")
 
     st.markdown("---")
     st.markdown("### 3. Astrodox Engine Settings")
@@ -122,16 +118,31 @@ with st.sidebar:
     running_price = st.number_input("Harga Running XAUUSD:", value=4314.00, step=0.5)
 
 # ==========================================
-# 3. MODUL DUAL-API ECONOMIC CALENDAR (WITH HIGH CACHING)
+# 3. AUTO SAVE LOCAL FILE & CACHE LOGIC (24 JAM)
 # ==========================================
-# OPSI NOMOR 3: Mengubah ttl menjadi 14400 detik (4 Jam) agar kuota API hemat total
-@st.cache_data(ttl=14400, show_spinner="Mengambil data Kalender Ekonomi dari API...")
+@st.cache_data(ttl=86400, show_spinner="Mengambil data Kalender Ekonomi...")
 def fetch_full_month_calendar(bln_num, thn_num):
+    file_path = os.path.join(DATA_CACHE_DIR, f"calendar_{thn_num}_{bln_num:02d}.json")
+    
+    # 1. Cek apakah file historis bulan ini sudah ada di folder laptop/server
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                saved_data = json.load(f)
+                if isinstance(saved_data, list) and len(saved_data) > 0:
+                    return saved_data, "Local File Database (Offline Cache)"
+        except Exception:
+            pass
+
+    # 2. Jika file belum ada, panggil API (Finnhub / FMP)
     last_day = calendar.monthrange(thn_num, bln_num)[1]
     from_date = f"{thn_num}-{bln_num:02d}-01"
     to_date = f"{thn_num}-{bln_num:02d}-{last_day:02d}"
     
-    # 1. Fetch Finnhub API
+    normalized_data = []
+    source_used = "System Presets (Offline)"
+
+    # Fetch Finnhub API
     url_finn = f"https://finnhub.io/api/v1/economic?from={from_date}&to={to_date}&token={FINNHUB_TOKEN}"
     try:
         res = requests.get(url_finn, timeout=8)
@@ -139,9 +150,8 @@ def fetch_full_month_calendar(bln_num, thn_num):
             raw_json = res.json()
             data = raw_json.get('economicData', []) if isinstance(raw_json, dict) else raw_json
             if isinstance(data, list) and len(data) > 0:
-                normalized = []
                 for item in data:
-                    normalized.append({
+                    normalized_data.append({
                         'event': item.get('event', ''),
                         'country': 'US',
                         'actual': item.get('actual'),
@@ -149,33 +159,39 @@ def fetch_full_month_calendar(bln_num, thn_num):
                         'previous': item.get('prev'),
                         'date': item.get('time', '')
                     })
-                return normalized, "Finnhub Realtime API (Cached 4 Jam)"
+                source_used = "Finnhub Realtime API"
     except Exception:
         pass
 
-    # 2. Fetch FMP API
-    url_fmp = f"https://financialmodelingprep.com/api/v3/economic_calendar?from={from_date}&to={to_date}&apikey={FMP_API_KEY}"
-    try:
-        res = requests.get(url_fmp, timeout=8)
-        if res.status_code == 200:
-            data = res.json()
-            if isinstance(data, list) and len(data) > 0 and 'error' not in str(data).lower():
-                return data, "Financial Modeling Prep (Cached 4 Jam)"
-    except Exception:
-        pass
+    # Fetch FMP API jika Finnhub tidak mengembalikan data
+    if not normalized_data:
+        url_fmp = f"https://financialmodelingprep.com/api/v3/economic_calendar?from={from_date}&to={to_date}&apikey={FMP_API_KEY}"
+        try:
+            res = requests.get(url_fmp, timeout=8)
+            if res.status_code == 200:
+                data = res.json()
+                if isinstance(data, list) and len(data) > 0 and 'error' not in str(data).lower():
+                    normalized_data = data
+                    source_used = "Financial Modeling Prep"
+        except Exception:
+            pass
 
-    return [], "System Presets (API Offline / Rate Limited)"
+    # 3. Simpan otomatis data yang didapat ke dalam file JSON lokal di folder project
+    if normalized_data:
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(normalized_data, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
 
-bulan_int = bulan_dict.get(bulan_rilis, 8)
-calendar_raw, api_source = fetch_full_month_calendar(bulan_int, int(tahun_rilis))
+    return normalized_data, source_used
+
+calendar_raw, api_source = fetch_full_month_calendar(bulan_num, int(tahun_rilis))
 
 # ==========================================
 # 4. SMART INDIKATOR RESOLVER
 # ==========================================
-def extract_indicator_smart(raw_list, keywords, default_act, default_est, default_prev, fallback_day, fallback_time="19:30", manual_val=""):
-    if override_active and manual_val.strip() != "":
-        return manual_val.strip(), str(default_est), str(default_prev), f"{fallback_day} {bulan_rilis[:3]} {tahun_rilis} {fallback_time} WIB"
-
+def extract_indicator_smart(raw_list, keywords, default_act, default_est, default_prev, fallback_day, fallback_time="19:30"):
     found_item = None
     if raw_list:
         for item in raw_list:
@@ -194,7 +210,7 @@ def extract_indicator_smart(raw_list, keywords, default_act, default_est, defaul
             ind_dt = datetime.strptime(event_date_raw[:16], "%Y-%m-%d %H:%M")
             jadwal_str = ind_dt.strftime("%d %b %Y %H:%M WIB")
         except Exception:
-            ind_dt = datetime(int(tahun_rilis), bulan_int, fallback_day, int(fallback_time[:2]), int(fallback_time[3:]))
+            ind_dt = datetime(int(tahun_rilis), bulan_num, fallback_day, int(fallback_time[:2]), int(fallback_time[3:]))
             jadwal_str = f"{fallback_day} {bulan_rilis[:3]} {tahun_rilis} {fallback_time} WIB"
 
         is_ind_past = ind_dt <= now
@@ -212,7 +228,7 @@ def extract_indicator_smart(raw_list, keywords, default_act, default_est, defaul
 
         return act_str, est_str, prev_str, jadwal_str
 
-    ind_dt_fallback = datetime(int(tahun_rilis), bulan_int, fallback_day, int(fallback_time[:2]), int(fallback_time[3:]))
+    ind_dt_fallback = datetime(int(tahun_rilis), bulan_num, fallback_day, int(fallback_time[:2]), int(fallback_time[3:]))
     jadwal_fallback_str = f"{fallback_day} {bulan_rilis[:3]} {tahun_rilis} {fallback_time} WIB"
     
     if ind_dt_fallback <= now:
@@ -220,16 +236,16 @@ def extract_indicator_smart(raw_list, keywords, default_act, default_est, defaul
     else:
         return f"OTW ({jadwal_fallback_str})", str(default_est), str(default_prev), jadwal_fallback_str
 
-# Data Preset Default
+# Preset Data Load
 if "NFP" in target_news:
-    act1, est1, prev1, j1 = extract_indicator_smart(calendar_raw, ["non farm payrolls", "nonfarm payrolls", "nfp"], "-23K", "80K", "20K", fallback_day=7, fallback_time="19:30", manual_val=manual_act1)
-    act2, est2, prev2, j2 = extract_indicator_smart(calendar_raw, ["unemployment rate"], "4.1%", "4.2%", "4.2%", fallback_day=7, fallback_time="19:30", manual_val=manual_act2)
-    act3, est3, prev3, j3 = extract_indicator_smart(calendar_raw, ["participation rate"], "61.4%", "61.6%", "61.5%", fallback_day=7, fallback_time="19:30", manual_val=manual_act3)
-    act4, est4, prev4, j4 = extract_indicator_smart(calendar_raw, ["average hourly earnings", "hourly earnings"], "0.2%", "0.3%", "0.3%", fallback_day=7, fallback_time="19:30", manual_val=manual_act4)
+    act1, est1, prev1, j1 = extract_indicator_smart(calendar_raw, ["non farm payrolls", "nonfarm payrolls", "nfp"], "-23K", "80K", "20K", fallback_day=7)
+    act2, est2, prev2, j2 = extract_indicator_smart(calendar_raw, ["unemployment rate"], "4.1%", "4.2%", "4.2%", fallback_day=7)
+    act3, est3, prev3, j3 = extract_indicator_smart(calendar_raw, ["participation rate"], "61.4%", "61.6%", "61.5%", fallback_day=7)
+    act4, est4, prev4, j4 = extract_indicator_smart(calendar_raw, ["average hourly earnings"], "0.2%", "0.3%", "0.3%", fallback_day=7)
     
     ind_data = {
         "status_rilis": "SUDAH RILIS" if not is_future_event else "BELUM RILIS",
-        "ringkasan": f"NFP Status Rilis: {act1} vs Forecast {est1}. (Sumber: {api_source})",
+        "ringkasan": f"NFP Status Rilis: {act1} vs Forecast {est1}.",
         "dampak": "Perubahan sektor tenaga kerja berpengaruh langsung ke ekspektasi Dolar US.",
         "ind_1": {"nama": "Non-Farm Payrolls", "actual": act1, "forecast": est1, "previous": prev1, "penjelasan": "Jumlah lapangan kerja baru non-pertanian.", "efek": "Actual > Forecast -> Menguatkan USD"},
         "ind_2": {"nama": "Unemployment Rate", "actual": act2, "forecast": est2, "previous": prev2, "penjelasan": "Persentase angka pengangguran.", "efek": "Actual < Forecast -> Menguatkan USD"},
@@ -237,14 +253,14 @@ if "NFP" in target_news:
         "ind_4": {"nama": "Average Hourly Earnings m/m", "actual": act4, "forecast": est4, "previous": prev4, "penjelasan": "Pertumbuhan rata-rata upah pekerja per jam.", "efek": "Actual > Forecast -> Menguatkan USD"}
     }
 elif "CPI" in target_news:
-    act1, est1, prev1, j1 = extract_indicator_smart(calendar_raw, ["cpi m/m", "cpi y/y", "consumer price index"], "0.2%", "0.2%", "0.1%", fallback_day=12, fallback_time="19:30", manual_val=manual_act1)
-    act2, est2, prev2, j2 = extract_indicator_smart(calendar_raw, ["ppi m/m", "producer price"], "0.1%", "0.2%", "0.2%", fallback_day=13, fallback_time="19:30", manual_val=manual_act2)
-    act3, est3, prev3, j3 = extract_indicator_smart(calendar_raw, ["import price"], "0.1%", "0.0%", "-0.1%", fallback_day=14, fallback_time="19:30", manual_val=manual_act3)
-    act4, est4, prev4, j4 = extract_indicator_smart(calendar_raw, ["michigan consumer sentiment"], "67.8", "66.5", "66.4", fallback_day=14, fallback_time="21:00", manual_val=manual_act4)
+    act1, est1, prev1, j1 = extract_indicator_smart(calendar_raw, ["cpi m/m", "cpi y/y", "consumer price index"], "0.2%", "0.2%", "0.1%", fallback_day=12)
+    act2, est2, prev2, j2 = extract_indicator_smart(calendar_raw, ["ppi m/m", "producer price"], "0.1%", "0.2%", "0.2%", fallback_day=13)
+    act3, est3, prev3, j3 = extract_indicator_smart(calendar_raw, ["import price"], "0.1%", "0.0%", "-0.1%", fallback_day=14)
+    act4, est4, prev4, j4 = extract_indicator_smart(calendar_raw, ["michigan consumer sentiment"], "67.8", "66.5", "66.4", fallback_day=14)
     
     ind_data = {
         "status_rilis": "SUDAH RILIS" if not is_future_event else "BELUM RILIS",
-        "ringkasan": f"CPI Status Rilis: {act1} vs Forecast {est1}. (Sumber: {api_source})",
+        "ringkasan": f"CPI Status Rilis: {act1} vs Forecast {est1}.",
         "dampak": "Perkembangan laju inflasi mempengaruhi kebijakan suku bunga The Fed.",
         "ind_1": {"nama": "Consumer Price Index (CPI)", "actual": act1, "forecast": est1, "previous": prev1, "penjelasan": "Indikator laju inflasi konsumen.", "efek": "Actual > Forecast -> Menguatkan USD"},
         "ind_2": {"nama": "Producer Price Index (PPI)", "actual": act2, "forecast": est2, "previous": prev2, "penjelasan": "Indikator inflasi produsen.", "efek": "Actual > Forecast -> Menguatkan USD"},
@@ -252,14 +268,14 @@ elif "CPI" in target_news:
         "ind_4": {"nama": "Michigan Consumer Sentiment", "actual": act4, "forecast": est4, "previous": prev4, "penjelasan": "Kepercayaan konsumen terhadap ekonomi.", "efek": "Actual > Forecast -> Menguatkan USD"}
     }
 else:
-    act1, est1, prev1, j1 = extract_indicator_smart(calendar_raw, ["fed interest rate", "fed rate decision"], "5.25%", "5.25%", "5.50%", fallback_day=20, fallback_time="01:00", manual_val=manual_act1)
-    act2, est2, prev2, j2 = extract_indicator_smart(calendar_raw, ["core pce"], "0.2%", "0.2%", "0.2%", fallback_day=30, fallback_time="19:30", manual_val=manual_act2)
-    act3, est3, prev3, j3 = extract_indicator_smart(calendar_raw, ["gdp"], "2.8%", "2.8%", "1.4%", fallback_day=29, fallback_time="19:30", manual_val=manual_act3)
-    act4, est4, prev4, j4 = extract_indicator_smart(calendar_raw, ["retail sales"], "1.0%", "0.3%", "-0.2%", fallback_day=15, fallback_time="19:30", manual_val=manual_act4)
+    act1, est1, prev1, j1 = extract_indicator_smart(calendar_raw, ["fed interest rate", "fed rate decision"], "5.25%", "5.25%", "5.50%", fallback_day=20)
+    act2, est2, prev2, j2 = extract_indicator_smart(calendar_raw, ["core pce"], "0.2%", "0.2%", "0.2%", fallback_day=30)
+    act3, est3, prev3, j3 = extract_indicator_smart(calendar_raw, ["gdp"], "2.8%", "2.8%", "1.4%", fallback_day=29)
+    act4, est4, prev4, j4 = extract_indicator_smart(calendar_raw, ["retail sales"], "1.0%", "0.3%", "-0.2%", fallback_day=15)
     
     ind_data = {
         "status_rilis": "SUDAH RILIS" if not is_future_event else "BELUM RILIS",
-        "ringkasan": f"FOMC Decision Status: {act1} vs Forecast {est1}. (Sumber: {api_source})",
+        "ringkasan": f"FOMC Decision Status: {act1} vs Forecast {est1}.",
         "dampak": "Keputusan suku bunga Fed menentukan arah jangka panjang USD.",
         "ind_1": {"nama": "Fed Interest Rate Decision", "actual": act1, "forecast": est1, "previous": prev1, "penjelasan": "Keputusan suku bunga acuan AS.", "efek": "Rate Hike -> Menguatkan USD"},
         "ind_2": {"nama": "Core PCE Price Index", "actual": act2, "forecast": est2, "previous": prev2, "penjelasan": "Inflasi acuan utama pilihan The Fed.", "efek": "Actual > Forecast -> Menguatkan USD"},
@@ -281,14 +297,14 @@ if not is_bullish:
     tech_entry = running_price + 3.00
     tech_sl = tech_entry + 7.50
     tech_tp = tech_entry - 42.00
-    tech_reason = "Multi-TF Crosscheck (Weekly-D1 Bearish BOS, H4-H1 SnD Supply Zone, M15-M1 Liquidity Sweep)."
+    tech_reason = "Multi-TF Crosscheck (Weekly-D1 Bearish BOS, H4-H1 SnD Supply Zone)."
 else:
     tech_signal = "BULLISH (STRONG PUMP)"
     tech_action = "🟢 BUY LIMIT / DISCOUNT ZONE REJECTION"
     tech_entry = running_price - 3.00
     tech_sl = running_price - 7.50
     tech_tp = running_price + 42.00
-    tech_reason = "Multi-TF Crosscheck (Weekly-D1 Bullish BOS, H4-H1 SnD Demand Zone, M15-M1 Mitigation)."
+    tech_reason = "Multi-TF Crosscheck (Weekly-D1 Bullish BOS, H4-H1 SnD Demand Zone)."
 
 # ==========================================
 # 5. KALKULATOR REKAP DATA PENDUKUNG
@@ -346,15 +362,14 @@ def calculate_macro_divergence(act1, est1, act2, est2, act3, est3, act4, est4):
 def fetch_geopolitical_analysis(event_name, actual_val, forecast_val):
     prompt = f"""
     Bertindaklah sebagai Senior Geopolitical & Macroeconomic Analyst.
-    Berikan analisis terupdate mengenai isu geopolitik krusial terkini (seperti konflik Selat Hormuz, aktivitas rudal/militer Iran, ketegangan Timur Tengah, pasokan minyak bumi, perang/sanksi global) 
-    dan kombinasikan dengan dampak rilis data {event_name} (Actual: {actual_val} vs Forecast: {forecast_val}).
+    Berikan analisis terupdate mengenai isu geopolitik krusial terkini dan kombinasikan dengan dampak rilis data {event_name} (Actual: {actual_val} vs Forecast: {forecast_val}).
 
     Format jawaban HARUS JSON MURNI tanpa markdown:
     {{
         "isu_utama": "Eskalasi Selat Hormuz & Ancaman Rudal Iran",
-        "ringkasan_situasi": "Eskalasi militer di Selat Hormuz dan ancaman serangan rudal Iran memperketat jalur distribusi minyak global dan mendongkrak minat beli aset safe haven.",
-        "dampak_usd": "USD menguat terbatas terdorong arus safe-haven di tengah ketidakpastian pasokan.",
-        "dampak_xau": "XAUUSD sangat kuat didukung oleh lonjakan permintaan hedging safe-haven perang."
+        "ringkasan_situasi": "Eskalasi militer di Selat Hormuz mendongkrak minat beli aset safe haven.",
+        "dampak_usd": "USD menguat terbatas terdorong arus safe-haven.",
+        "dampak_xau": "XAUUSD sangat kuat didukung oleh lonjakan permintaan hedging safe-haven."
     }}
     """
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
@@ -373,9 +388,9 @@ def fetch_geopolitical_analysis(event_name, actual_val, forecast_val):
 
     return {
         "isu_utama": "Ketegangan Selat Hormuz & Eskalasi Rudal Iran / Perang Timur Tengah",
-        "ringkasan_situasi": "Eskalasi militer di Selat Hormuz dan ancaman serangan rudal Iran memperketat jalur distribusi minyak global dan mendongkrak minat beli aset safe haven.",
-        "dampak_usd": "USD menguat terbatas terdorong arus safe-haven di tengah ketidakpastian pasokan.",
-        "dampak_xau": "XAUUSD sangat kuat didukung oleh lonjakan permintaan hedging safe-haven perang."
+        "ringkasan_situasi": "Eskalasi militer memperketat jalur distribusi minyak global dan mendongkrak safe haven.",
+        "dampak_usd": "USD menguat terbatas terdorong arus safe-haven.",
+        "dampak_xau": "XAUUSD sangat kuat didukung oleh lonjakan permintaan hedging safe-haven."
     }
 
 # ==========================================
@@ -393,7 +408,7 @@ if ind_data["status_rilis"] == "SUDAH RILIS":
     - **Status:** Event ini telah rilis / lewat pada {tanggal_rilis} {bulan_rilis} {tahun_rilis} jam {jam_rilis_formatted}.
     - **Ringkasan Data:** {ind_data['ringkasan']}
     - **Dampak Pasar:** {ind_data['dampak']}
-    - **Sumber Feed API:** Terintegrasi via **{api_source}**
+    - **Sumber Feed Data:** {api_source}
     """)
 else:
     st.info(f"""
@@ -401,11 +416,15 @@ else:
     - **Status:** Event baru akan rilis pada **{tanggal_rilis} {bulan_rilis} {tahun_rilis} jam {jam_rilis_formatted}**.
     - **Ringkasan:** {ind_data['ringkasan']}
     - **Dampak Kebijakan:** {ind_data['dampak']}
+    - **Sumber Feed Data:** {api_source}
     """)
 
 st.markdown("---")
 st.subheader(f"📊 Data Indikator Pendukung Real-Time ({target_news})")
-st.caption(f"💡 Synchronized via {api_source} | Waktu Sistem Saat Ini: {now.strftime('%d-%m-%Y %H:%M:%S')} WIB")
+st.caption(f"💡 Synchronized via {api_source} | Waktu Sistem: {now.strftime('%d-%m-%Y %H:%M:%S')} WIB")
+
+# Variabel penyimpan input aktual dari UI utama
+actual_inputs = {}
 
 def render_indicator_box(key_prefix, ind_dict):
     unique_key_suffix = f"{key_prefix}_{target_news}_{tanggal_rilis}_{bulan_rilis}_{tahun_rilis}"
@@ -415,7 +434,8 @@ def render_indicator_box(key_prefix, ind_dict):
     
     c1, c2, c3 = st.columns(3)
     with c1:
-        st.text_input("Actual", value=str(ind_dict.get('actual', '-')), key=f"act_{unique_key_suffix}")
+        val_act = st.text_input("Actual", value=str(ind_dict.get('actual', '-')), key=f"act_{unique_key_suffix}")
+        actual_inputs[key_prefix] = val_act
     with c2:
         st.text_input("Forecast", value=str(ind_dict.get('forecast', '-')), key=f"for_{unique_key_suffix}")
     with c3:
@@ -427,12 +447,18 @@ render_indicator_box("ind_2", ind_data.get("ind_2", {}))
 render_indicator_box("ind_3", ind_data.get("ind_3", {}))
 render_indicator_box("ind_4", ind_data.get("ind_4", {}))
 
+# Gunakan input langsung dari UI utama untuk evaluasi AI
+final_act1 = actual_inputs.get("ind_1", act1)
+final_act2 = actual_inputs.get("ind_2", act2)
+final_act3 = actual_inputs.get("ind_3", act3)
+final_act4 = actual_inputs.get("ind_4", act4)
+
 # ==========================================
 # 8. MODUL GEOPOLITIK
 # ==========================================
 st.subheader("🌍 MODUL BERITA GEOPOLITIK & SENTIMEN TRANSISI")
 
-geo_info = fetch_geopolitical_analysis(target_news, act1, est1)
+geo_info = fetch_geopolitical_analysis(target_news, final_act1, est1)
 
 st.warning(f"""
 - 🚨 **Isu Utama:** {geo_info.get('isu_utama')}
@@ -450,7 +476,7 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
     with st.spinner("Sintesis Data Makro + Geopolitik + Technical Setup..."):
         
         rekap_text, macro_bias_result, score_val = calculate_macro_divergence(
-            act1, est1, act2, est2, act3, est3, act4, est4
+            final_act1, est1, final_act2, est2, final_act3, est3, final_act4, est4
         )
         
         system_prompt = f"""
@@ -629,7 +655,7 @@ with col_r:
 st.markdown("---")
 
 # ==========================================
-# 11. LIVE CHART TRADINGVIEW
+# 11. LIVE CHART TRADINGVIEW (BERSIH TANPA INDICATOR)
 # ==========================================
 st.subheader("📉 LIVE CHART TRADINGVIEW (INTERACTIVE)")
 
@@ -652,10 +678,7 @@ tradingview_widget = """
     "allow_symbol_change": true,
     "container_id": "tradingview_chart",
     "hide_side_toolbar": false,
-    "studies": [
-      "RSI@tv-basicstudies",
-      "MASimple@tv-basicstudies"
-    ]
+    "studies": []
   });
   </script>
 </div>
