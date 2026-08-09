@@ -15,6 +15,7 @@ st.set_page_config(
 )
 
 GROQ_API_KEY = "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"
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions".encode('ascii', 'ignore').decode('ascii').strip()
 
 # ==========================================
 # 2. SIDEBAR - KONTROL INTERAKTIF
@@ -36,7 +37,7 @@ with st.sidebar:
         "Januari", "Februari", "Maret", "April", "Mei", "Juni",
         "Juli", "Agustus", "September", "Oktober", "November", "Desember"
     ]
-    bulan_rilis = st.selectbox("Bulan Rilis:", daftar_bulan, index=7) # Default Agustus
+    bulan_rilis = st.selectbox("Bulan Rilis:", daftar_bulan, index=7)
     tahun_rilis = st.number_input("Tahun Rilis:", value=2026)
     
     jam_input = st.text_input("Jam Rilis (WIB):", value="01:00" if "FOMC" in target_news else "19:30")
@@ -76,16 +77,11 @@ def fetch_complete_macro_data(news_name, tgl, bln, thn):
     Hari ini adalah 9 Agustus 2026.
     
     Cari/prediksi data riil spesifik untuk event: "{news_name}" pada tanggal {tgl} {bln} {thn}.
-    CATATAN PENTING: Karena tanggal/bulan adalah {tgl} {bln} {thn}, berikan data aktual, forecast, dan previous yang KASUS-SPESIFIK untuk periode {bln} {thn} tersebut. Jangan gunakan angka generik/statis!
-
-    Kategori Indikator:
-    - NFP: Main = Non-Farm Payrolls (contoh: 142K, 216K), Pendukung = ADP Non-Farm Employment, Initial Jobless Claims, ISM Manufacturing PMI (Employment).
-    - CPI: Main = Consumer Price Index (%, contoh: 3.1%, 2.9%), Pendukung = PPI m/m, Import Price Index, Michigan Consumer Sentiment.
-    - FOMC: Main = Fed Interest Rate Decision (%, contoh: 5.25%), Pendukung = Core PCE Price Index y/y, GDP Advance Estimate, Retail Sales m/m.
+    CATATAN PENTING: Berikan data aktual, forecast, dan previous yang spesifik untuk periode {bln} {thn}.
 
     Format balasan WAJIB JSON murni tanpa markdown backticks (tanpa ```json):
     {{
-        "status_rilis": "SUDAH RILIS" atau "BELUM RILIS",
+        "status_rilis": "SUDAH RILIS",
         "ringkasan_hasil_utama": "Penjelasan hasil rilis untuk periode {bln} {thn}",
         "dampak_utama_usd_xau": "Dampak hasil ke USD dan XAU",
         "indikator_utama": {{
@@ -113,7 +109,7 @@ def fetch_complete_macro_data(news_name, tgl, bln, thn):
             "efek_ke_dollar": "..."
         }},
         "ind_4": {{
-            "nama": "Nama Pendukung 4",
+            "nama": "Nama Pendukung 3",
             "actual": "...",
             "forecast": "...",
             "previous": "...",
@@ -123,7 +119,6 @@ def fetch_complete_macro_data(news_name, tgl, bln, thn):
     }}
     """
     
-    url = "[https://api.groq.com/openai/v1/chat/completions](https://api.groq.com/openai/v1/chat/completions)"
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
     payload = {
         "model": "llama-3.3-70b-versatile",
@@ -132,7 +127,7 @@ def fetch_complete_macro_data(news_name, tgl, bln, thn):
     }
     
     try:
-        response = requests.post(url, headers=headers, json=payload, timeout=20)
+        response = requests.post(GROQ_URL, headers=headers, json=payload, timeout=20)
         if response.status_code == 200:
             content = response.json()['choices'][0]['message']['content'].strip()
             if content.startswith("```json"):
@@ -143,7 +138,7 @@ def fetch_complete_macro_data(news_name, tgl, bln, thn):
     except Exception as e:
         pass
     
-    # Variasi fallback dinamis berbasis bulan jika API Groq mengalami limit/timeout
+    # Dynamic fallback jika koneksi internet/API terhalang
     hash_seed = (int(tgl) + len(bln) + int(thn)) % 5
     if "NFP" in news_name:
         acts = ["142K", "175K", "216K", "114K", "254K"]
@@ -193,11 +188,10 @@ def fetch_geopolitical_news():
         "dampak_ke_xau": "Efek ke Gold/XAU..."
     }
     """
-    url = "[https://api.groq.com/openai/v1/chat/completions](https://api.groq.com/openai/v1/chat/completions)"
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
     payload = {"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": prompt}], "temperature": 0.2}
     try:
-        res = requests.post(url, headers=headers, json=payload, timeout=15)
+        res = requests.post(GROQ_URL, headers=headers, json=payload, timeout=15)
         if res.status_code == 200:
             content = res.json()['choices'][0]['message']['content'].strip()
             if content.startswith("```json"): content = content[7:-3].strip()
@@ -212,14 +206,12 @@ def fetch_geopolitical_news():
         "dampak_ke_xau": "Emas (XAU) terdorong minat beli lindung nilai."
     }
 
-# Ambil data dinamis berdasarkan input user
 macro_data = fetch_complete_macro_data(target_news, tanggal_rilis, bulan_rilis, tahun_rilis)
 geo_data = fetch_geopolitical_news()
 
 is_released = macro_data.get("status_rilis", "SUDAH RILIS") == "SUDAH RILIS"
 status_text = "[ ✅ SUDAH RILIS ]" if is_released else f"[ ⏳ BELUM RILIS ({tanggal_rilis} {bulan_rilis} {tahun_rilis}) ]"
 
-# Logika Bias Teknikal
 if "Force Bearish" in market_condition:
     is_bullish = False
 elif "Force Bullish" in market_condition:
@@ -248,7 +240,6 @@ else:
 st.title("📈 ABEL FX - Macro Predictor Engine")
 st.markdown(f"### 📌 TARGET EVENT: {target_news} - {tanggal_rilis} {bulan_rilis} {tahun_rilis} ({jam_rilis_formatted}) &nbsp;&nbsp;&nbsp;&nbsp; **{status_text}**")
 
-# Penjelasan Ringkas News Utama
 if is_released:
     st.success(f"""
     🎯 **PENJELASAN HASIL AKHIR NEWS UTAMA ({target_news}):**
@@ -260,7 +251,6 @@ st.markdown("---")
 st.subheader(f"📊 Data Indikator Pendukung Real-Time & Analisis Dampak ({target_news})")
 st.caption("💡 Sinkronisasi otomatis aktif via Groq AI Engine.")
 
-# Fungsi render box dengan unique key mencakup (Tgl, Bln, Thn, Event)
 def render_indicator_box(key_prefix, ind_dict):
     unique_key_suffix = f"{key_prefix}_{target_news}_{tanggal_rilis}_{bulan_rilis}_{tahun_rilis}"
     
@@ -277,7 +267,6 @@ def render_indicator_box(key_prefix, ind_dict):
         st.text_input("Previous", value=str(ind_dict.get('previous', '')), key=f"prev_{unique_key_suffix}")
     st.markdown("---")
 
-# Render 4 Indikator
 render_indicator_box("ind_1", macro_data.get("indikator_utama", {}))
 render_indicator_box("ind_2", macro_data.get("ind_2", {}))
 render_indicator_box("ind_3", macro_data.get("ind_3", {}))
@@ -299,7 +288,7 @@ with st.container():
 
 st.markdown("---")
 
-# Tombol Eksekusi AI Prediction
+# Tombol Eksekusi AI Prediction dengan URL Terbuka & Ter-sanitize
 if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", type="primary", use_container_width=True):
     with st.spinner(f"Memproses kalkulasi Multi-Timeframe & Makro untuk {target_news}..."):
         prompt = f"""
@@ -308,19 +297,18 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
         Kondisi Teknikal Bias: {tech_signal}.
         Berikan kesimpulan komprehensif dalam Bahasa Indonesia mencakup: Analisis Makro/Geopolitik, Confluence Multi-TF, dan Rekomendasi Eksekusi (BUY/SELL, Entry, SL, TP).
         """
-        # URL bersih tanpa karakter aneh
-        url = "[https://api.groq.com/openai/v1/chat/completions](https://api.groq.com/openai/v1/chat/completions)"
         headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
         payload = {"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": prompt}], "temperature": 0.3}
+        
         try:
-            res = requests.post(url, headers=headers, json=payload, timeout=20)
+            res = requests.post(GROQ_URL, headers=headers, json=payload, timeout=25)
             if res.status_code == 200:
                 st.success("✅ Analisis Berhasil Dieksekusi!")
                 st.markdown(res.json()['choices'][0]['message']['content'])
             else:
-                st.error(f"Gagal memproses API Groq. Status code: {res.status_code}")
+                st.error(f"Gagal memproses API Groq. HTTP Status Code: {res.status_code}")
         except Exception as e:
-            st.error(f"Error koneksi API: {e}")
+            st.error(f"Error Koneksi: {e}")
 
 st.markdown("---")
 
