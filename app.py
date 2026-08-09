@@ -88,7 +88,7 @@ def compute_planetary_positions(dt_utc):
 
     return raw_degs, formatted_pos
 
-def generate_astrodox_unified_image(target_date: datetime):
+def generate_astrodox_unified_image(target_date: datetime, ai_result_data=None):
     dt_utc = target_date - timedelta(hours=7)
     planet_degrees, planet_positions = compute_planetary_positions(dt_utc)
 
@@ -155,7 +155,7 @@ def generate_astrodox_unified_image(target_date: datetime):
         color='white', fontsize=12, pad=15, fontweight='bold'
     )
 
-    # 2. DETAIL POSISI & REKAPITULASI ASPEK
+    # 2. DETAIL POSISI & INTEGRASI AI PROYEKSI RANGE DI KOLOM RODA ASTRODOX
     ax_text = fig.add_subplot(122, facecolor='#0e1117')
     ax_text.axis('off')
 
@@ -174,19 +174,33 @@ def generate_astrodox_unified_image(target_date: datetime):
     info_text += "\n" + "─" * 52 + "\n"
     info_text += "💡 REKAP GARIS ASPEK GEOMETRI ASTRODOX:\n"
     info_text += "─" * 52 + "\n"
-    info_text += f"🔴 MERAH (Square 90°/Opp 180°) : {aspect_counts['merah']} Garis (Volatilitas Tinggi / Friction)\n"
-    info_text += f"🟢 HIJAU (Trine 120°)          : {aspect_counts['hijau']} Garis (Expansion Trend / Flow)\n"
-    info_text += f"🔵 BIRU  (Sextile 60°)         : {aspect_counts['biru']} Garis (Harmonis / Retest Zone)\n"
-    info_text += f"🟡 KUNING (Conjunction 0°)     : {aspect_counts['kuning']} Garis (Extreme Turning Point)\n"
+    info_text += f"🔴 MERAH (Square 90°/Opp 180°) : {aspect_counts['merah']} Garis (Volatilitas/Tension)\n"
+    info_text += f"🟢 HIJAU (Trine 120°)          : {aspect_counts['hijau']} Garis (Expansion Trend/Flow)\n"
+    info_text += f"🔵 BIRU  (Sextile 60°)         : {aspect_counts['biru']} Garis (Harmonis/Retest Zone)\n"
+    info_text += f"🟡 KUNING (Conjunction 0°)     : {aspect_counts['kuning']} Garis (Turning Point/Extreme)\n"
 
+    # Masukkan Data AI Proyeksi Range Pips ke dalam Kolom Astrodox
     info_text += "\n" + "─" * 52 + "\n"
-    info_text += "📌 CATATAN MULTI-CONFLUENCE:\n"
-    info_text += "Perkiraan Range Pips (Sweep, Trend, Reversal) disintesiskan\n"
-    info_text += "secara presisi oleh AI Predictor Engine dengan menggabungkan\n"
-    info_text += "bobot Aspek Astrodox + SMC Technical Market Structure di bawah."
+    info_text += "⚡ AI PROYEKSI RANGE & EXECUTION SETUP (INTEGRATED):\n"
+    info_text += "─" * 52 + "\n"
+    
+    if ai_result_data:
+        pips = ai_result_data.get("proyeksi_pips", {})
+        setup = ai_result_data.get("setup_spesifik", {})
+        info_text += f"• Arah Bias Utama : {ai_result_data.get('arah_bias', '-')}\n"
+        info_text += f"• Whipsaw Alert   : {ai_result_data.get('peringatan_whipsaw', 'Waspada lonjakan dua arah!')}\n"
+        info_text += f"• Sweep Range     : {pips.get('sweep_pips', '-')}\n"
+        info_text += f"• Trend Range     : {pips.get('trend_pips', '-')}\n"
+        info_text += f"• Reversal Range  : {pips.get('reversal_pips', '-')}\n"
+        info_text += f"• Zona Buy Demand : {setup.get('zona_buy_demand', '-')}\n"
+        info_text += f"• Zona Sell Supply: {setup.get('zona_sell_supply', '-')}\n"
+        info_text += f"• Stop Loss (SL)  : Buy ({setup.get('sl_buy', '-')}) | Sell ({setup.get('sl_sell', '-')})\n"
+        info_text += f"• Take Profit (TP): Buy ({setup.get('tp_buy', '-')}) | Sell ({setup.get('tp_sell', '-')})\n"
+    else:
+        info_text += "[ Menunggu Eksekusi Tombol AI Prediction di Dashboard atas ]\n"
 
     ax_text.text(
-        0.01, 0.98, info_text, color='#e0e0e0', fontsize=8.8, 
+        0.01, 0.98, info_text, color='#e0e0e0', fontsize=8.2, 
         fontfamily='monospace', va='top', ha='left',
         bbox=dict(boxstyle='round,pad=0.8', facecolor='#161b22', edgecolor='#30363d')
     )
@@ -604,9 +618,6 @@ st.warning(f"""
 
 st.markdown("---")
 
-# Render Astrodox Chart First to Extract Aspect Counts
-fig_astro_unified, img_astro_buf, aspect_counts = generate_astrodox_unified_image(event_datetime)
-
 if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", type="primary", use_container_width=True):
     with st.spinner("Sintesis Data Makro + Astrodox Aspect Weights + Geopolitik + SMC Technical Structure..."):
         
@@ -616,19 +627,23 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
         
         _, astro_positions_dict = compute_planetary_positions(event_datetime - timedelta(hours=7))
 
+        # Dummy aspect count calculation first to feed AI
+        fig_temp, _, temp_counts = generate_astrodox_unified_image(event_datetime, None)
+        plt.close(fig_temp)
+
         system_prompt = f"""
         Kamu adalah Senior Quantitative Trader, Macro Analyst & Financial Astrologer spesialis XAUUSD.
-        Sintesiskan Data Makro + Bobot Garis Aspek Astrodox + Geopolitik + SMC Technical Structure menjadi ESTIMASI RANGE PIPS PRESISI DAN ZONA ENTRY.
+        Sintesiskan Data Makro + Bobot Garis Aspek Astrodox + Geopolitik + SMC Technical Structure menjadi ESTIMASI RANGE PIPS PRESISI, WHIPSAW WARNING, ZONA ENTRY, SL, DAN TP.
 
         [INPUT DATA REAL-TIME]
         - Target Event: {target_news} ({status_text})
         - Running Price XAUUSD: {running_price}
         - Posisi Planet Astrodox: {json.dumps(astro_positions_dict)}
         - Hitungan Garis Aspek Astrodox Active:
-            * Merah (Square 90° / Opposite 180° - Volatilitas/Tension): {aspect_counts['merah']} garis
-            * Hijau (Trine 120° - Expansion Trend): {aspect_counts['hijau']} garis
-            * Biru (Sextile 60° - Support/Demand Retest): {aspect_counts['biru']} garis
-            * Kuning (Conjunction 0° - Extreme Volatility/Turning Point): {aspect_counts['kuning']} garis
+            * Merah (Square 90° / Opposite 180° - Volatilitas/Tension): {temp_counts['merah']} garis
+            * Hijau (Trine 120° - Expansion Trend): {temp_counts['hijau']} garis
+            * Biru (Sextile 60° - Support/Demand Retest): {temp_counts['biru']} garis
+            * Kuning (Conjunction 0° - Extreme Volatility/Turning Point): {temp_counts['kuning']} garis
         - Rekap Data Makro Pendukung:
         {rekap_text}
         - Bias Makro Kalkulasi: {macro_bias_result}
@@ -636,13 +651,14 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
 
         [INSTRUKSI ENGINE AI]
         1. Baca Garis Astro Dominan:
-           - Jika Garis Merah/Kuning Tinggi: Proyeksikan Sweep Liquidity Pips & Reversal Pips yang LEBIH BESAR.
+           - Jika Garis Merah/Kuning Tinggi: Proyeksikan Sweep Liquidity Pips & Whipsaw Warning yang TINGGI. Berikan peringatan whipsaw spesifik (misal: "Awas False Breakout dua arah sebelum arah tren utama divalidasi").
            - Jika Garis Hijau Dominan: Proyeksikan Trend Expansion Pips yang LEBIH BESAR.
-        2. Hitung estimasi konkret range Pips untuk XAUUSD (10 pips = $1.00 move).
+        2. Tentukan Bias Trend, Zona Entry Presisi, SL, dan TP berdasarkan konvergensi Astro + SMC.
         3. Berikan jawaban HANYA dalam format JSON MURNI tanpa markdown tambahan:
 
         {{
             "arah_bias": "BULLISH / BEARISH / WHIPSAW",
+            "peringatan_whipsaw": "Waspada sweep ekstrem di area support/resistance sebelum pergerakan tren utama terkunci.",
             "ringkasan_sintesis": "Sintesis gabungan pengaruh aspek planet astrodox dan makro.",
             "proyeksi_pips": {{
                 "sweep_pips": "80-120 Pips ($8.0-$12.0)",
@@ -692,7 +708,7 @@ if st.session_state["ai_result"]:
     st.markdown(st.session_state["rekap_text"])
     st.info(f"⚖️ **Kesimpulan Bias Makro:** {st.session_state['macro_bias_result']} (Score Net: {st.session_state['score_val']})")
 
-    st.markdown("### ⚡ AI PROYEKSI RANGE PIPS (CONFLUENCE ASTRO + TECHNICALS)")
+    st.markdown("### ⚡ AI PROYEKSI RANGE PIPS & WHIPSAW WARNING")
     
     p1, p2, p3, p4 = st.columns(4)
     with p1:
@@ -705,6 +721,7 @@ if st.session_state["ai_result"]:
         st.metric("📊 Total Expected Range", pips_ai.get("total_expected_range", "-"))
 
     st.markdown("---")
+    st.warning(f"⚠️ **Peringatan Whipsaw & False Breakout:** {res_ai.get('peringatan_whipsaw', '-')}")
     st.markdown(f"• **Arah Bias Utama AI:** `{res_ai.get('arah_bias')}`")
     st.markdown(f"• **Sintesis Makro, Astro & Geopolitik:** {res_ai.get('ringkasan_sintesis')}")
     st.markdown(f"• **Reasoning & Liquidity Trigger:** {res_ai.get('logika_entry_detail')}")
@@ -738,6 +755,12 @@ if st.session_state["ai_result"]:
 
 st.markdown("---")
 
+# Generate Astrodox Unified Section with AI Data integrated inside the wheel column box
+fig_astro_unified, img_astro_buf, aspect_counts = generate_astrodox_unified_image(
+    event_datetime, 
+    st.session_state["ai_result"]
+)
+
 # ==========================================
 # 6. CONFLUENCE CARDS
 # ==========================================
@@ -746,25 +769,26 @@ st.subheader("🎯 MULTI-TIMEFRAME LIQUIDITY & METHOD CONFLUENCE")
 col_l, col_m, col_r = st.columns(3)
 
 with col_l:
-    st.markdown("### 🤖 AI Macro Engine")
+    st.markdown("### 🤖 AI Macro & Range Engine")
     if st.session_state["ai_result"]:
         ai_bias = st.session_state["ai_result"].get("arah_bias", "NEUTRAL")
         ai_setup = st.session_state["ai_result"].get("setup_spesifik", {})
         
+        st.markdown(f"• **Bias Utama:** `{ai_bias}`")
         if "NEUTRAL" in str(ai_bias).upper() or "WHIPSAW" in str(ai_bias).upper():
-            st.warning("⚠️ **ARAH BIAS: NEUTRAL / WHIPSAW**")
-            st.markdown("#### 🟢 ZONA BUY (DISCOUNT)")
+            st.warning("⚠️ **Waspada Whipsaw Dua Arah**")
+            st.markdown("#### 🟢 ZONA BUY")
             st.info(f"{ai_setup.get('zona_buy_demand')}")
-            st.markdown("#### 🔴 ZONA SELL (PREMIUM)")
+            st.markdown("#### 🔴 ZONA SELL")
             st.error(f"{ai_setup.get('zona_sell_supply')}")
         elif "BULLISH" in str(ai_bias).upper():
-            st.markdown("🟢 **ARAH BIAS: BULLISH (BUY)**")
+            st.markdown("🟢 **ZONA BUY DEMAND**")
             st.info(f"{ai_setup.get('zona_buy_demand')}")
         else:
-            st.markdown("🔴 **ARAH BIAS: BEARISH (SELL)**")
+            st.markdown("🔴 **ZONA SELL SUPPLY**")
             st.error(f"{ai_setup.get('zona_sell_supply')}")
     else:
-        st.caption("Klik tombol 'EXECUTE MULTI-TF AI PREDICTION' untuk mengaktifkan AI Engine.")
+        st.caption("Klik tombol 'EXECUTE MULTI-TF AI PREDICTION' untuk mengaktifkan AI Range Engine.")
 
 with col_m:
     st.markdown("### 🔮 Astrodox Engine")
@@ -800,14 +824,14 @@ st.markdown("---")
 # ==========================================
 # 7. ASTRODOX UNIFIED SECTION
 # ==========================================
-st.subheader("🔮 ASTRODOX TRANSIT WHEEL & ASPECT ANALYSIS")
+st.subheader("🔮 ASTRODOX TRANSIT WHEEL & AI RANGE INTEGRATED ANALYSIS")
 
 st.pyplot(fig_astro_unified)
 
 st.download_button(
-    label="📥 Download Roda Astrodox & Analisis (.png)",
+    label="📥 Download Roda Astrodox & AI Proyeksi Range (.png)",
     data=img_astro_buf,
-    file_name=f"Astrodox_Analysis_{event_datetime.strftime('%Y%m%d_%H%M')}.png",
+    file_name=f"Astrodox_AI_Range_{event_datetime.strftime('%Y%m%d_%H%M')}.png",
     mime="image/png",
     use_container_width=True
 )
