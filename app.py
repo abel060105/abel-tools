@@ -1,5 +1,6 @@
 import os
 import json
+import calendar
 import requests
 import pandas as pd
 import streamlit as st
@@ -48,7 +49,7 @@ with st.sidebar:
     
     now = datetime.now()
     
-    tanggal_rilis = st.number_input("Tanggal Rilis:", value=12, min_value=1, max_value=31)
+    tanggal_rilis = st.number_input("Tanggal Rilis:", value=7, min_value=1, max_value=31)
     
     daftar_bulan = [
         "Januari", "Februari", "Maret", "April", "Mei", "Juni",
@@ -66,9 +67,7 @@ with st.sidebar:
     jam_input = st.text_input("Jam Rilis (WIB):", value="01:00" if "FOMC" in target_news else "19:30")
     jam_rilis_formatted = f"{jam_input} WIB"
 
-    # ==========================================
-    # VALIDASI PRESISI WAKTU (TANGGAL + JAM + MENIT)
-    # ==========================================
+    # Validasi Presisi Waktu Main Event
     try:
         if ":" in jam_input:
             jam_str, menit_str = jam_input.strip().split(":")
@@ -109,24 +108,33 @@ with st.sidebar:
     running_price = st.number_input("Harga Running XAUUSD:", value=4314.00, step=0.5)
 
 # ==========================================
-# 3. MODUL DUAL-API ECONOMIC CALENDAR
+# 3. MODUL DUAL-API ECONOMIC CALENDAR (PENCARIAN 1 BULAN FULL)
 # ==========================================
-def fetch_from_fmp(date_str):
-    url = f"https://financialmodelingprep.com/api/v3/economic_calendar?from={date_str}&to={date_str}&apikey={FMP_API_KEY}"
+@st.cache_data(ttl=300)
+def fetch_full_month_calendar(bln_num, thn_num):
+    """
+    Menarik seluruh data kalender ekonomi dalam 1 bulan penuh
+    agar tiap indikator pendukung ketemu jadwal/rilis aslinya.
+    """
+    last_day = calendar.monthrange(thn_num, bln_num)[1]
+    from_date = f"{thn_num}-{bln_num:02d}-01"
+    to_date = f"{thn_num}-{bln_num:02d}-{last_day:02d}"
+    
+    # 1. Try FMP API
+    url_fmp = f"https://financialmodelingprep.com/api/v3/economic_calendar?from={from_date}&to={to_date}&apikey={FMP_API_KEY}"
     try:
-        res = requests.get(url, timeout=5)
+        res = requests.get(url_fmp, timeout=6)
         if res.status_code == 200:
             data = res.json()
             if isinstance(data, list) and len(data) > 0:
-                return data
+                return data, "Financial Modeling Prep (FMP)"
     except Exception:
         pass
-    return None
 
-def fetch_from_finnhub(date_str):
-    url = f"https://finnhub.io/api/v1/economic?from={date_str}&to={date_str}&token={FINNHUB_TOKEN}"
+    # 2. Try Finnhub API Fallback
+    url_finn = f"https://finnhub.io/api/v1/economic?from={from_date}&to={to_date}&token={FINNHUB_TOKEN}"
     try:
-        res = requests.get(url, timeout=5)
+        res = requests.get(url_finn, timeout=6)
         if res.status_code == 200:
             data = res.json().get('economicData', [])
             if len(data) > 0:
@@ -140,31 +148,23 @@ def fetch_from_finnhub(date_str):
                         'previous': item.get('prev'),
                         'date': item.get('time', '')
                     })
-                return normalized
+                return normalized, "Finnhub"
     except Exception:
         pass
-    return None
 
-def get_economic_calendar_data(tgl, bln_str, thn):
-    m = f"{bulan_dict.get(bln_str, 8):02d}"
-    d = f"{int(tgl):02d}"
-    date_str = f"{thn}-{m}-{d}"
-    
-    raw_data = fetch_from_fmp(date_str)
-    source = "Financial Modeling Prep (FMP)"
-    
-    if not raw_data:
-        raw_data = fetch_from_finnhub(date_str)
-        source = "Finnhub"
-        
-    return raw_data, source
+    return [], "None"
+
+bulan_int = bulan_dict.get(bulan_rilis, 8)
+calendar_raw, api_source = fetch_full_month_calendar(bulan_int, int(tahun_rilis))
 
 # ==========================================
-# 4. EKSTRAKSI INDIKATOR & OTOMATIS OTW SPESIFIK
+# 4. EKSTRAKSI INDIKATOR INDIVIDUAL & VALIDASI WAKTU PRESISI
 # ==========================================
-calendar_raw, api_source = get_economic_calendar_data(tanggal_rilis, bulan_rilis, tahun_rilis)
-
-def extract_indicator_values(raw_list, keywords, default_est="OTW", default_prev="OTW"):
+def extract_indicator_values(raw_list, keywords, default_est="-", default_prev="-"):
+    """
+    Ekstraksi data actual, forecast, previous, beserta tanggal/jam rilis spesifik.
+    Jika waktu rilis sudah berlalu dari datetime.now(), status BUKAN OTW.
+    """
     if raw_list:
         for item in raw_list:
             event_name = item.get('event', '').lower()
@@ -173,38 +173,49 @@ def extract_indicator_values(raw_list, keywords, default_est="OTW", default_prev
                 est = item.get('estimate')
                 prev = item.get('previous')
                 
-                # Coba ambil timestamp spesifik per indikator dari API
                 event_date_raw = item.get('date', '')
+                ind_dt = None
+                
                 if event_date_raw:
                     try:
-                        dt_obj = datetime.strptime(event_date_raw[:16], "%Y-%m-%d %H:%M")
-                        jadwal_spesifik = dt_obj.strftime("%d %b %Y %H:%M WIB")
+                        ind_dt = datetime.strptime(event_date_raw[:16], "%Y-%m-%d %H:%M")
+                        jadwal_spesifik = ind_dt.strftime("%d %b %Y %H:%M WIB")
                     except Exception:
                         jadwal_spesifik = f"{tanggal_rilis} {bulan_rilis[:3]} {tahun_rilis} {jam_rilis_formatted}"
                 else:
                     jadwal_spesifik = f"{tanggal_rilis} {bulan_rilis[:3]} {tahun_rilis} {jam_rilis_formatted}"
 
-                status_otw = f"OTW ({jadwal_spesifik})"
+                # Cek apakah indikator ini sudah lewat dari waktu sekarang
+                is_ind_past = (ind_dt <= now) if ind_dt else (not is_future_event)
                 
-                act_str = str(act) if (act is not None and str(act).strip() != "") else status_otw
+                if act is not None and str(act).strip() != "":
+                    act_str = str(act)
+                else:
+                    if is_ind_past:
+                        act_str = "Pending Update"
+                    else:
+                        act_str = f"OTW ({jadwal_spesifik})"
+                
                 est_str = str(est) if (est is not None and str(est).strip() != "") else default_est
                 prev_str = str(prev) if (prev is not None and str(prev).strip() != "") else default_prev
                 
                 return act_str, est_str, prev_str
-            
-    jadwal_default = f"OTW ({tanggal_rilis} {bulan_rilis[:3]} {tahun_rilis} {jam_rilis_formatted})"
-    return jadwal_default, default_est, default_prev
 
+    # Fallback jika indikator tidak ada di log API
+    is_main_past = not is_future_event
+    fallback_act = "Pending / No Data" if is_main_past else f"OTW ({tanggal_rilis} {bulan_rilis[:3]} {tahun_rilis} {jam_rilis_formatted})"
+    return fallback_act, default_est, default_prev
+
+# Ekstraksi sesuai Target News
 if "NFP" in target_news:
     act1, est1, prev1 = extract_indicator_values(calendar_raw, ["non farm payrolls", "nonfarm payrolls", "nfp"], "80K", "20K")
     act2, est2, prev2 = extract_indicator_values(calendar_raw, ["unemployment rate"], "4.2%", "4.2%")
     act3, est3, prev3 = extract_indicator_values(calendar_raw, ["participation rate"], "61.6%", "61.5%")
     act4, est4, prev4 = extract_indicator_values(calendar_raw, ["manufacturing payrolls"], "4K", "11K")
     
-    is_released_flag = ("OTW" not in act1) and (not is_future_event)
     ind_data = {
-        "status_rilis": "SUDAH RILIS" if is_released_flag else "BELUM RILIS",
-        "ringkasan": f"NFP Rilis {act1} vs Forecast {est1}. Sumber API: {api_source}." if is_released_flag else f"Menunggu Rilis NFP pada {tanggal_rilis} {bulan_rilis} {tahun_rilis} ({jam_rilis_formatted}). Forecast: {est1}.",
+        "status_rilis": "SUDAH RILIS" if not is_future_event else "BELUM RILIS",
+        "ringkasan": f"NFP Data Status: {act1} vs Forecast {est1}. Sumber API: {api_source}." if not is_future_event else f"Menunggu Rilis NFP pada {tanggal_rilis} {bulan_rilis} {tahun_rilis} ({jam_rilis_formatted}). Forecast: {est1}.",
         "dampak": "Perubahan sektor tenaga kerja berpengaruh langsung ke ekspektasi Dolar US.",
         "ind_1": {"nama": "Non-Farm Payrolls", "actual": act1, "forecast": est1, "previous": prev1, "penjelasan": "Jumlah lapangan kerja baru non-pertanian.", "efek": "Actual > Forecast -> Menguatkan USD"},
         "ind_2": {"nama": "Unemployment Rate", "actual": act2, "forecast": est2, "previous": prev2, "penjelasan": "Persentase angka pengangguran.", "efek": "Actual < Forecast -> Menguatkan USD"},
@@ -217,10 +228,9 @@ elif "CPI" in target_news:
     act3, est3, prev3 = extract_indicator_values(calendar_raw, ["import price"], "0.0%", "-0.1%")
     act4, est4, prev4 = extract_indicator_values(calendar_raw, ["michigan consumer sentiment"], "66.5", "66.4")
     
-    is_released_flag = ("OTW" not in act1) and (not is_future_event)
     ind_data = {
-        "status_rilis": "SUDAH RILIS" if is_released_flag else "BELUM RILIS",
-        "ringkasan": f"CPI Rilis {act1} vs Forecast {est1}. Sumber API: {api_source}." if is_released_flag else f"Menunggu Rilis CPI pada {tanggal_rilis} {bulan_rilis} {tahun_rilis} ({jam_rilis_formatted}). Forecast: {est1}.",
+        "status_rilis": "SUDAH RILIS" if not is_future_event else "BELUM RILIS",
+        "ringkasan": f"CPI Data Status: {act1} vs Forecast {est1}. Sumber API: {api_source}." if not is_future_event else f"Menunggu Rilis CPI pada {tanggal_rilis} {bulan_rilis} {tahun_rilis} ({jam_rilis_formatted}). Forecast: {est1}.",
         "dampak": "Perkembangan laju inflasi mempengaruhi kebijakan suku bunga The Fed.",
         "ind_1": {"nama": "Consumer Price Index (CPI)", "actual": act1, "forecast": est1, "previous": prev1, "penjelasan": "Indikator laju inflasi konsumen.", "efek": "Actual > Forecast -> Menguatkan USD"},
         "ind_2": {"nama": "Producer Price Index (PPI)", "actual": act2, "forecast": est2, "previous": prev2, "penjelasan": "Indikator inflasi produsen.", "efek": "Actual > Forecast -> Menguatkan USD"},
@@ -233,10 +243,9 @@ else:
     act3, est3, prev3 = extract_indicator_values(calendar_raw, ["gdp"], "2.5%", "1.4%")
     act4, est4, prev4 = extract_indicator_values(calendar_raw, ["retail sales"], "0.3%", "0.1%")
     
-    is_released_flag = ("OTW" not in act1) and (not is_future_event)
     ind_data = {
-        "status_rilis": "SUDAH RILIS" if is_released_flag else "BELUM RILIS",
-        "ringkasan": f"FOMC Rate Decision {act1} vs Forecast {est1}. Sumber API: {api_source}." if is_released_flag else f"Menunggu Rilis FOMC pada {tanggal_rilis} {bulan_rilis} {tahun_rilis} ({jam_rilis_formatted}). Forecast: {est1}.",
+        "status_rilis": "SUDAH RILIS" if not is_future_event else "BELUM RILIS",
+        "ringkasan": f"FOMC Data Status: {act1} vs Forecast {est1}. Sumber API: {api_source}." if not is_future_event else f"Menunggu Rilis FOMC pada {tanggal_rilis} {bulan_rilis} {tahun_rilis} ({jam_rilis_formatted}). Forecast: {est1}.",
         "dampak": "Keputusan suku bunga Fed menentukan arah jangka panjang USD.",
         "ind_1": {"nama": "Fed Interest Rate Decision", "actual": act1, "forecast": est1, "previous": prev1, "penjelasan": "Keputusan suku bunga acuan AS.", "efek": "Rate Hike -> Menguatkan USD"},
         "ind_2": {"nama": "Core PCE Price Index", "actual": act2, "forecast": est2, "previous": prev2, "penjelasan": "Inflasi acuan utama pilihan The Fed.", "efek": "Actual > Forecast -> Menguatkan USD"},
@@ -280,8 +289,8 @@ def calculate_macro_divergence(act1, est1, act2, est2, act3, est3, act4, est4):
     def eval_indicator(name, act_raw, est_raw, higher_is_good_for_usd=True):
         a = parse_num(act_raw)
         e = parse_num(est_raw)
-        if a is None or e is None or "OTW" in str(act_raw):
-            return f"- **{name}**: Data belum rilis / {act_raw} (Skenario Konsensus Market)", 0
+        if a is None or e is None or "OTW" in str(act_raw) or "Pending" in str(act_raw):
+            return f"- **{name}**: Data belum/sedang diproses ({act_raw}) -> Konsensus Market", 0
         
         if a > e:
             res = "BULLISH USD" if higher_is_good_for_usd else "BEARISH USD"
@@ -365,6 +374,7 @@ st.markdown(f"### 📌 TARGET EVENT: {target_news} - {tanggal_rilis} {bulan_rili
 if ind_data["status_rilis"] == "SUDAH RILIS":
     st.success(f"""
     🎯 **HASIL AKHIR NEWS ({target_news}):**
+    - **Status:** Event ini telah lewat pada {tanggal_rilis} {bulan_rilis} {tahun_rilis} jam {jam_rilis_formatted}.
     - **Ringkasan:** {ind_data['ringkasan']}
     - **Dampak Pasar:** {ind_data['dampak']}
     - **Sumber Data:** Terintegrasi via **{api_source}**
@@ -389,11 +399,11 @@ def render_indicator_box(key_prefix, ind_dict):
     
     c1, c2, c3 = st.columns(3)
     with c1:
-        st.text_input("Actual", value=str(ind_dict.get('actual', f"OTW ({tanggal_rilis} {bulan_rilis[:3]} {tahun_rilis} {jam_rilis_formatted})")), key=f"act_{unique_key_suffix}")
+        st.text_input("Actual", value=str(ind_dict.get('actual', '-')), key=f"act_{unique_key_suffix}")
     with c2:
-        st.text_input("Forecast", value=str(ind_dict.get('forecast', 'OTW')), key=f"for_{unique_key_suffix}")
+        st.text_input("Forecast", value=str(ind_dict.get('forecast', '-')), key=f"for_{unique_key_suffix}")
     with c3:
-        st.text_input("Previous", value=str(ind_dict.get('previous', 'OTW')), key=f"prev_{unique_key_suffix}")
+        st.text_input("Previous", value=str(ind_dict.get('previous', '-')), key=f"prev_{unique_key_suffix}")
     st.markdown("---")
 
 render_indicator_box("ind_1", ind_data.get("ind_1", {}))
@@ -603,7 +613,7 @@ with col_r:
 st.markdown("---")
 
 # ==========================================
-# 11. LIVE CHART TRADINGVIEW (FULL CUSTOM PAIR)
+# 11. LIVE CHART TRADINGVIEW
 # ==========================================
 st.subheader("📉 LIVE CHART TRADINGVIEW (INTERACTIVE)")
 
