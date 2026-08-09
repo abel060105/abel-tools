@@ -3,4 +3,4 @@ requests
 pandas
 matplotlib
 numpy
-pyswisseph
+flatlib
