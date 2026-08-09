@@ -14,13 +14,15 @@ st.set_page_config(
     layout="wide"
 )
 
-# API Keys dari User
 FMP_API_KEY = "Wr5uNw4BQAo5syaNYXylIqcg8908kPd5"
 FINNHUB_TOKEN = "d9saqq9r01qopv46gkigd9saqq9r01qopv46gkj0"
 GROQ_API_KEY = "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"
 
-# Endpoint Groq API dengan sanitasi string
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions".encode('ascii', 'ignore').decode('ascii').strip()
+
+# Initialize Session State untuk sinkronisasi UI
+if "ai_result" not in st.session_state:
+    st.session_state["ai_result"] = None
 
 # ==========================================
 # 2. SIDEBAR - KONTROL INTERAKTIF
@@ -51,18 +53,10 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### 3. Astrodox Engine Settings")
     astrodox_active = st.toggle("Aktifkan Astrodox Engine", value=True)
-    if astrodox_active:
-        st.success("🟢 Astrodox Status: ACTIVE")
-    else:
-        st.error("🔴 Astrodox Status: OFF")
 
     st.markdown("---")
     st.markdown("### 4. Multi-Timeframe Technical Engine")
     tech_active = st.toggle("Aktifkan Technical Engine", value=True)
-    if tech_active:
-        st.success("🟢 Technical Status: ACTIVE")
-    else:
-        st.error("🔴 Technical Status: OFF")
 
     market_condition = st.selectbox(
         "Kondisi Market Saat Ini:",
@@ -77,7 +71,6 @@ with st.sidebar:
 # 3. MODUL DUAL-API ECONOMIC CALENDAR (FMP + FINNHUB)
 # ==========================================
 def fetch_from_fmp(date_str):
-    """Priority 1: Mengambil kalender ekonomi dari Financial Modeling Prep"""
     url = f"https://financialmodelingprep.com/api/v3/economic_calendar?from={date_str}&to={date_str}&apikey={FMP_API_KEY}"
     try:
         res = requests.get(url, timeout=5)
@@ -90,7 +83,6 @@ def fetch_from_fmp(date_str):
     return None
 
 def fetch_from_finnhub(date_str):
-    """Priority 2: Fallback ke Finnhub jika FMP error/kosong"""
     url = f"https://finnhub.io/api/v1/economic?from={date_str}&to={date_str}&token={FINNHUB_TOKEN}"
     try:
         res = requests.get(url, timeout=5)
@@ -121,11 +113,9 @@ def get_economic_calendar_data(tgl, bln_str, thn):
     d = f"{int(tgl):02d}"
     date_str = f"{thn}-{m}-{d}"
     
-    # Priority 1: FMP
     raw_data = fetch_from_fmp(date_str)
     source = "Financial Modeling Prep (FMP)"
     
-    # Priority 2: Finnhub
     if not raw_data:
         raw_data = fetch_from_finnhub(date_str)
         source = "Finnhub"
@@ -140,23 +130,15 @@ calendar_raw, api_source = get_economic_calendar_data(tanggal_rilis, bulan_rilis
 def extract_indicator_values(raw_list, keywords, default_act="TBA", default_est="TBA", default_prev="TBA"):
     if not raw_list:
         return default_act, default_est, default_prev
-    
     for item in raw_list:
         event_name = item.get('event', '').lower()
         if any(kw.lower() in event_name for kw in keywords):
             act = item.get('actual')
             est = item.get('estimate')
             prev = item.get('previous')
-            
-            act_str = str(act) if act is not None else "TBA"
-            est_str = str(est) if est is not None else "TBA"
-            prev_str = str(prev) if prev is not None else "TBA"
-            
-            return act_str, est_str, prev_str
-            
+            return str(act) if act is not None else "TBA", str(est) if est is not None else "TBA", str(prev) if prev is not None else "TBA"
     return default_act, default_est, default_prev
 
-# Mapping Indikator berdasarkan Target Event
 if "NFP" in target_news:
     act1, est1, prev1 = extract_indicator_values(calendar_raw, ["non farm payrolls", "nonfarm payrolls", "nfp"], "-23K", "80K", "20K")
     act2, est2, prev2 = extract_indicator_values(calendar_raw, ["unemployment rate"], "4.1%", "4.2%", "4.2%")
@@ -203,7 +185,7 @@ else:
         "ind_4": {"nama": "Retail Sales m/m", "actual": act4, "forecast": est4, "previous": prev4, "penjelasan": "Tingkat belanja konsumen.", "efek": "Actual > Forecast -> Menguatkan USD"}
     }
 
-# Logic Bias Teknikal
+# Logic Bias Teknikal Static
 if "Force Bearish" in market_condition:
     is_bullish = False
 elif "Force Bullish" in market_condition:
@@ -227,11 +209,9 @@ else:
     tech_reason = "Multi-TF Crosscheck (Weekly-D1 Bullish BOS, H4-H1 SnD Demand Zone, M15-M1 Mitigation)."
 
 # ==========================================
-# 5. KALKULATOR REKAP DATA PENDUKUNG (ANTI-HALUSINASI)
+# 5. KALKULATOR REKAP DATA PENDUKUNG
 # ==========================================
 def calculate_macro_divergence(act1, est1, act2, est2, act3, est3, act4, est4):
-    usd_score = 0
-
     def parse_num(val):
         try:
             return float(str(val).replace('%', '').replace('K', '').replace('M', ''))
@@ -288,15 +268,15 @@ def calculate_macro_divergence(act1, est1, act2, est2, act3, est3, act4, est4):
 def fetch_geopolitical_analysis(event_name, actual_val, forecast_val):
     prompt = f"""
     Bertindaklah sebagai Senior Geopolitical & Macroeconomic Analyst.
-    Berikan analisis ringkas mengenai konteks Geopolitik Global terkini (misal: isu Timur Tengah, pasokan energi, perang dagang) 
-    dan hubungannya dengan data {event_name} (Actual: {actual_val} vs Forecast: {forecast_val}).
+    Berikan analisis terupdate mengenai isu geopolitik krusial terkini (seperti konflik Selat Hormuz, aktivitas rudal/militer Iran, ketegangan Timur Tengah, pasokan minyak bumi, perang/sanksi global) 
+    dan kombinasikan dengan dampak rilis data {event_name} (Actual: {actual_val} vs Forecast: {forecast_val}).
 
     Format jawaban HARUS JSON MURNI tanpa markdown:
     {{
-        "isu_utama": "nama isu utama",
-        "ringkasan_situasi": "2 kalimat situasi terkini",
-        "dampak_usd": "efek ke USD",
-        "dampak_xau": "efek ke Emas XAUUSD"
+        "isu_utama": "nama isu utama (misal: Eskalasi Selat Hormuz & Ancaman Rudal Iran)",
+        "ringkasan_situasi": "2-3 kalimat update situasi perang/geopolitik terkini",
+        "dampak_usd": "efek kombinasi ke Dolar US",
+        "dampak_xau": "efek kombinasi ke Emas XAUUSD (Safe Haven Demand)"
     }}
     """
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
@@ -314,10 +294,10 @@ def fetch_geopolitical_analysis(event_name, actual_val, forecast_val):
         pass
 
     return {
-        "isu_utama": "Eskalasi Geopolitik & Pasokan Energi Global",
-        "ringkasan_situasi": "Ketegangan wilayah meningkatkan arus permintaan safe haven pada komoditas utama.",
-        "dampak_usd": "USD ditopang aliran modal safe-haven.",
-        "dampak_xau": "XAUUSD mendapatkan dorongan aksi beli hedging."
+        "isu_utama": "Ketegangan Selat Hormuz & Eskalasi Rudal Iran / Perang Timur Tengah",
+        "ringkasan_situasi": "Eskalasi militer di Selat Hormuz dan ancaman serangan rudal Iran memperketat jalur distribusi minyak global dan mendongkrak minat beli aset safe haven.",
+        "dampak_usd": "USD menguat terbatas terdorong arus safe-haven di tengah ketidakpastian pasokan.",
+        "dampak_xau": "XAUUSD sangat kuat didukung oleh lonjakan permintaan hedging safe-haven perang."
     }
 
 # ==========================================
@@ -361,7 +341,7 @@ render_indicator_box("ind_3", ind_data.get("ind_3", {}))
 render_indicator_box("ind_4", ind_data.get("ind_4", {}))
 
 # ==========================================
-# 8. MODUL GEOPOLITIK (INTEGRATED)
+# 8. MODUL GEOPOLITIK (INTEGRATED & DYNAMIC)
 # ==========================================
 st.subheader("🌍 MODUL BERITA GEOPOLITIK & SENTIMEN TRANSISI (AI + CALENDAR)")
 
@@ -377,74 +357,124 @@ st.warning(f"""
 st.markdown("---")
 
 # ==========================================
-# 9. AI ENTRY LOGIC EXECUTION
+# 9. AI ENTRY LOGIC EXECUTION (FULL INTEGRATION)
 # ==========================================
 if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", type="primary", use_container_width=True):
-    with st.spinner("Memproses Rekap Data Pendukung & Generasi Logika Entry AI..."):
+    with st.spinner("Sintesis Data Pendukung + Geopolitik + Technical Setup..."):
         
         rekap_text, macro_bias_result, score_val = calculate_macro_divergence(
             act1, est1, act2, est2, act3, est3, act4, est4
         )
         
-        st.subheader("📋 Rekap Evaluasi Data Pendukung Real-Time")
-        st.markdown(rekap_text)
-        st.info(f"⚖️ **Kesimpulan Bias Makro:** {macro_bias_result} (Score Net: {score_val})")
-        
         system_prompt = f"""
         Kamu adalah Senior Quantitative Trader & Macro Analyst profesional.
-        Tugasmu menyusun LOGIKA ENTRY FLEKSIBEL untuk XAUUSD berbasis Data Makro Real-Time + Technical Setup.
-        
-        [DATA INPUT REAL-TIME]
-        - Target Event: {target_news} ({tanggal_rilis} {bulan_rilis} {tahun_rilis})
-        - Harga Running XAUUSD: {running_price}
-        - Rekap Indikator Pendukung:
+        Sintesiskan Data Makro + Geopolitik + Teknikal menjadi LOGIKA ENTRY PRESISI XAUUSD.
+
+        [INPUT DATA REAL-TIME]
+        - Target Event: {target_news}
+        - Running Price XAUUSD: {running_price}
+        - Rekap Data Pendukung:
         {rekap_text}
-        - Bias Makro Hasil Kalkulasi: {macro_bias_result}
-        - Technical Setup: {tech_signal} | Setup Action: {tech_action}
+        - Bias Makro Kalkulasi: {macro_bias_result} (Score: {score_val})
+        - Isu Geopolitik Terkini: {geo_info.get('isu_utama')} - {geo_info.get('ringkasan_situasi')}
+        - Dampak Safe Haven Geopolitik: {geo_info.get('dampak_xau')}
 
-        [ATURAN KHUSUS LOGIKA ENTRY]:
-        1. JANGAN HALUSINASI. Logika entry HARUS berbasis konfluensi/deviasi data pendukung.
-        2. Data Pendukung dominan Bearish USD -> Wajib fokus Opsi BUY XAUUSD.
-        3. Data Pendukung dominan Bullish USD -> Wajib fokus Opsi SELL XAUUSD.
-        4. Data Pendukung MIXED -> Wajib merekomendasikan Wait & See / Liquidity Sweep Zone.
+        [ATURAN EXECUTION SANGAT KETAT]:
+        1. JIKA BIAS "NEUTRAL / MIXED DATA":
+           - Arah Bias Utama WAJIB "NEUTRAL / TWO-SIDED (WHIPSAW SETUP)".
+           - WAJIB berikan TWO-SIDED SETUP (Opsi Buy & Opsi Sell terpisah jelas di area Liquidity Sweep).
+           - Tentukan Rencana A (BUY LIMIT di Zona Discount Bawah) DAN Rencana B (SELL LIMIT di Zona Premium Atas). JELASKAN MANA YANG BUY DAN MANA YANG SELL!
+        2. JIKA BIAS "BULLISH USD":
+           - Arah Bias Utama WAJIB "BEARISH XAUUSD (SELL)".
+        3. JIKA BIAS "BEARISH USD":
+           - Arah Bias Utama WAJIB "BULLISH XAUUSD (BUY)".
 
-        [FORMAT JAWABAN MARKDOWN]
-        ### 🔍 1. Rekap & Sintesis Data Pendukung
-        (Penjelasan deviasi angka actual vs forecast)
-        
-        ### ⚡ 2. Logika Entry & Trigger Konfirmasi
-        - **Arah Bias Utama:** [BUY / SELL / NEUTRAL]
-        - **Reasoning Logika:** (Hubungan angka data pendukung dengan SnD Zone)
-        - **Kondisi Trigger:** (Syarat konfirmasi candlestick M5/M15)
-
-        ### 🎯 3. Specific Execution Setup (XAUUSD)
-        - **Execution Type:** [Instant Market / Limit Order]
-        - **Entry Zone:** [Rentang Harga]
-        - **Stop Loss (SL):** [Harga SL]
-        - **Take Profit (TP):** [TP1, TP2, & TP Extended]
+        Jawab HANYA dalam format JSON MURNI berikut (tanpa teks ekstra di luar JSON):
+        {{
+            "arah_bias": "BULLISH / BEARISH / NEUTRAL (WHIPSAW)",
+            "ringkasan_sintesis": "Penjelasan sinkronisasi data makro + geopolitik selat hormuz/iran + teknikal",
+            "logika_entry_detail": "Alasan spesifik mengenai kondisi market dan pemicu entry",
+            "setup_spesifik": {{
+                "tipe_eksekusi": "Two-Sided Limit Orders / Sweep Liquidity",
+                "zona_buy_demand": "{running_price - 25.00:.2f} - {running_price - 15.00:.2f}",
+                "zona_sell_supply": "{running_price + 15.00:.2f} - {running_price + 25.00:.2f}",
+                "sl_buy": "{running_price - 32.00:.2f}",
+                "sl_sell": "{running_price + 32.00:.2f}",
+                "tp_buy": "{running_price + 10.00:.2f}",
+                "tp_sell": "{running_price - 10.00:.2f}"
+            }}
+        }}
         """
 
         headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
         payload = {
             "model": "llama-3.3-70b-versatile",
             "messages": [{"role": "user", "content": system_prompt}],
-            "temperature": 0.2
+            "temperature": 0.1,
+            "response_format": {"type": "json_object"}
         }
         
         try:
             res = requests.post(GROQ_URL, headers=headers, json=payload, timeout=25)
             if res.status_code == 200:
-                st.success("✅ AI Logic Execution Berhasil Terbentuk!")
-                st.markdown(res.json()['choices'][0]['message']['content'])
+                parsed_json = json.loads(res.json()['choices'][0]['message']['content'])
+                st.session_state["ai_result"] = parsed_json
+                st.session_state["rekap_text"] = rekap_text
+                st.session_state["macro_bias_result"] = macro_bias_result
+                st.session_state["score_val"] = score_val
+                st.success("✅ AI Engine Synthesis Success!")
             else:
                 st.error(f"Gagal memproses AI Groq. HTTP Status: {res.status_code}")
         except Exception as e:
             st.error(f"Error Koneksi: {e}")
 
+# Display AI Results jika sudah dieksekusi
+if st.session_state["ai_result"]:
+    res_ai = st.session_state["ai_result"]
+    setup_ai = res_ai.get("setup_spesifik", {})
+
+    st.subheader("📋 Rekap Evaluasi Data Pendukung Real-Time")
+    st.markdown(st.session_state["rekap_text"])
+    st.info(f"⚖️ **Kesimpulan Bias Makro:** {st.session_state['macro_bias_result']} (Score Net: {st.session_state['score_val']})")
+
+    st.markdown("### ⚡ Logika Entry & Trigger Konfirmasi AI")
+    st.markdown(f"• **Arah Bias Utama AI:** `{res_ai.get('arah_bias')}`")
+    st.markdown(f"• **Sintesis Makro & Geopolitik:** {res_ai.get('ringkasan_sintesis')}")
+    st.markdown(f"• **Reasoning & Conditions:** {res_ai.get('logika_entry_detail')}")
+
+    st.markdown("### 🎯 Specific Execution Setup (XAUUSD)")
+    
+    if "NEUTRAL" in str(res_ai.get('arah_bias')).upper():
+        c_buy, c_sell = st.columns(2)
+        with c_buy:
+            st.success(f"""
+            🟢 **PLAN A: BUY LIMIT (ZONA DISCOUNT / SWEEP LOWER)**
+            - **Entry Zone Buy:** {setup_ai.get('zona_buy_demand')}
+            - **Stop Loss (SL):** {setup_ai.get('sl_buy')}
+            - **Take Profit (TP):** {setup_ai.get('tp_buy')}
+            - **Trigger:** Tunggu Liquidity Sweep di bawah low lalu Rejection M5.
+            """)
+        with c_sell:
+            st.error(f"""
+            🔴 **PLAN B: SELL LIMIT (ZONA PREMIUM / SWEEP UPPER)**
+            - **Entry Zone Sell:** {setup_ai.get('zona_sell_supply')}
+            - **Stop Loss (SL):** {setup_ai.get('sl_sell')}
+            - **Take Profit (TP):** {setup_ai.get('tp_sell')}
+            - **Trigger:** Tunggu Liquidity Sweep di atas high lalu Rejection M5.
+            """)
+    else:
+        st.info(f"""
+        - **Execution Type:** {setup_ai.get('tipe_eksekusi')}
+        - **Zona Buy Demand:** {setup_ai.get('zona_buy_demand')}
+        - **Zona Sell Supply:** {setup_ai.get('zona_sell_supply')}
+        - **Stop Loss:** Buy SL ({setup_ai.get('sl_buy')}) | Sell SL ({setup_ai.get('sl_sell')})
+        - **Take Profit:** Buy TP ({setup_ai.get('tp_buy')}) | Sell TP ({setup_ai.get('tp_sell')})
+        """)
+
 st.markdown("---")
 
 # ==========================================
-# 10. MULTI-TIMEFRAME CONFLUENCE & ZONES
+# 10. MULTI-TIMEFRAME CONFLUENCE (SINKRON 100%)
 # ==========================================
 st.subheader("🎯 MULTI-TIMEFRAME LIQUIDITY & METHOD CONFLUENCE")
 
@@ -452,23 +482,37 @@ col_l, col_m, col_r = st.columns(3)
 
 with col_l:
     st.markdown("### 🤖 AI Macro Engine")
-    st.write("Signal: Macro Divergence Engine")
-    if not is_bullish:
-        st.markdown("🔴 **ARAH BIAS: BEARISH (SELL)**")
-        st.markdown("#### 🎯 ZONA ENTRY")
-        st.info(f"{running_price + 1.50:.2f} - {running_price + 4.00:.2f}")
-        st.markdown("#### 🛑 STOP LOSS")
-        st.error(f"{running_price + 8.50:.2f}")
-        st.markdown("#### 🏁 TARGET TP")
-        st.success(f"{running_price - 38.00:.2f}")
+    st.write("Signal: Macro + Geopolitical Confluence")
+    
+    # Ambil data langsung dari session state hasil AI
+    if st.session_state["ai_result"]:
+        ai_bias = st.session_state["ai_result"].get("arah_bias", "NEUTRAL")
+        ai_setup = st.session_state["ai_result"].get("setup_spesifik", {})
+        
+        if "NEUTRAL" in str(ai_bias).upper():
+            st.warning("⚠️ **ARAH BIAS: NEUTRAL (WHIPSAW / TWO-SIDED)**")
+            st.markdown("#### 🟢 ZONA BUY (DISCOUNT)")
+            st.info(f"{ai_setup.get('zona_buy_demand')}")
+            st.markdown("#### 🔴 ZONA SELL (PREMIUM)")
+            st.error(f"{ai_setup.get('zona_sell_supply')}")
+        elif "BULLISH" in str(ai_bias).upper():
+            st.markdown("🟢 **ARAH BIAS: BULLISH (BUY)**")
+            st.markdown("#### 🎯 ZONA ENTRY BUY")
+            st.info(f"{ai_setup.get('zona_buy_demand')}")
+            st.markdown("#### 🛑 STOP LOSS")
+            st.error(f"{ai_setup.get('sl_buy')}")
+            st.markdown("#### 🏁 TARGET TP")
+            st.success(f"{ai_setup.get('tp_buy')}")
+        else:
+            st.markdown("🔴 **ARAH BIAS: BEARISH (SELL)**")
+            st.markdown("#### 🎯 ZONA ENTRY SELL")
+            st.error(f"{ai_setup.get('zona_sell_supply')}")
+            st.markdown("#### 🛑 STOP LOSS")
+            st.error(f"{ai_setup.get('sl_sell')}")
+            st.markdown("#### 🏁 TARGET TP")
+            st.success(f"{ai_setup.get('tp_sell')}")
     else:
-        st.markdown("🟢 **ARAH BIAS: BULLISH (BUY)**")
-        st.markdown("#### 🎯 ZONA ENTRY")
-        st.info(f"{running_price - 4.00:.2f} - {running_price - 1.50:.2f}")
-        st.markdown("#### 🛑 STOP LOSS")
-        st.error(f"{running_price - 8.50:.2f}")
-        st.markdown("#### 🏁 TARGET TP")
-        st.success(f"{running_price + 38.00:.2f}")
+        st.caption("Klik tombol 'EXECUTE MULTI-TF AI PREDICTION' di atas untuk mengaktifkan AI Engine.")
 
 with col_m:
     st.markdown("### 🔮 Astrodox Engine")
