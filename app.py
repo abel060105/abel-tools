@@ -90,6 +90,13 @@ with st.sidebar:
         is_future_event = False
 
     st.markdown("---")
+    st.markdown("### ⚡ API Cache Control (Hemat Kuota)")
+    # Opsi Nomer 3: Tombol manual untuk clearing cache jika butuh update data mendadak
+    if st.button("🔄 Force Refresh API Data", use_container_width=True):
+        st.cache_data.clear()
+        st.toast("Cache API dibersihkan! Mengambil ulang data terbaru...", icon="✅")
+
+    st.markdown("---")
     st.markdown("### 🛠️ Manual Data Override")
     override_active = st.checkbox("Aktifkan Manual Input Actual", value=False)
     manual_act1 = st.text_input("Actual Indikator 1:", value="")
@@ -115,9 +122,10 @@ with st.sidebar:
     running_price = st.number_input("Harga Running XAUUSD:", value=4314.00, step=0.5)
 
 # ==========================================
-# 3. MODUL DUAL-API ECONOMIC CALENDAR
+# 3. MODUL DUAL-API ECONOMIC CALENDAR (WITH HIGH CACHING)
 # ==========================================
-@st.cache_data(ttl=180)
+# OPSI NOMOR 3: Mengubah ttl menjadi 14400 detik (4 Jam) agar kuota API hemat total
+@st.cache_data(ttl=14400, show_spinner="Mengambil data Kalender Ekonomi dari API...")
 def fetch_full_month_calendar(bln_num, thn_num):
     last_day = calendar.monthrange(thn_num, bln_num)[1]
     from_date = f"{thn_num}-{bln_num:02d}-01"
@@ -141,7 +149,7 @@ def fetch_full_month_calendar(bln_num, thn_num):
                         'previous': item.get('prev'),
                         'date': item.get('time', '')
                     })
-                return normalized, "Finnhub Realtime API"
+                return normalized, "Finnhub Realtime API (Cached 4 Jam)"
     except Exception:
         pass
 
@@ -152,7 +160,7 @@ def fetch_full_month_calendar(bln_num, thn_num):
         if res.status_code == 200:
             data = res.json()
             if isinstance(data, list) and len(data) > 0 and 'error' not in str(data).lower():
-                return data, "Financial Modeling Prep (FMP)"
+                return data, "Financial Modeling Prep (Cached 4 Jam)"
     except Exception:
         pass
 
@@ -212,7 +220,7 @@ def extract_indicator_smart(raw_list, keywords, default_act, default_est, defaul
     else:
         return f"OTW ({jadwal_fallback_str})", str(default_est), str(default_prev), jadwal_fallback_str
 
-# UPDATE DATA PRESET SESUAI RILIS MYFXBOOK 7 AGUSTUS 2026
+# Data Preset Default
 if "NFP" in target_news:
     act1, est1, prev1, j1 = extract_indicator_smart(calendar_raw, ["non farm payrolls", "nonfarm payrolls", "nfp"], "-23K", "80K", "20K", fallback_day=7, fallback_time="19:30", manual_val=manual_act1)
     act2, est2, prev2, j2 = extract_indicator_smart(calendar_raw, ["unemployment rate"], "4.1%", "4.2%", "4.2%", fallback_day=7, fallback_time="19:30", manual_val=manual_act2)
