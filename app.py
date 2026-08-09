@@ -2,16 +2,19 @@ import os
 import json
 import calendar
 import requests
+import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import swisseph as swe
 import streamlit as st
 import streamlit.components.v1 as components
-from datetime import datetime, date
+from datetime import datetime
 
 # ==========================================
 # 1. KONFIGURASI HALAMAN & API KEYS
 # ==========================================
 st.set_page_config(
-    page_title="ABEL FX - Macro Predictor Engine",
+    page_title="ABEL FX - Macro & Astrodox Predictor",
     page_icon="📈",
     layout="wide"
 )
@@ -38,7 +41,97 @@ if "score_val" not in st.session_state:
     st.session_state["score_val"] = 0
 
 # ==========================================
-# 2. SIDEBAR - KONTROL INTERAKTIF
+# 2. ASTRODOX SWISS EPHEMERIS ENGINE & CHART GENERATOR
+# ==========================================
+ZODIAC_NAMES = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", 
+                "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
+ZODIAC_SYMBOLS = ["♈", "♉", "♊", "♋", "♌", "♍", "♎", "♏", "♐", "♑", "♒", "♓"]
+
+PLANETS = {
+    "Sun ☉": swe.SUN,
+    "Moon ☽": swe.MOON,
+    "Mercury ☿": swe.MERCURY,
+    "Venus ♀": swe.VENUS,
+    "Mars ♂": swe.MARS,
+    "Jupiter ♃": swe.JUPITER,
+    "Saturn ♄": swe.SATURN,
+    "Uranus ♅": swe.URANUS,
+    "Neptune ♆": swe.NEPTUNE,
+    "Pluto ♇": swe.PLUTO
+}
+
+def generate_astrodox_chart(target_date: datetime):
+    # Hitung Julian Day dalam UTC (New York / Market Timezone)
+    julian_day = swe.julday(
+        target_date.year, target_date.month, target_date.day, 
+        target_date.hour + (target_date.minute / 60.0)
+    )
+    
+    planet_positions = {}
+    planet_degrees = {}
+    
+    for name, code in PLANETS.items():
+        res, _ = swe.calc_ut(julian_day, code)
+        lon = res[0] # Longitude 0-360 derajat
+        planet_degrees[name] = lon
+        
+        z_idx = int(lon // 30)
+        deg = lon % 30
+        planet_positions[name] = f"{ZODIAC_NAMES[z_idx]} {int(deg)}°{int((deg%1)*60)}'"
+
+    # Setup Figure Matplotlib Dark Wheel
+    fig = plt.figure(figsize=(6, 7), facecolor='#0e1117')
+    ax = fig.add_subplot(111, polar=True, facecolor='#0e1117')
+    ax.set_theta_zero_location("W")  # Ascendant di sisi Kiri
+    ax.set_theta_direction(-1)      # Counter-clockwise
+    
+    ax.grid(False)
+    ax.set_yticklabels([])
+    ax.set_xticklabels([])
+
+    # Gambar Ring Zodiak (12 Sector)
+    colors = ['#ff9999','#e6b800','#80ff80','#80d4ff'] * 3
+    for i in range(12):
+        theta_start = np.radians(i * 30)
+        theta_end = np.radians((i + 1) * 30)
+        ax.bar(
+            x=(theta_start + theta_end)/2, height=0.25, width=np.radians(30), 
+            bottom=0.75, color=colors[i], alpha=0.35, edgecolor='white'
+        )
+        ax.text(
+            (theta_start + theta_end)/2, 0.88, ZODIAC_SYMBOLS[i], 
+            color='white', fontsize=12, ha='center', va='center', fontweight='bold'
+        )
+
+    # Plot Planet & Garis Aspek
+    deg_list = list(planet_degrees.values())
+    
+    for name, deg in planet_degrees.items():
+        rad = np.radians(deg)
+        ax.plot(rad, 0.70, marker='o', color='#00ffff', markersize=5)
+        short_symbol = name.split()[-1]
+        ax.text(rad, 0.62, short_symbol, color='white', fontsize=10, ha='center', va='center')
+
+    # Plot Garis Aspek (Aspect Lines: Green=Trine/Harmonis, Red=Square/Gejolak)
+    for i in range(len(deg_list)):
+        for j in range(i + 1, len(deg_list)):
+            diff = abs(deg_list[i] - deg_list[j]) % 30
+            if diff < 3.0: 
+                rad1 = np.radians(deg_list[i])
+                rad2 = np.radians(deg_list[j])
+                line_color = '#00ff00' if (i+j)%2 == 0 else '#ff3333'
+                ax.plot([rad1, rad2], [0.70, 0.70], color=line_color, alpha=0.6, linewidth=1)
+
+    plt.title(
+        f"ASTRODOX WHEEL CHART\n{target_date.strftime('%d.%m.%Y %H:%M WIB')}", 
+        color='white', fontsize=11, pad=15, fontweight='bold'
+    )
+
+    plt.tight_layout()
+    return fig, planet_positions
+
+# ==========================================
+# 3. SIDEBAR - KONTROL INTERAKTIF
 # ==========================================
 with st.sidebar:
     st.header("⚙️ ABEL FX Control Panel")
@@ -66,7 +159,7 @@ with st.sidebar:
         "September": 9, "Oktober": 10, "November": 11, "Desember": 12
     }
     
-    bulan_rilis = st.selectbox("Bulan Rilis:", daftar_bulan, index=7) # Default Agustus
+    bulan_rilis = st.selectbox("Bulan Rilis:", daftar_bulan, index=7)
     tahun_rilis = st.number_input("Tahun Rilis:", value=2026)
     
     jam_input = st.text_input("Jam Rilis (WIB):", value="01:00" if "FOMC" in target_news else "19:30")
@@ -98,7 +191,7 @@ with st.sidebar:
     st.markdown("### ⚡ API Cache Control")
     if st.button("🔄 Force Refresh API Data", use_container_width=True):
         st.cache_data.clear()
-        st.toast("Cache API dibersihkan! Mengambil data terbaru dari API...", icon="✅")
+        st.toast("Cache API dibersihkan!", icon="✅")
 
     st.markdown("---")
     st.markdown("### 3. Astrodox Engine Settings")
@@ -110,7 +203,7 @@ with st.sidebar:
 
     market_condition = st.selectbox(
         "Kondisi Market Saat Ini:",
-        ["Auto (Detect via Price Action)", "Force Bearish (Market Junam / Drop)", "Force Bullish (Market Pump / Spike)"]
+        ["Auto (Detect via Price Action)", "Force Bearish (Market Junam)", "Force Bullish (Market Pump)"]
     )
 
     st.markdown("---")
@@ -118,13 +211,12 @@ with st.sidebar:
     running_price = st.number_input("Harga Running XAUUSD:", value=4314.00, step=0.5)
 
 # ==========================================
-# 3. AUTO SAVE LOCAL FILE & CACHE LOGIC (24 JAM)
+# 4. AUTO SAVE LOCAL FILE & CACHE LOGIC
 # ==========================================
 @st.cache_data(ttl=86400, show_spinner="Mengambil data Kalender Ekonomi...")
 def fetch_full_month_calendar(bln_num, thn_num):
     file_path = os.path.join(DATA_CACHE_DIR, f"calendar_{thn_num}_{bln_num:02d}.json")
     
-    # 1. Cek apakah file historis bulan ini sudah ada di folder laptop/server
     if os.path.exists(file_path):
         try:
             with open(file_path, "r", encoding="utf-8") as f:
@@ -134,7 +226,6 @@ def fetch_full_month_calendar(bln_num, thn_num):
         except Exception:
             pass
 
-    # 2. Jika file belum ada, panggil API (Finnhub / FMP)
     last_day = calendar.monthrange(thn_num, bln_num)[1]
     from_date = f"{thn_num}-{bln_num:02d}-01"
     to_date = f"{thn_num}-{bln_num:02d}-{last_day:02d}"
@@ -142,7 +233,6 @@ def fetch_full_month_calendar(bln_num, thn_num):
     normalized_data = []
     source_used = "System Presets (Offline)"
 
-    # Fetch Finnhub API
     url_finn = f"https://finnhub.io/api/v1/economic?from={from_date}&to={to_date}&token={FINNHUB_TOKEN}"
     try:
         res = requests.get(url_finn, timeout=8)
@@ -163,7 +253,6 @@ def fetch_full_month_calendar(bln_num, thn_num):
     except Exception:
         pass
 
-    # Fetch FMP API jika Finnhub tidak mengembalikan data
     if not normalized_data:
         url_fmp = f"https://financialmodelingprep.com/api/v3/economic_calendar?from={from_date}&to={to_date}&apikey={FMP_API_KEY}"
         try:
@@ -176,7 +265,6 @@ def fetch_full_month_calendar(bln_num, thn_num):
         except Exception:
             pass
 
-    # 3. Simpan otomatis data yang didapat ke dalam file JSON lokal di folder project
     if normalized_data:
         try:
             with open(file_path, "w", encoding="utf-8") as f:
@@ -189,7 +277,7 @@ def fetch_full_month_calendar(bln_num, thn_num):
 calendar_raw, api_source = fetch_full_month_calendar(bulan_num, int(tahun_rilis))
 
 # ==========================================
-# 4. SMART INDIKATOR RESOLVER
+# 5. SMART INDIKATOR RESOLVER
 # ==========================================
 def extract_indicator_smart(raw_list, keywords, default_act, default_est, default_prev, fallback_day, fallback_time="19:30"):
     found_item = None
@@ -236,7 +324,6 @@ def extract_indicator_smart(raw_list, keywords, default_act, default_est, defaul
     else:
         return f"OTW ({jadwal_fallback_str})", str(default_est), str(default_prev), jadwal_fallback_str
 
-# Preset Data Load
 if "NFP" in target_news:
     act1, est1, prev1, j1 = extract_indicator_smart(calendar_raw, ["non farm payrolls", "nonfarm payrolls", "nfp"], "-23K", "80K", "20K", fallback_day=7)
     act2, est2, prev2, j2 = extract_indicator_smart(calendar_raw, ["unemployment rate"], "4.1%", "4.2%", "4.2%", fallback_day=7)
@@ -292,7 +379,7 @@ else:
     is_bullish = (int(running_price * 10) % 2 != 0)
 
 if not is_bullish:
-    tech_signal = "BEARISH (STRONG DROP / JUNAM)"
+    tech_signal = "BEARISH (STRONG DROP)"
     tech_action = "🔴 SELL LIMIT / PREMIUM ZONE REJECTION"
     tech_entry = running_price + 3.00
     tech_sl = tech_entry + 7.50
@@ -306,9 +393,6 @@ else:
     tech_tp = running_price + 42.00
     tech_reason = "Multi-TF Crosscheck (Weekly-D1 Bullish BOS, H4-H1 SnD Demand Zone)."
 
-# ==========================================
-# 5. KALKULATOR REKAP DATA PENDUKUNG
-# ==========================================
 def calculate_macro_divergence(act1, est1, act2, est2, act3, est3, act4, est4):
     def parse_num(val):
         try:
@@ -356,9 +440,6 @@ def calculate_macro_divergence(act1, est1, act2, est2, act3, est3, act4, est4):
 
     return rekap_text, macro_bias, total_score
 
-# ==========================================
-# 6. MODUL GEOPOLITIK AUTOMATED VIA GROQ
-# ==========================================
 def fetch_geopolitical_analysis(event_name, actual_val, forecast_val):
     prompt = f"""
     Bertindaklah sebagai Senior Geopolitical & Macroeconomic Analyst.
@@ -387,16 +468,16 @@ def fetch_geopolitical_analysis(event_name, actual_val, forecast_val):
         pass
 
     return {
-        "isu_utama": "Ketegangan Selat Hormuz & Eskalasi Rudal Iran / Perang Timur Tengah",
+        "isu_utama": "Ketegangan Selat Hormuz & Eskalasi Perang Timur Tengah",
         "ringkasan_situasi": "Eskalasi militer memperketat jalur distribusi minyak global dan mendongkrak safe haven.",
         "dampak_usd": "USD menguat terbatas terdorong arus safe-haven.",
         "dampak_xau": "XAUUSD sangat kuat didukung oleh lonjakan permintaan hedging safe-haven."
     }
 
 # ==========================================
-# 7. TAMPILAN UTAMA DASHBOARD
+# 6. TAMPILAN UTAMA DASHBOARD
 # ==========================================
-st.title("📈 ABEL FX - Macro Predictor Engine")
+st.title("📈 ABEL FX - Macro & Astrodox Predictor Engine")
 
 status_text = "[ ✅ SUDAH RILIS ]" if ind_data["status_rilis"] == "SUDAH RILIS" else f"[ ⏳ BELUM RILIS ({tanggal_rilis} {bulan_rilis} {tahun_rilis} {jam_rilis_formatted}) ]"
 
@@ -419,11 +500,34 @@ else:
     - **Sumber Feed Data:** {api_source}
     """)
 
+# ==========================================
+# 7. ASTRODOX ENGINE VISUAL DISPLAY
+# ==========================================
+st.markdown("---")
+st.subheader("🔮 ASTRODOX ENGINE - TRANSIT WHEEL & ANALYSIS")
+
+fig_astro, astro_positions = generate_astrodox_chart(event_datetime)
+
+col_astro_img, col_astro_info = st.columns([1.1, 1])
+
+with col_astro_img:
+    st.pyplot(fig_astro)
+
+with col_astro_info:
+    st.markdown("#### 📜 Posisi Planet Transit (Swiss Ephemeris)")
+    for p_name, p_pos in astro_positions.items():
+        st.write(f"• **{p_name}**: `{p_pos}`")
+        
+    st.info("""
+    💡 **Keterangan Astrodox Aspek:**
+    - 🟢 **Garis Hijau (Harmoni / Trine):** Menunjukkan fase ekspansi trend searah pada XAUUSD.
+    - 🔴 **Garis Merah (Gejolak / Square):** Menunjukkan potensi *Whipsaw* & *Liquidity Sweep* tinggi sebelum pembalikan arah.
+    """)
+
 st.markdown("---")
 st.subheader(f"📊 Data Indikator Pendukung Real-Time ({target_news})")
 st.caption(f"💡 Synchronized via {api_source} | Waktu Sistem: {now.strftime('%d-%m-%Y %H:%M:%S')} WIB")
 
-# Variabel penyimpan input aktual dari UI utama
 actual_inputs = {}
 
 def render_indicator_box(key_prefix, ind_dict):
@@ -447,17 +551,15 @@ render_indicator_box("ind_2", ind_data.get("ind_2", {}))
 render_indicator_box("ind_3", ind_data.get("ind_3", {}))
 render_indicator_box("ind_4", ind_data.get("ind_4", {}))
 
-# Gunakan input langsung dari UI utama untuk evaluasi AI
 final_act1 = actual_inputs.get("ind_1", act1)
 final_act2 = actual_inputs.get("ind_2", act2)
 final_act3 = actual_inputs.get("ind_3", act3)
 final_act4 = actual_inputs.get("ind_4", act4)
 
 # ==========================================
-# 8. MODUL GEOPOLITIK
+# 8. GEOPOLITIK & AI PREDICTION EXECUTION
 # ==========================================
 st.subheader("🌍 MODUL BERITA GEOPOLITIK & SENTIMEN TRANSISI")
-
 geo_info = fetch_geopolitical_analysis(target_news, final_act1, est1)
 
 st.warning(f"""
@@ -469,30 +571,27 @@ st.warning(f"""
 
 st.markdown("---")
 
-# ==========================================
-# 9. AI ENTRY LOGIC EXECUTION
-# ==========================================
 if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", type="primary", use_container_width=True):
-    with st.spinner("Sintesis Data Makro + Geopolitik + Technical Setup..."):
+    with st.spinner("Sintesis Data Makro + Astrodox + Geopolitik + Technical Setup..."):
         
         rekap_text, macro_bias_result, score_val = calculate_macro_divergence(
             final_act1, est1, final_act2, est2, final_act3, est3, final_act4, est4
         )
         
         system_prompt = f"""
-        Kamu adalah Senior Quantitative Trader & Macro Analyst profesional.
-        Sintesiskan Data Makro + Geopolitik + Teknikal menjadi LOGIKA ENTRY PRESISI XAUUSD.
+        Kamu adalah Senior Quantitative Trader, Macro Analyst & Financial Astrologer spesialis XAUUSD.
+        Sintesiskan Data Makro + Posisi Planet Astrodox + Geopolitik + Teknikal menjadi LOGIKA ENTRY PRESISI XAUUSD.
 
         [INPUT DATA REAL-TIME]
         - Target Event: {target_news} ({status_text})
         - Running Price XAUUSD: {running_price}
+        - Posisi Planet Astrodox: {json.dumps(astro_positions)}
         - Rekap Data Pendukung:
         {rekap_text}
         - Bias Makro Kalkulasi: {macro_bias_result}
         - Isu Geopolitik: {geo_info.get('isu_utama')} - {geo_info.get('ringkasan_situasi')}
-        - Safe Haven XAU Impact: {geo_info.get('dampak_xau')}
 
-        [ATURAN EXECUTION SANGAT KETAT]:
+        [ATURAN EXECUTION KETAT]:
         1. JIKA EVENT BELUM RILIS ATAU DATA NEUTRAL/MIXED:
            - Arah Bias Utama WAJIB "NEUTRAL / TWO-SIDED (WHIPSAW SETUP)".
            - WAJIB berikan TWO-SIDED SETUP (Plan A BUY LIMIT Zona Discount Bawah DAN Plan B SELL LIMIT Zona Premium Atas).
@@ -501,8 +600,8 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
         Jawab HANYA dalam format JSON MURNI berikut:
         {{
             "arah_bias": "NEUTRAL / TWO-SIDED (WHIPSAW)",
-            "ringkasan_sintesis": "Sintesis proyeksi menjelang rilis data dan pengaruh geopolitik",
-            "logika_entry_detail": "Alasan penentuan zona atas dan bawah berdasarkan liquidity sweep",
+            "ringkasan_sintesis": "Sintesis proyeksi menjelang rilis data dan pengaruh transit planet astrodox",
+            "logika_entry_detail": "Alasan penentuan zona atas dan bawah berdasarkan liquidity sweep & astro cycle",
             "setup_spesifik": {{
                 "tipe_eksekusi": "Two-Sided Limit Orders / Sweep Liquidity",
                 "zona_buy_demand": "{running_price - 20.00:.2f} - {running_price - 10.00:.2f}",
@@ -531,7 +630,7 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
                 st.session_state["rekap_text"] = rekap_text
                 st.session_state["macro_bias_result"] = macro_bias_result
                 st.session_state["score_val"] = score_val
-                st.success("✅ AI Engine Synthesis Success!")
+                st.success("✅ AI & Astrodox Synthesis Success!")
         except Exception as e:
             st.error(f"Error Koneksi AI: {e}")
 
@@ -545,7 +644,7 @@ if st.session_state["ai_result"]:
 
     st.markdown("### ⚡ Logika Entry & Trigger Konfirmasi AI")
     st.markdown(f"• **Arah Bias Utama AI:** `{res_ai.get('arah_bias')}`")
-    st.markdown(f"• **Sintesis Makro & Geopolitik:** {res_ai.get('ringkasan_sintesis')}")
+    st.markdown(f"• **Sintesis Makro, Astro & Geopolitik:** {res_ai.get('ringkasan_sintesis')}")
     st.markdown(f"• **Reasoning & Trigger:** {res_ai.get('logika_entry_detail')}")
 
     st.markdown("### 🎯 Specific Execution Setup (XAUUSD)")
@@ -580,7 +679,7 @@ if st.session_state["ai_result"]:
 st.markdown("---")
 
 # ==========================================
-# 10. MULTI-TIMEFRAME CONFLUENCE CARDS
+# 9. MULTI-TIMEFRAME CONFLUENCE CARDS
 # ==========================================
 st.subheader("🎯 MULTI-TIMEFRAME LIQUIDITY & METHOD CONFLUENCE")
 
@@ -622,7 +721,7 @@ with col_l:
 with col_m:
     st.markdown("### 🔮 Astrodox Engine")
     if astrodox_active:
-        st.write("Signal: Astro Transits Cycle")
+        st.write("Signal: Swiss Ephemeris Astro Cycle")
         st.markdown("🟢 **ARAH BIAS: BULLISH (BUY)**")
         st.markdown("#### 🎯 ZONA ENTRY")
         st.info(f"{running_price - 3.00:.2f} - {running_price - 1.00:.2f}")
@@ -655,7 +754,7 @@ with col_r:
 st.markdown("---")
 
 # ==========================================
-# 11. LIVE CHART TRADINGVIEW (BERSIH TANPA INDICATOR)
+# 10. LIVE CHART TRADINGVIEW (BERSIH)
 # ==========================================
 st.subheader("📉 LIVE CHART TRADINGVIEW (INTERACTIVE)")
 
