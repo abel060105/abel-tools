@@ -91,9 +91,6 @@ with st.sidebar:
     except Exception:
         is_future_event = False
 
-    # String Keterangan Rilis untuk Data TBA
-    jadwal_string_tba = f"TBA ({tanggal_rilis} {bulan_rilis[:3]} {tahun_rilis} {jam_rilis_formatted})"
-
     st.markdown("---")
     st.markdown("### 3. Astrodox Engine Settings")
     astrodox_active = st.toggle("Aktifkan Astrodox Engine", value=True)
@@ -140,7 +137,8 @@ def fetch_from_finnhub(date_str):
                         'country': 'US',
                         'actual': item.get('actual'),
                         'estimate': item.get('estimate'),
-                        'previous': item.get('prev')
+                        'previous': item.get('prev'),
+                        'date': item.get('time', '')
                     })
                 return normalized
     except Exception:
@@ -162,29 +160,40 @@ def get_economic_calendar_data(tgl, bln_str, thn):
     return raw_data, source
 
 # ==========================================
-# 4. EKSTRAKSI INDIKATOR & EKSEKUSI STATUS
+# 4. EKSTRAKSI INDIKATOR & OTOMATIS OTW SPESIFIK
 # ==========================================
 calendar_raw, api_source = get_economic_calendar_data(tanggal_rilis, bulan_rilis, tahun_rilis)
 
-def extract_indicator_values(raw_list, keywords, default_est="TBA", default_prev="TBA"):
-    # JIKA EVENT MASIH DI MASA DEPAN, ACTUAL MANDATORI KEMBALIKAN STRING JADWAL TBA
-    if is_future_event or not raw_list:
-        return jadwal_string_tba, default_est, default_prev
-    
-    for item in raw_list:
-        event_name = item.get('event', '').lower()
-        if any(kw.lower() in event_name for kw in keywords):
-            act = item.get('actual')
-            est = item.get('estimate')
-            prev = item.get('previous')
+def extract_indicator_values(raw_list, keywords, default_est="OTW", default_prev="OTW"):
+    if raw_list:
+        for item in raw_list:
+            event_name = item.get('event', '').lower()
+            if any(kw.lower() in event_name for kw in keywords):
+                act = item.get('actual')
+                est = item.get('estimate')
+                prev = item.get('previous')
+                
+                # Coba ambil timestamp spesifik per indikator dari API
+                event_date_raw = item.get('date', '')
+                if event_date_raw:
+                    try:
+                        dt_obj = datetime.strptime(event_date_raw[:16], "%Y-%m-%d %H:%M")
+                        jadwal_spesifik = dt_obj.strftime("%d %b %Y %H:%M WIB")
+                    except Exception:
+                        jadwal_spesifik = f"{tanggal_rilis} {bulan_rilis[:3]} {tahun_rilis} {jam_rilis_formatted}"
+                else:
+                    jadwal_spesifik = f"{tanggal_rilis} {bulan_rilis[:3]} {tahun_rilis} {jam_rilis_formatted}"
+
+                status_otw = f"OTW ({jadwal_spesifik})"
+                
+                act_str = str(act) if (act is not None and str(act).strip() != "") else status_otw
+                est_str = str(est) if (est is not None and str(est).strip() != "") else default_est
+                prev_str = str(prev) if (prev is not None and str(prev).strip() != "") else default_prev
+                
+                return act_str, est_str, prev_str
             
-            act_str = str(act) if (act is not None and str(act).strip() != "") else jadwal_string_tba
-            est_str = str(est) if (est is not None and str(est).strip() != "") else default_est
-            prev_str = str(prev) if (prev is not None and str(prev).strip() != "") else default_prev
-            
-            return act_str, est_str, prev_str
-            
-    return jadwal_string_tba, default_est, default_prev
+    jadwal_default = f"OTW ({tanggal_rilis} {bulan_rilis[:3]} {tahun_rilis} {jam_rilis_formatted})"
+    return jadwal_default, default_est, default_prev
 
 if "NFP" in target_news:
     act1, est1, prev1 = extract_indicator_values(calendar_raw, ["non farm payrolls", "nonfarm payrolls", "nfp"], "80K", "20K")
@@ -192,7 +201,7 @@ if "NFP" in target_news:
     act3, est3, prev3 = extract_indicator_values(calendar_raw, ["participation rate"], "61.6%", "61.5%")
     act4, est4, prev4 = extract_indicator_values(calendar_raw, ["manufacturing payrolls"], "4K", "11K")
     
-    is_released_flag = ("TBA" not in act1) and (not is_future_event)
+    is_released_flag = ("OTW" not in act1) and (not is_future_event)
     ind_data = {
         "status_rilis": "SUDAH RILIS" if is_released_flag else "BELUM RILIS",
         "ringkasan": f"NFP Rilis {act1} vs Forecast {est1}. Sumber API: {api_source}." if is_released_flag else f"Menunggu Rilis NFP pada {tanggal_rilis} {bulan_rilis} {tahun_rilis} ({jam_rilis_formatted}). Forecast: {est1}.",
@@ -208,7 +217,7 @@ elif "CPI" in target_news:
     act3, est3, prev3 = extract_indicator_values(calendar_raw, ["import price"], "0.0%", "-0.1%")
     act4, est4, prev4 = extract_indicator_values(calendar_raw, ["michigan consumer sentiment"], "66.5", "66.4")
     
-    is_released_flag = ("TBA" not in act1) and (not is_future_event)
+    is_released_flag = ("OTW" not in act1) and (not is_future_event)
     ind_data = {
         "status_rilis": "SUDAH RILIS" if is_released_flag else "BELUM RILIS",
         "ringkasan": f"CPI Rilis {act1} vs Forecast {est1}. Sumber API: {api_source}." if is_released_flag else f"Menunggu Rilis CPI pada {tanggal_rilis} {bulan_rilis} {tahun_rilis} ({jam_rilis_formatted}). Forecast: {est1}.",
@@ -224,7 +233,7 @@ else:
     act3, est3, prev3 = extract_indicator_values(calendar_raw, ["gdp"], "2.5%", "1.4%")
     act4, est4, prev4 = extract_indicator_values(calendar_raw, ["retail sales"], "0.3%", "0.1%")
     
-    is_released_flag = ("TBA" not in act1) and (not is_future_event)
+    is_released_flag = ("OTW" not in act1) and (not is_future_event)
     ind_data = {
         "status_rilis": "SUDAH RILIS" if is_released_flag else "BELUM RILIS",
         "ringkasan": f"FOMC Rate Decision {act1} vs Forecast {est1}. Sumber API: {api_source}." if is_released_flag else f"Menunggu Rilis FOMC pada {tanggal_rilis} {bulan_rilis} {tahun_rilis} ({jam_rilis_formatted}). Forecast: {est1}.",
@@ -271,7 +280,7 @@ def calculate_macro_divergence(act1, est1, act2, est2, act3, est3, act4, est4):
     def eval_indicator(name, act_raw, est_raw, higher_is_good_for_usd=True):
         a = parse_num(act_raw)
         e = parse_num(est_raw)
-        if a is None or e is None or "TBA" in str(act_raw):
+        if a is None or e is None or "OTW" in str(act_raw):
             return f"- **{name}**: Data belum rilis / {act_raw} (Skenario Konsensus Market)", 0
         
         if a > e:
@@ -380,11 +389,11 @@ def render_indicator_box(key_prefix, ind_dict):
     
     c1, c2, c3 = st.columns(3)
     with c1:
-        st.text_input("Actual", value=str(ind_dict.get('actual', jadwal_string_tba)), key=f"act_{unique_key_suffix}")
+        st.text_input("Actual", value=str(ind_dict.get('actual', f"OTW ({tanggal_rilis} {bulan_rilis[:3]} {tahun_rilis} {jam_rilis_formatted})")), key=f"act_{unique_key_suffix}")
     with c2:
-        st.text_input("Forecast", value=str(ind_dict.get('forecast', 'TBA')), key=f"for_{unique_key_suffix}")
+        st.text_input("Forecast", value=str(ind_dict.get('forecast', 'OTW')), key=f"for_{unique_key_suffix}")
     with c3:
-        st.text_input("Previous", value=str(ind_dict.get('previous', 'TBA')), key=f"prev_{unique_key_suffix}")
+        st.text_input("Previous", value=str(ind_dict.get('previous', 'OTW')), key=f"prev_{unique_key_suffix}")
     st.markdown("---")
 
 render_indicator_box("ind_1", ind_data.get("ind_1", {}))
