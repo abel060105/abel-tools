@@ -92,7 +92,6 @@ def generate_astrodox_unified_image(target_date: datetime, ai_result_data=None):
     dt_utc = target_date - timedelta(hours=7)
     planet_degrees, planet_positions = compute_planetary_positions(dt_utc)
 
-    # Perbesar figur agar kotak informasi jauh lebih lega & proporsional
     fig = plt.figure(figsize=(16.5, 9.2), facecolor='#0e1117')
     
     # 1. POLAR ASTRODOX WHEEL
@@ -156,7 +155,7 @@ def generate_astrodox_unified_image(target_date: datetime, ai_result_data=None):
         color='white', fontsize=13, pad=15, fontweight='bold'
     )
 
-    # 2. DETAIL POSISI & AI PROYEKSI RANGE (KOTAK INFORMASI DIPERBESAR)
+    # 2. DETAIL POSISI & AI PROYEKSI RANGE
     ax_text = fig.add_subplot(122, facecolor='#0e1117')
     ax_text.axis('off')
 
@@ -198,7 +197,6 @@ def generate_astrodox_unified_image(target_date: datetime, ai_result_data=None):
     else:
         info_text += "[ Menunggu Eksekusi AI Prediction di Dashboard ]\n"
 
-    # Ukuran font teks ditingkatkan agar pas dan jelas saat di-download
     ax_text.text(
         0.00, 0.98, info_text, color='#e0e0e0', fontsize=9.2, 
         fontfamily='monospace', va='top', ha='left',
@@ -754,7 +752,6 @@ if st.session_state["ai_result"]:
 
 st.markdown("---")
 
-# Generate Astrodox Unified Section
 fig_astro_unified, img_astro_buf, aspect_counts = generate_astrodox_unified_image(
     event_datetime, 
     st.session_state["ai_result"]
@@ -796,17 +793,26 @@ with col_m:
         st.markdown(f"• Hijau (Trine)     : **{aspect_counts['hijau']}**")
         st.markdown(f"• Biru (Sextile)    : **{aspect_counts['biru']}**")
         st.markdown(f"• Kuning (Conjn)    : **{aspect_counts['kuning']}**")
+        
         st.markdown("#### 🎯 ZONA BIAS ASTRO")
         astro_entry_zone = f"{running_price - 3.00:.2f} - {running_price + 3.00:.2f}"
         st.info(astro_entry_zone)
         
-        # SL dan TP disesuaikan otomatis dari data AI Proyeksi Range Pips jika tersedia
+        # Disederhanakan: Menampilkan satu sisi yang relevan (mengikuti arah AI / Default Buy)
         if st.session_state["ai_result"]:
             ast_setup = st.session_state["ai_result"].get("setup_spesifik", {})
-            st.markdown("#### 🛑 STOP LOSS (SL) ASTRO")
-            st.error(f"Buy: {ast_setup.get('sl_buy')} | Sell: {ast_setup.get('sl_sell')}")
-            st.markdown("#### 🏁 TARGET TP ASTRO")
-            st.success(f"Buy: {ast_setup.get('tp_buy')} | Sell: {ast_setup.get('tp_sell')}")
+            ai_b_check = str(st.session_state["ai_result"].get("arah_bias", "")).upper()
+            
+            if "BEARISH" in ai_b_check:
+                st.markdown("#### 🛑 STOP LOSS ASTRO (SELL)")
+                st.error(f"{ast_setup.get('sl_sell')}")
+                st.markdown("#### 🏁 TARGET TP ASTRO (SELL)")
+                st.success(f"{ast_setup.get('tp_sell')}")
+            else:
+                st.markdown("#### 🛑 STOP LOSS ASTRO (BUY)")
+                st.error(f"{ast_setup.get('sl_buy')}")
+                st.markdown("#### 🏁 TARGET TP ASTRO (BUY)")
+                st.success(f"{ast_setup.get('tp_buy')}")
         else:
             st.markdown("#### 🛑 STOP LOSS & TP")
             st.caption("Menunggu hasil AI Proyeksi Range...")
