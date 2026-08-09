@@ -16,7 +16,7 @@ st.set_page_config(
 )
 
 FMP_API_KEY = "Wr5uNw4BQAo5syaNYXylIqcg8908kPd5"
-FINNHUB_TOKEN = "d9saqq9r01qopv46gkigd9saqq9r01qopv46gkj0"
+FINNHUB_TOKEN = "d9saqq9r01qopv46igd9saqq9r01qopv46gkj0"
 GROQ_API_KEY = "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"
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -46,7 +46,6 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### 2. Jadwal Official & Event")
     
-    # Ambil waktu sekarang (Real-Time System Waktu)
     now = datetime.now()
     
     tanggal_rilis = st.number_input("Tanggal Rilis:", value=12, min_value=1, max_value=31)
@@ -88,10 +87,12 @@ with st.sidebar:
             menit_num
         )
         
-        # Mengecek apakah jadwal rilis MASIH DI MASA DEPAN (Termasuk membandingkan Jam & Menit)
         is_future_event = event_datetime > now
     except Exception:
         is_future_event = False
+
+    # String Keterangan Rilis untuk Data TBA
+    jadwal_string_tba = f"TBA ({tanggal_rilis} {bulan_rilis[:3]} {tahun_rilis} {jam_rilis_formatted})"
 
     st.markdown("---")
     st.markdown("### 3. Astrodox Engine Settings")
@@ -161,14 +162,14 @@ def get_economic_calendar_data(tgl, bln_str, thn):
     return raw_data, source
 
 # ==========================================
-# 4. EKSTRAKSI INDIKATOR & ESEKUSI STATUS
+# 4. EKSTRAKSI INDIKATOR & EKSEKUSI STATUS
 # ==========================================
 calendar_raw, api_source = get_economic_calendar_data(tanggal_rilis, bulan_rilis, tahun_rilis)
 
 def extract_indicator_values(raw_list, keywords, default_est="TBA", default_prev="TBA"):
-    # JIKA EVENT MASIH DI MASA DEPAN (SEBELUM TANGGAL + JAM RILIS), ACTUAL MANDATORI "TBA"
+    # JIKA EVENT MASIH DI MASA DEPAN, ACTUAL MANDATORI KEMBALIKAN STRING JADWAL TBA
     if is_future_event or not raw_list:
-        return "TBA", default_est, default_prev
+        return jadwal_string_tba, default_est, default_prev
     
     for item in raw_list:
         event_name = item.get('event', '').lower()
@@ -177,13 +178,13 @@ def extract_indicator_values(raw_list, keywords, default_est="TBA", default_prev
             est = item.get('estimate')
             prev = item.get('previous')
             
-            act_str = str(act) if (act is not None and str(act).strip() != "") else "TBA"
+            act_str = str(act) if (act is not None and str(act).strip() != "") else jadwal_string_tba
             est_str = str(est) if (est is not None and str(est).strip() != "") else default_est
             prev_str = str(prev) if (prev is not None and str(prev).strip() != "") else default_prev
             
             return act_str, est_str, prev_str
             
-    return "TBA", default_est, default_prev
+    return jadwal_string_tba, default_est, default_prev
 
 if "NFP" in target_news:
     act1, est1, prev1 = extract_indicator_values(calendar_raw, ["non farm payrolls", "nonfarm payrolls", "nfp"], "80K", "20K")
@@ -191,7 +192,7 @@ if "NFP" in target_news:
     act3, est3, prev3 = extract_indicator_values(calendar_raw, ["participation rate"], "61.6%", "61.5%")
     act4, est4, prev4 = extract_indicator_values(calendar_raw, ["manufacturing payrolls"], "4K", "11K")
     
-    is_released_flag = (act1 != "TBA") and (not is_future_event)
+    is_released_flag = ("TBA" not in act1) and (not is_future_event)
     ind_data = {
         "status_rilis": "SUDAH RILIS" if is_released_flag else "BELUM RILIS",
         "ringkasan": f"NFP Rilis {act1} vs Forecast {est1}. Sumber API: {api_source}." if is_released_flag else f"Menunggu Rilis NFP pada {tanggal_rilis} {bulan_rilis} {tahun_rilis} ({jam_rilis_formatted}). Forecast: {est1}.",
@@ -207,7 +208,7 @@ elif "CPI" in target_news:
     act3, est3, prev3 = extract_indicator_values(calendar_raw, ["import price"], "0.0%", "-0.1%")
     act4, est4, prev4 = extract_indicator_values(calendar_raw, ["michigan consumer sentiment"], "66.5", "66.4")
     
-    is_released_flag = (act1 != "TBA") and (not is_future_event)
+    is_released_flag = ("TBA" not in act1) and (not is_future_event)
     ind_data = {
         "status_rilis": "SUDAH RILIS" if is_released_flag else "BELUM RILIS",
         "ringkasan": f"CPI Rilis {act1} vs Forecast {est1}. Sumber API: {api_source}." if is_released_flag else f"Menunggu Rilis CPI pada {tanggal_rilis} {bulan_rilis} {tahun_rilis} ({jam_rilis_formatted}). Forecast: {est1}.",
@@ -223,7 +224,7 @@ else:
     act3, est3, prev3 = extract_indicator_values(calendar_raw, ["gdp"], "2.5%", "1.4%")
     act4, est4, prev4 = extract_indicator_values(calendar_raw, ["retail sales"], "0.3%", "0.1%")
     
-    is_released_flag = (act1 != "TBA") and (not is_future_event)
+    is_released_flag = ("TBA" not in act1) and (not is_future_event)
     ind_data = {
         "status_rilis": "SUDAH RILIS" if is_released_flag else "BELUM RILIS",
         "ringkasan": f"FOMC Rate Decision {act1} vs Forecast {est1}. Sumber API: {api_source}." if is_released_flag else f"Menunggu Rilis FOMC pada {tanggal_rilis} {bulan_rilis} {tahun_rilis} ({jam_rilis_formatted}). Forecast: {est1}.",
@@ -270,8 +271,8 @@ def calculate_macro_divergence(act1, est1, act2, est2, act3, est3, act4, est4):
     def eval_indicator(name, act_raw, est_raw, higher_is_good_for_usd=True):
         a = parse_num(act_raw)
         e = parse_num(est_raw)
-        if a is None or e is None or act_raw == "TBA":
-            return f"- **{name}**: Data belum rilis / TBA (Skenario Konsensus Market)", 0
+        if a is None or e is None or "TBA" in str(act_raw):
+            return f"- **{name}**: Data belum rilis / {act_raw} (Skenario Konsensus Market)", 0
         
         if a > e:
             res = "BULLISH USD" if higher_is_good_for_usd else "BEARISH USD"
@@ -379,7 +380,7 @@ def render_indicator_box(key_prefix, ind_dict):
     
     c1, c2, c3 = st.columns(3)
     with c1:
-        st.text_input("Actual", value=str(ind_dict.get('actual', 'TBA')), key=f"act_{unique_key_suffix}")
+        st.text_input("Actual", value=str(ind_dict.get('actual', jadwal_string_tba)), key=f"act_{unique_key_suffix}")
     with c2:
         st.text_input("Forecast", value=str(ind_dict.get('forecast', 'TBA')), key=f"for_{unique_key_suffix}")
     with c3:
@@ -518,7 +519,7 @@ if st.session_state["ai_result"]:
 st.markdown("---")
 
 # ==========================================
-# 10. MULTI-TIMEFRAME CONFLUENCE CARDS (SINKRON)
+# 10. MULTI-TIMEFRAME CONFLUENCE CARDS
 # ==========================================
 st.subheader("🎯 MULTI-TIMEFRAME LIQUIDITY & METHOD CONFLUENCE")
 
@@ -593,25 +594,19 @@ with col_r:
 st.markdown("---")
 
 # ==========================================
-# 11. LIVE CHART TRADINGVIEW (FIX REALTIME MULTI-ASSET)
+# 11. LIVE CHART TRADINGVIEW (FULL CUSTOM PAIR)
 # ==========================================
-st.subheader("📉 LIVE CHART TRADINGVIEW (REALTIME MULTI-ASSET)")
+st.subheader("📉 LIVE CHART TRADINGVIEW (INTERACTIVE)")
 
-chart_symbol = st.selectbox(
-    "Pilih Pair Chart:",
-    ["OANDA:XAUUSD", "BINANCE:BTCUSDT", "FX:EURUSD", "BITSTAMP:ETHUSD"],
-    index=0
-)
-
-tradingview_widget = f"""
-<div class="tradingview-widget-container" style="height:600px;width:100%">
+tradingview_widget = """
+<div class="tradingview-widget-container" style="height:620px;width:100%">
   <div id="tradingview_chart" style="height:100%;width:100%"></div>
   <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
   <script type="text/javascript">
-  new TradingView.widget({{
+  new TradingView.widget({
     "width": "100%",
-    "height": 580,
-    "symbol": "{chart_symbol}",
+    "height": 600,
+    "symbol": "OANDA:XAUUSD",
     "interval": "15",
     "timezone": "Asia/Jakarta",
     "theme": "dark",
@@ -626,8 +621,8 @@ tradingview_widget = f"""
       "RSI@tv-basicstudies",
       "MASimple@tv-basicstudies"
     ]
-  }});
+  });
   </script>
 </div>
 """
-components.html(tradingview_widget, height=600)
+components.html(tradingview_widget, height=620)
