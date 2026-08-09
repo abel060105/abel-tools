@@ -5,10 +5,15 @@ import requests
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import swisseph as swe
 import streamlit as st
 import streamlit.components.v1 as components
 from datetime import datetime
+
+# Flatlib Astro Engine Imports
+from flatlib.datetime import Datetime
+from flatlib.geopos import GeoPos
+from flatlib.chart import Chart
+from flatlib import const
 
 # ==========================================
 # 1. KONFIGURASI HALAMAN & API KEYS
@@ -25,12 +30,10 @@ GROQ_API_KEY = "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"
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-# Buat folder penyimpanan histori lokal jika belum ada
 DATA_CACHE_DIR = "news_history_data"
 if not os.path.exists(DATA_CACHE_DIR):
     os.makedirs(DATA_CACHE_DIR)
 
-# Session state initialization
 if "ai_result" not in st.session_state:
     st.session_state["ai_result"] = None
 if "rekap_text" not in st.session_state:
@@ -41,55 +44,52 @@ if "score_val" not in st.session_state:
     st.session_state["score_val"] = 0
 
 # ==========================================
-# 2. ASTRODOX SWISS EPHEMERIS ENGINE & CHART GENERATOR
+# 2. ASTRODOX ENGINE (FLATLIB & MATPLOTLIB)
 # ==========================================
-ZODIAC_NAMES = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", 
-                "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
 ZODIAC_SYMBOLS = ["♈", "♉", "♊", "♋", "♌", "♍", "♎", "♏", "♐", "♑", "♒", "♓"]
 
-PLANETS = {
-    "Sun ☉": swe.SUN,
-    "Moon ☽": swe.MOON,
-    "Mercury ☿": swe.MERCURY,
-    "Venus ♀": swe.VENUS,
-    "Mars ♂": swe.MARS,
-    "Jupiter ♃": swe.JUPITER,
-    "Saturn ♄": swe.SATURN,
-    "Uranus ♅": swe.URANUS,
-    "Neptune ♆": swe.NEPTUNE,
-    "Pluto ♇": swe.PLUTO
+PLANET_LIST = [
+    const.SUN, const.MOON, const.MERCURY, const.VENUS, 
+    const.MARS, const.JUPITER, const.SATURN, const.URANUS, 
+    const.NEPTUNE, const.PLUTO
+]
+
+PLANET_NAMES = {
+    const.SUN: "Sun ☉", const.MOON: "Moon ☽", const.MERCURY: "Mercury ☿",
+    const.VENUS: "Venus ♀", const.MARS: "Mars ♂", const.JUPITER: "Jupiter ♃",
+    const.SATURN: "Saturn ♄", const.URANUS: "Uranus ♅", const.NEPTUNE: "Neptune ♆",
+    const.PLUTO: "Pluto ♇"
 }
 
 def generate_astrodox_chart(target_date: datetime):
-    # Hitung Julian Day dalam UTC (New York / Market Timezone)
-    julian_day = swe.julday(
-        target_date.year, target_date.month, target_date.day, 
-        target_date.hour + (target_date.minute / 60.0)
-    )
-    
+    # Setup Koordinat New York (Default US Session Market)
+    date_str = target_date.strftime('%Y/%m/%d')
+    time_str = target_date.strftime('%H:%M')
+    dt = Datetime(date_str, time_str, '-04:00')
+    pos = GeoPos('40n42', '74w00')
+    chart = Chart(dt, pos)
+
     planet_positions = {}
     planet_degrees = {}
-    
-    for name, code in PLANETS.items():
-        res, _ = swe.calc_ut(julian_day, code)
-        lon = res[0] # Longitude 0-360 derajat
-        planet_degrees[name] = lon
-        
-        z_idx = int(lon // 30)
-        deg = lon % 30
-        planet_positions[name] = f"{ZODIAC_NAMES[z_idx]} {int(deg)}°{int((deg%1)*60)}'"
 
-    # Setup Figure Matplotlib Dark Wheel
+    for p in PLANET_LIST:
+        obj = chart.get(p)
+        lon = obj.lon
+        p_label = PLANET_NAMES[p]
+        planet_degrees[p_label] = lon
+        planet_positions[p_label] = f"{obj.sign} {int(obj.signlon)}°{int((obj.signlon%1)*60)}'"
+
+    # Setup Gambar Matplotlib Wheel
     fig = plt.figure(figsize=(6, 7), facecolor='#0e1117')
     ax = fig.add_subplot(111, polar=True, facecolor='#0e1117')
-    ax.set_theta_zero_location("W")  # Ascendant di sisi Kiri
-    ax.set_theta_direction(-1)      # Counter-clockwise
+    ax.set_theta_zero_location("W")
+    ax.set_theta_direction(-1)
     
     ax.grid(False)
     ax.set_yticklabels([])
     ax.set_xticklabels([])
 
-    # Gambar Ring Zodiak (12 Sector)
+    # Ring Zodiak
     colors = ['#ff9999','#e6b800','#80ff80','#80d4ff'] * 3
     for i in range(12):
         theta_start = np.radians(i * 30)
@@ -103,16 +103,15 @@ def generate_astrodox_chart(target_date: datetime):
             color='white', fontsize=12, ha='center', va='center', fontweight='bold'
         )
 
-    # Plot Planet & Garis Aspek
+    # Plot Titik Planet
     deg_list = list(planet_degrees.values())
-    
     for name, deg in planet_degrees.items():
         rad = np.radians(deg)
         ax.plot(rad, 0.70, marker='o', color='#00ffff', markersize=5)
         short_symbol = name.split()[-1]
         ax.text(rad, 0.62, short_symbol, color='white', fontsize=10, ha='center', va='center')
 
-    # Plot Garis Aspek (Aspect Lines: Green=Trine/Harmonis, Red=Square/Gejolak)
+    # Garis Aspek
     for i in range(len(deg_list)):
         for j in range(i + 1, len(deg_list)):
             diff = abs(deg_list[i] - deg_list[j]) % 30
@@ -131,7 +130,7 @@ def generate_astrodox_chart(target_date: datetime):
     return fig, planet_positions
 
 # ==========================================
-# 3. SIDEBAR - KONTROL INTERAKTIF
+# 3. SIDEBAR & CONTROL PANEL
 # ==========================================
 with st.sidebar:
     st.header("⚙️ ABEL FX Control Panel")
@@ -146,7 +145,6 @@ with st.sidebar:
     st.markdown("### 2. Jadwal Official & Event")
     
     now = datetime.now()
-    
     tanggal_rilis = st.number_input("Tanggal Rilis:", value=7, min_value=1, max_value=31)
     
     daftar_bulan = [
@@ -211,7 +209,7 @@ with st.sidebar:
     running_price = st.number_input("Harga Running XAUUSD:", value=4314.00, step=0.5)
 
 # ==========================================
-# 4. AUTO SAVE LOCAL FILE & CACHE LOGIC
+# 4. CALENDAR DATA CACHE
 # ==========================================
 @st.cache_data(ttl=86400, show_spinner="Mengambil data Kalender Ekonomi...")
 def fetch_full_month_calendar(bln_num, thn_num):
@@ -276,9 +274,6 @@ def fetch_full_month_calendar(bln_num, thn_num):
 
 calendar_raw, api_source = fetch_full_month_calendar(bulan_num, int(tahun_rilis))
 
-# ==========================================
-# 5. SMART INDIKATOR RESOLVER
-# ==========================================
 def extract_indicator_smart(raw_list, keywords, default_act, default_est, default_prev, fallback_day, fallback_time="19:30"):
     found_item = None
     if raw_list:
@@ -370,7 +365,7 @@ else:
         "ind_4": {"nama": "Retail Sales m/m", "actual": act4, "forecast": est4, "previous": prev4, "penjelasan": "Tingkat belanja konsumen.", "efek": "Actual > Forecast -> Menguatkan USD"}
     }
 
-# Technical Bias Logic
+# Technical Bias
 if "Force Bearish" in market_condition:
     is_bullish = False
 elif "Force Bullish" in market_condition:
@@ -379,14 +374,12 @@ else:
     is_bullish = (int(running_price * 10) % 2 != 0)
 
 if not is_bullish:
-    tech_signal = "BEARISH (STRONG DROP)"
     tech_action = "🔴 SELL LIMIT / PREMIUM ZONE REJECTION"
     tech_entry = running_price + 3.00
     tech_sl = tech_entry + 7.50
     tech_tp = tech_entry - 42.00
     tech_reason = "Multi-TF Crosscheck (Weekly-D1 Bearish BOS, H4-H1 SnD Supply Zone)."
 else:
-    tech_signal = "BULLISH (STRONG PUMP)"
     tech_action = "🟢 BUY LIMIT / DISCOUNT ZONE REJECTION"
     tech_entry = running_price - 3.00
     tech_sl = running_price - 7.50
@@ -475,7 +468,7 @@ def fetch_geopolitical_analysis(event_name, actual_val, forecast_val):
     }
 
 # ==========================================
-# 6. TAMPILAN UTAMA DASHBOARD
+# 5. DASHBOARD UI
 # ==========================================
 st.title("📈 ABEL FX - Macro & Astrodox Predictor Engine")
 
@@ -500,9 +493,7 @@ else:
     - **Sumber Feed Data:** {api_source}
     """)
 
-# ==========================================
-# 7. ASTRODOX ENGINE VISUAL DISPLAY
-# ==========================================
+# ASTRODOX WHEEL CHART DISPLAY
 st.markdown("---")
 st.subheader("🔮 ASTRODOX ENGINE - TRANSIT WHEEL & ANALYSIS")
 
@@ -514,7 +505,7 @@ with col_astro_img:
     st.pyplot(fig_astro)
 
 with col_astro_info:
-    st.markdown("#### 📜 Posisi Planet Transit (Swiss Ephemeris)")
+    st.markdown("#### 📜 Posisi Planet Transit (Astrodox Data)")
     for p_name, p_pos in astro_positions.items():
         st.write(f"• **{p_name}**: `{p_pos}`")
         
@@ -556,9 +547,6 @@ final_act2 = actual_inputs.get("ind_2", act2)
 final_act3 = actual_inputs.get("ind_3", act3)
 final_act4 = actual_inputs.get("ind_4", act4)
 
-# ==========================================
-# 8. GEOPOLITIK & AI PREDICTION EXECUTION
-# ==========================================
 st.subheader("🌍 MODUL BERITA GEOPOLITIK & SENTIMEN TRANSISI")
 geo_info = fetch_geopolitical_analysis(target_news, final_act1, est1)
 
@@ -591,12 +579,6 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
         - Bias Makro Kalkulasi: {macro_bias_result}
         - Isu Geopolitik: {geo_info.get('isu_utama')} - {geo_info.get('ringkasan_situasi')}
 
-        [ATURAN EXECUTION KETAT]:
-        1. JIKA EVENT BELUM RILIS ATAU DATA NEUTRAL/MIXED:
-           - Arah Bias Utama WAJIB "NEUTRAL / TWO-SIDED (WHIPSAW SETUP)".
-           - WAJIB berikan TWO-SIDED SETUP (Plan A BUY LIMIT Zona Discount Bawah DAN Plan B SELL LIMIT Zona Premium Atas).
-           - Tulis secara eksplisit angka zona BUY dan angka zona SELL secara terpisah!
-
         Jawab HANYA dalam format JSON MURNI berikut:
         {{
             "arah_bias": "NEUTRAL / TWO-SIDED (WHIPSAW)",
@@ -609,7 +591,7 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
                 "sl_buy": "{running_price - 27.00:.2f}",
                 "sl_sell": "{running_price + 27.00:.2f}",
                 "tp_buy": "{running_price + 15.00:.2f}",
-                "tp_sell": "{running_price - 15.00:.2f}"
+                "tp_sell": "{running_price + 15.00:.2f}"
             }}
         }}
         """
@@ -657,7 +639,6 @@ if st.session_state["ai_result"]:
             - **Entry Zone Buy:** {setup_ai.get('zona_buy_demand')}
             - **Stop Loss (SL):** {setup_ai.get('sl_buy')}
             - **Take Profit (TP):** {setup_ai.get('tp_buy')}
-            - **Trigger:** Tunggu Liquidity Sweep di bawah low lalu Rejection M5.
             """)
         with c_sell:
             st.error(f"""
@@ -665,7 +646,6 @@ if st.session_state["ai_result"]:
             - **Entry Zone Sell:** {setup_ai.get('zona_sell_supply')}
             - **Stop Loss (SL):** {setup_ai.get('sl_sell')}
             - **Take Profit (TP):** {setup_ai.get('tp_sell')}
-            - **Trigger:** Tunggu Liquidity Sweep di atas high lalu Rejection M5.
             """)
     else:
         st.info(f"""
@@ -679,7 +659,7 @@ if st.session_state["ai_result"]:
 st.markdown("---")
 
 # ==========================================
-# 9. MULTI-TIMEFRAME CONFLUENCE CARDS
+# 6. CONFLUENCE CARDS & LIVE CHART
 # ==========================================
 st.subheader("🎯 MULTI-TIMEFRAME LIQUIDITY & METHOD CONFLUENCE")
 
@@ -687,41 +667,28 @@ col_l, col_m, col_r = st.columns(3)
 
 with col_l:
     st.markdown("### 🤖 AI Macro Engine")
-    st.write("Signal: Macro + Geopolitical Confluence")
-    
     if st.session_state["ai_result"]:
         ai_bias = st.session_state["ai_result"].get("arah_bias", "NEUTRAL")
         ai_setup = st.session_state["ai_result"].get("setup_spesifik", {})
         
         if "NEUTRAL" in str(ai_bias).upper():
-            st.warning("⚠️ **ARAH BIAS: NEUTRAL (WHIPSAW / TWO-SIDED)**")
+            st.warning("⚠️ **ARAH BIAS: NEUTRAL (WHIPSAW)**")
             st.markdown("#### 🟢 ZONA BUY (DISCOUNT)")
             st.info(f"{ai_setup.get('zona_buy_demand')}")
             st.markdown("#### 🔴 ZONA SELL (PREMIUM)")
             st.error(f"{ai_setup.get('zona_sell_supply')}")
         elif "BULLISH" in str(ai_bias).upper():
             st.markdown("🟢 **ARAH BIAS: BULLISH (BUY)**")
-            st.markdown("#### 🎯 ZONA ENTRY BUY")
             st.info(f"{ai_setup.get('zona_buy_demand')}")
-            st.markdown("#### 🛑 STOP LOSS")
-            st.error(f"{ai_setup.get('sl_buy')}")
-            st.markdown("#### 🏁 TARGET TP")
-            st.success(f"{ai_setup.get('tp_buy')}")
         else:
             st.markdown("🔴 **ARAH BIAS: BEARISH (SELL)**")
-            st.markdown("#### 🎯 ZONA ENTRY SELL")
             st.error(f"{ai_setup.get('zona_sell_supply')}")
-            st.markdown("#### 🛑 STOP LOSS")
-            st.error(f"{ai_setup.get('sl_sell')}")
-            st.markdown("#### 🏁 TARGET TP")
-            st.success(f"{ai_setup.get('tp_sell')}")
     else:
-        st.caption("Klik tombol 'EXECUTE MULTI-TF AI PREDICTION' di atas untuk mengaktifkan AI Engine.")
+        st.caption("Klik tombol 'EXECUTE MULTI-TF AI PREDICTION' untuk mengaktifkan AI Engine.")
 
 with col_m:
     st.markdown("### 🔮 Astrodox Engine")
     if astrodox_active:
-        st.write("Signal: Swiss Ephemeris Astro Cycle")
         st.markdown("🟢 **ARAH BIAS: BULLISH (BUY)**")
         st.markdown("#### 🎯 ZONA ENTRY")
         st.info(f"{running_price - 3.00:.2f} - {running_price - 1.00:.2f}")
@@ -735,13 +702,11 @@ with col_m:
 with col_r:
     st.markdown("### 📐 Multi-TF Technical Engine")
     if tech_active:
-        st.write("Signal: Price Action SnD")
         if not is_bullish:
             st.markdown("🔴 **ARAH BIAS: BEARISH (STRONG DROP)**")
         else:
             st.markdown("🟢 **ARAH BIAS: BULLISH (STRONG PUMP)**")
         st.write(f"Eksekusi: **{tech_action}**")
-        st.caption(f"💡 **Reasoning:** {tech_reason}")
         st.markdown("#### 🎯 ZONA ENTRY PRESISI")
         st.info(f"{tech_entry - 1.00:.2f} - {tech_entry + 1.50:.2f}")
         st.markdown("#### 🛑 STOP LOSS (SL)")
@@ -752,10 +717,6 @@ with col_r:
         st.info("Technical Engine OFF")
 
 st.markdown("---")
-
-# ==========================================
-# 10. LIVE CHART TRADINGVIEW (BERSIH)
-# ==========================================
 st.subheader("📉 LIVE CHART TRADINGVIEW (INTERACTIVE)")
 
 tradingview_widget = """
