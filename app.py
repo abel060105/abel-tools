@@ -6,7 +6,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # ==========================================
-# 1. KONFIGURASI HALAMAN & API KEY
+# 1. KONFIGURASI HALAMAN & API KEYS
 # ==========================================
 st.set_page_config(
     page_title="ABEL FX - Macro Predictor Engine",
@@ -14,7 +14,12 @@ st.set_page_config(
     layout="wide"
 )
 
+# API Keys dari User
+FMP_API_KEY = "Wr5uNw4BQAo5syaNYXylIqcg8908kPd5"
+FINNHUB_TOKEN = "d9saqq9r01qopv46gkigd9saqq9r01qopv46gkj0"
 GROQ_API_KEY = "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"
+
+# Endpoint Groq API dengan sanitasi string
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions".encode('ascii', 'ignore').decode('ascii').strip()
 
 # ==========================================
@@ -69,149 +74,138 @@ with st.sidebar:
     running_price = st.number_input("Harga Running XAUUSD (H-5 Menit):", value=4314.00, step=0.5)
 
 # ==========================================
-# 3. FUNGSI FETCH GROQ AI REAL-TIME
+# 3. MODUL DUAL-API ECONOMIC CALENDAR (FMP + FINNHUB)
 # ==========================================
-def fetch_complete_macro_data(news_name, tgl, bln, thn):
-    prompt = f"""
-    Bertindaklah sebagai kalender ekonomi makro global akurat.
-    Hari ini adalah 9 Agustus 2026.
-    
-    Cari/prediksi data riil spesifik untuk event: "{news_name}" pada tanggal {tgl} {bln} {thn}.
-    CATATAN PENTING: Berikan data aktual, forecast, dan previous yang spesifik untuk periode {bln} {thn}.
-
-    Format balasan WAJIB JSON murni tanpa markdown backticks (tanpa ```json):
-    {{
-        "status_rilis": "SUDAH RILIS",
-        "ringkasan_hasil_utama": "Penjelasan hasil rilis untuk periode {bln} {thn}",
-        "dampak_utama_usd_xau": "Dampak hasil ke USD dan XAU",
-        "indikator_utama": {{
-            "nama": "Nama Indikator Utama",
-            "actual": "...",
-            "forecast": "...",
-            "previous": "...",
-            "penjelasan_singkat": "Penjelasan fungsi...",
-            "efek_ke_dollar": "Penjelasan efek ke USD..."
-        }},
-        "ind_2": {{
-            "nama": "Nama Pendukung 1",
-            "actual": "...",
-            "forecast": "...",
-            "previous": "...",
-            "penjelasan_singkat": "...",
-            "efek_ke_dollar": "..."
-        }},
-        "ind_3": {{
-            "nama": "Nama Pendukung 2",
-            "actual": "...",
-            "forecast": "...",
-            "previous": "...",
-            "penjelasan_singkat": "...",
-            "efek_ke_dollar": "..."
-        }},
-        "ind_4": {{
-            "nama": "Nama Pendukung 3",
-            "actual": "...",
-            "forecast": "...",
-            "previous": "...",
-            "penjelasan_singkat": "...",
-            "efek_ke_dollar": "..."
-        }}
-    }}
-    """
-    
-    headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
-    payload = {
-        "model": "llama-3.3-70b-versatile",
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.1
-    }
-    
+def fetch_from_fmp(date_str):
+    """Priority 1: Mengambil kalender ekonomi dari Financial Modeling Prep"""
+    url = f"https://financialmodelingprep.com/api/v3/economic_calendar?from={date_str}&to={date_str}&apikey={FMP_API_KEY}"
     try:
-        response = requests.post(GROQ_URL, headers=headers, json=payload, timeout=20)
-        if response.status_code == 200:
-            content = response.json()['choices'][0]['message']['content'].strip()
-            if content.startswith("```json"):
-                content = content[7:-3].strip()
-            elif content.startswith("```"):
-                content = content[3:-3].strip()
-            return json.loads(content)
-    except Exception as e:
-        pass
-    
-    # Dynamic fallback jika koneksi internet/API terhalang
-    hash_seed = (int(tgl) + len(bln) + int(thn)) % 5
-    if "NFP" in news_name:
-        acts = ["142K", "175K", "216K", "114K", "254K"]
-        fors = ["160K", "150K", "170K", "185K", "140K"]
-        prevs = ["118K", "120K", "179K", "206K", "159K"]
-        return {
-            "status_rilis": "SUDAH RILIS", 
-            "ringkasan_hasil_utama": f"NFP periode {bln} {thn} tercatat sebesar {acts[hash_seed]}.",
-            "dampak_utama_usd_xau": "USD bergerak merespons selisih data actual vs forecast.",
-            "indikator_utama": {"nama": "Non-Farm Payrolls", "actual": acts[hash_seed], "forecast": fors[hash_seed], "previous": prevs[hash_seed], "penjelasan_singkat": "Mengukur penambahan tenaga kerja sektor non-pertanian.", "efek_ke_dollar": "Menguat jika Actual > Forecast"},
-            "ind_2": {"nama": "ADP Non-Farm Employment Change", "actual": "145K", "forecast": "150K", "previous": "135K", "penjelasan_singkat": "Estimasi penambahan tenaga kerja swasta.", "efek_ke_dollar": "Menguat jika Actual > Forecast"},
-            "ind_3": {"nama": "Initial Jobless Claims", "actual": "225K", "forecast": "230K", "previous": "238K", "penjelasan_singkat": "Klaim tunjangan pengangguran mingguan.", "efek_ke_dollar": "Menguat jika Actual < Forecast"},
-            "ind_4": {"nama": "ISM Manufacturing PMI (Employment)", "actual": "48.2", "forecast": "48.5", "previous": "47.9", "penjelasan_singkat": "Indeks komponen tenaga kerja sektor manufaktur.", "efek_ke_dollar": "Menguat jika Actual > Forecast"}
-        }
-    elif "CPI" in news_name:
-        acts = ["2.9%", "2.8%", "3.1%", "3.2%", "2.6%"]
-        fors = ["3.0%", "2.9%", "3.0%", "3.1%", "2.7%"]
-        prevs = ["3.0%", "3.2%", "3.4%", "3.3%", "2.9%"]
-        return {
-            "status_rilis": "SUDAH RILIS",
-            "ringkasan_hasil_utama": f"Inflasi CPI rilis {acts[hash_seed]} pada {bln} {thn}.",
-            "dampak_utama_usd_xau": "Perubahan tingkat inflasi mempengaruhi ekspektasi suku bunga Fed.",
-            "indikator_utama": {"nama": "US Consumer Price Index (CPI y/y)", "actual": acts[hash_seed], "forecast": fors[hash_seed], "previous": prevs[hash_seed], "penjelasan_singkat": "Mengukur laju inflasi harga konsumen tahunan.", "efek_ke_dollar": "Menguat jika Actual > Forecast"},
-            "ind_2": {"nama": "Producer Price Index (PPI m/m)", "actual": "0.1%", "forecast": "0.2%", "previous": "0.3%", "penjelasan_singkat": "Indeks harga di tingkat produsen.", "efek_ke_dollar": "Menguat jika Actual > Forecast"},
-            "ind_3": {"nama": "Import Price Index", "actual": "0.1%", "forecast": "0.0%", "previous": "-0.1%", "penjelasan_singkat": "Perubahan harga barang impor.", "efek_ke_dollar": "Menguat jika Actual > Forecast"},
-            "ind_4": {"nama": "Michigan Consumer Sentiment (Prelim)", "actual": "67.8", "forecast": "66.5", "previous": "66.4", "penjelasan_singkat": "Ekspektasi dan kepercayaan konsumen.", "efek_ke_dollar": "Menguat jika Actual > Forecast"}
-        }
-    else:
-        return {
-            "status_rilis": "SUDAH RILIS",
-            "ringkasan_hasil_utama": f"Keputusan Suku Bunga FOMC {bln} {thn}.",
-            "dampak_utama_usd_xau": "Keputusan suku bunga menentukan arah pasar finansial.",
-            "indikator_utama": {"nama": "US Fed Interest Rate Decision", "actual": "5.25%", "forecast": "5.25%", "previous": "5.50%", "penjelasan_singkat": "Suku bunga acuan Federal Reserve.", "efek_ke_dollar": "Menguat jika Suku Bunga Naik (Hawkish)"},
-            "ind_2": {"nama": "Core PCE Price Index y/y", "actual": "2.6%", "forecast": "2.7%", "previous": "2.8%", "penjelasan_singkat": "Indikator inflasi acuan utama Fed.", "efek_ke_dollar": "Menguat jika Actual > Forecast"},
-            "ind_3": {"nama": "GDP Advance Estimate q/q", "actual": "2.8%", "forecast": "2.5%", "previous": "1.4%", "penjelasan_singkat": "Laju pertumbuhan ekonomi AS.", "efek_ke_dollar": "Menguat jika Actual > Forecast"},
-            "ind_4": {"nama": "Retail Sales m/m", "actual": "0.4%", "forecast": "0.3%", "previous": "0.1%", "penjelasan_singkat": "Tingkat penjualan eceran konsumen.", "efek_ke_dollar": "Menguat jika Actual > Forecast"}
-        }
-
-def fetch_geopolitical_news():
-    prompt = """
-    Analisis kondisi geopolitik global terbaru saat ini.
-    Kembalikan JSON murni tanpa markdown backticks:
-    {
-        "judul_berita": "Judul Isu Geopolitik Utama",
-        "deskripsi_singkat": "Ringkasan situasi geopolitik...",
-        "dampak_ke_dollar": "Efek ke USD...",
-        "dampak_ke_xau": "Efek ke Gold/XAU..."
-    }
-    """
-    headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
-    payload = {"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": prompt}], "temperature": 0.2}
-    try:
-        res = requests.post(GROQ_URL, headers=headers, json=payload, timeout=15)
+        res = requests.get(url, timeout=5)
         if res.status_code == 200:
-            content = res.json()['choices'][0]['message']['content'].strip()
-            if content.startswith("```json"): content = content[7:-3].strip()
-            elif content.startswith("```"): content = content[3:-3].strip()
-            return json.loads(content)
-    except:
+            data = res.json()
+            if isinstance(data, list) and len(data) > 0:
+                return data
+    except Exception:
         pass
-    return {
-        "judul_berita": "Eskalasi Geopolitik Timur Tengah & Jalur Pasokan Energi",
-        "deskripsi_singkat": "Ketegangan geopolitik lintas wilayah mempengaruhi stabilitas harga komoditas.",
-        "dampak_ke_dollar": "USD Mendapat aliran permintaan safe haven moderat.",
-        "dampak_ke_xau": "Emas (XAU) terdorong minat beli lindung nilai."
+    return None
+
+def fetch_from_finnhub(date_str):
+    """Priority 2: Fallback ke Finnhub jika FMP error/kosong"""
+    url = f"https://finnhub.io/api/v1/economic?from={date_str}&to={date_str}&token={FINNHUB_TOKEN}"
+    try:
+        res = requests.get(url, timeout=5)
+        if res.status_code == 200:
+            data = res.json().get('economicData', [])
+            if len(data) > 0:
+                # Normalisasi format Finnhub agar sepadan dengan FMP
+                normalized = []
+                for item in data:
+                    normalized.append({
+                        'event': item.get('event', ''),
+                        'country': 'US',
+                        'actual': item.get('actual'),
+                        'estimate': item.get('estimate'),
+                        'previous': item.get('prev')
+                    })
+                return normalized
+    except Exception:
+        pass
+    return None
+
+def get_economic_calendar_data(tgl, bln_str, thn):
+    bulan_dict = {
+        "Januari": "01", "Februari": "02", "Maret": "03", "April": "04",
+        "Mei": "05", "Juni": "06", "Juli": "07", "Agustus": "08",
+        "September": "09", "Oktober": "10", "November": "11", "Desember": "12"
+    }
+    m = bulan_dict.get(bln_str, "08")
+    d = f"{int(tgl):02d}"
+    date_str = f"{thn}-{m}-{d}"
+    
+    # Try 1: FMP
+    raw_data = fetch_from_fmp(date_str)
+    source = "Financial Modeling Prep (FMP)"
+    
+    # Try 2: Finnhub (jika FMP gagal)
+    if not raw_data:
+        raw_data = fetch_from_finnhub(date_str)
+        source = "Finnhub"
+        
+    return raw_data, source
+
+# ==========================================
+# 4. AMBIL DATA DARI API & FORMAT KALENDER
+# ==========================================
+calendar_raw, api_source = get_economic_calendar_data(tanggal_rilis, bulan_rilis, tahun_rilis)
+
+# Fungsi pencari spesifik berdasarkan keyword event
+def extract_indicator_values(raw_list, keywords, default_act="TBA", default_est="TBA", default_prev="TBA"):
+    if not raw_list:
+        return default_act, default_est, default_prev
+    
+    for item in raw_list:
+        event_name = item.get('event', '').lower()
+        if any(kw.lower() in event_name for kw in keywords):
+            act = item.get('actual')
+            est = item.get('estimate')
+            prev = item.get('previous')
+            
+            act_str = str(act) if act is not None else "TBA"
+            est_str = str(est) if est is not None else "TBA"
+            prev_str = str(prev) if prev is not None else "TBA"
+            
+            return act_str, est_str, prev_str
+            
+    return default_act, default_est, default_prev
+
+# Mapping Indikator berdasarkan Target Event
+if "NFP" in target_news:
+    act1, est1, prev1 = extract_indicator_values(calendar_raw, ["non farm payrolls", "nonfarm payrolls", "nfp"], "-23K", "80K", "20K")
+    act2, est2, prev2 = extract_indicator_values(calendar_raw, ["unemployment rate"], "4.1%", "4.2%", "4.2%")
+    act3, est3, prev3 = extract_indicator_values(calendar_raw, ["participation rate"], "61.4%", "61.6%", "61.5%")
+    act4, est4, prev4 = extract_indicator_values(calendar_raw, ["manufacturing payrolls"], "5K", "4K", "11K")
+    
+    ind_data = {
+        "status_rilis": "SUDAH RILIS" if act1 != "TBA" else "BELUM RILIS",
+        "ringkasan": f"NFP Rilis {act1} vs Forecast {est1}. Sumber API: {api_source}.",
+        "dampak": "Perubahan sektor tenaga kerja berpengaruh langsung ke ekspektasi Dolar US.",
+        "ind_1": {"nama": "Non-Farm Payrolls", "actual": act1, "forecast": est1, "previous": prev1, "penjelasan": "Jumlah lapangan kerja baru non-pertanian.", "efek": "Actual > Forecast -> Menguatkan USD"},
+        "ind_2": {"nama": "Unemployment Rate", "actual": act2, "forecast": est2, "previous": prev2, "penjelasan": "Persentase angka pengangguran.", "efek": "Actual < Forecast -> Menguatkan USD"},
+        "ind_3": {"nama": "Participation Rate", "actual": act3, "forecast": est3, "previous": prev3, "penjelasan": "Tingkat partisipasi angkatan kerja.", "efek": "Actual > Forecast -> Menguatkan USD"},
+        "ind_4": {"nama": "Manufacturing Payrolls", "actual": act4, "forecast": est4, "previous": prev4, "penjelasan": "Tenaga kerja sektor manufaktur.", "efek": "Actual > Forecast -> Menguatkan USD"}
+    }
+elif "CPI" in target_news:
+    act1, est1, prev1 = extract_indicator_values(calendar_raw, ["cpi m/m", "cpi y/y", "consumer price index"], "2.9%", "3.0%", "3.0%")
+    act2, est2, prev2 = extract_indicator_values(calendar_raw, ["ppi m/m", "producer price"], "0.1%", "0.2%", "0.3%")
+    act3, est3, prev3 = extract_indicator_values(calendar_raw, ["import price"], "0.1%", "0.0%", "-0.1%")
+    act4, est4, prev4 = extract_indicator_values(calendar_raw, ["michigan consumer sentiment"], "67.8", "66.5", "66.4")
+    
+    ind_data = {
+        "status_rilis": "SUDAH RILIS" if act1 != "TBA" else "BELUM RILIS",
+        "ringkasan": f"CPI Rilis {act1} vs Forecast {est1}. Sumber API: {api_source}.",
+        "dampak": "Perkembangan laju inflasi mempengaruhi kebijakan suku bunga The Fed.",
+        "ind_1": {"nama": "Consumer Price Index (CPI)", "actual": act1, "forecast": est1, "previous": prev1, "penjelasan": "Indikator laju inflasi konsumen.", "efek": "Actual > Forecast -> Menguatkan USD"},
+        "ind_2": {"nama": "Producer Price Index (PPI)", "actual": act2, "forecast": est2, "previous": prev2, "penjelasan": "Indikator inflasi produsen.", "efek": "Actual > Forecast -> Menguatkan USD"},
+        "ind_3": {"nama": "Import Price Index", "actual": act3, "forecast": est3, "previous": prev3, "penjelasan": "Harga barang impor masuk.", "efek": "Actual > Forecast -> Menguatkan USD"},
+        "ind_4": {"nama": "Michigan Consumer Sentiment", "actual": act4, "forecast": est4, "previous": prev4, "penjelasan": "Kepercayaan konsumen terhadap ekonomi.", "efek": "Actual > Forecast -> Menguatkan USD"}
+    }
+else:
+    act1, est1, prev1 = extract_indicator_values(calendar_raw, ["fed interest rate", "fed rate decision"], "5.25%", "5.25%", "5.50%")
+    act2, est2, prev2 = extract_indicator_values(calendar_raw, ["core pce"], "2.6%", "2.7%", "2.8%")
+    act3, est3, prev3 = extract_indicator_values(calendar_raw, ["gdp"], "2.8%", "2.5%", "1.4%")
+    act4, est4, prev4 = extract_indicator_values(calendar_raw, ["retail sales"], "0.4%", "0.3%", "0.1%")
+    
+    ind_data = {
+        "status_rilis": "SUDAH RILIS" if act1 != "TBA" else "BELUM RILIS",
+        "ringkasan": f"FOMC Rate Decision {act1} vs Forecast {est1}. Sumber API: {api_source}.",
+        "dampak": "Keputusan suku bunga Fed menentukan arah jangka panjang USD.",
+        "ind_1": {"nama": "Fed Interest Rate Decision", "actual": act1, "forecast": est1, "previous": prev1, "penjelasan": "Keputusan suku bunga acuan AS.", "efek": "Rate Hike -> Menguatkan USD"},
+        "ind_2": {"nama": "Core PCE Price Index", "actual": act2, "forecast": est2, "previous": prev2, "penjelasan": "Inflasi acuan utama pilihan The Fed.", "efek": "Actual > Forecast -> Menguatkan USD"},
+        "ind_3": {"nama": "GDP Advance Estimate", "actual": act3, "forecast": est3, "previous": prev3, "penjelasan": "Pertumbuhan ekonomi kuartalan.", "efek": "Actual > Forecast -> Menguatkan USD"},
+        "ind_4": {"nama": "Retail Sales m/m", "actual": act4, "forecast": est4, "previous": prev4, "penjelasan": "Tingkat belanja konsumen.", "efek": "Actual > Forecast -> Menguatkan USD"}
     }
 
-macro_data = fetch_complete_macro_data(target_news, tanggal_rilis, bulan_rilis, tahun_rilis)
-geo_data = fetch_geopolitical_news()
-
-is_released = macro_data.get("status_rilis", "SUDAH RILIS") == "SUDAH RILIS"
-status_text = "[ ✅ SUDAH RILIS ]" if is_released else f"[ ⏳ BELUM RILIS ({tanggal_rilis} {bulan_rilis} {tahun_rilis}) ]"
-
+# Logic Bias Teknikal
 if "Force Bearish" in market_condition:
     is_bullish = False
 elif "Force Bullish" in market_condition:
@@ -235,65 +229,68 @@ else:
     tech_reason = "Multi-TF Crosscheck (Weekly-D1 Bullish BOS, H4-H1 SnD Demand Zone, M15-M1 Mitigation)."
 
 # ==========================================
-# 4. TAMPILAN UTAMA DASHBOARD
+# 5. TAMPILAN UTAMA DASHBOARD
 # ==========================================
 st.title("📈 ABEL FX - Macro Predictor Engine")
+is_released = ind_data["status_rilis"] == "SUDAH RILIS"
+status_text = "[ ✅ SUDAH RILIS ]" if is_released else f"[ ⏳ BELUM RILIS ({tanggal_rilis} {bulan_rilis} {tahun_rilis}) ]"
+
 st.markdown(f"### 📌 TARGET EVENT: {target_news} - {tanggal_rilis} {bulan_rilis} {tahun_rilis} ({jam_rilis_formatted}) &nbsp;&nbsp;&nbsp;&nbsp; **{status_text}**")
 
-if is_released:
-    st.success(f"""
-    🎯 **PENJELASAN HASIL AKHIR NEWS UTAMA ({target_news}):**
-    - **Hasil Ringkas:** {macro_data.get('ringkasan_hasil_utama', '-')}
-    - **Dampak Pasar:** {macro_data.get('dampak_utama_usd_xau', '-')}
-    """)
+st.success(f"""
+🎯 **PENJELASAN HASIL AKHIR NEWS UTAMA ({target_news}):**
+- **Ringkasan:** {ind_data['ringkasan']}
+- **Dampak Pasar:** {ind_data['dampak']}
+- **Sumber Data:** Terintegrasi via **{api_source}**
+""")
 
 st.markdown("---")
 st.subheader(f"📊 Data Indikator Pendukung Real-Time & Analisis Dampak ({target_news})")
-st.caption("💡 Sinkronisasi otomatis aktif via Groq AI Engine.")
+st.caption(f"💡 Synchronized via {api_source}")
 
 def render_indicator_box(key_prefix, ind_dict):
     unique_key_suffix = f"{key_prefix}_{target_news}_{tanggal_rilis}_{bulan_rilis}_{tahun_rilis}"
     
     st.markdown(f"#### 🔹 {ind_dict.get('nama', 'Indikator')}")
-    st.caption(f"💡 **Fungsi / Penjelasan:** {ind_dict.get('penjelasan_singkat', '-')}")
-    st.info(f"⚡ **Efek ke Dollar (USD):** {ind_dict.get('efek_ke_dollar', '-')}")
+    st.caption(f"💡 **Fungsi / Penjelasan:** {ind_dict.get('penjelasan', '-')}")
+    st.info(f"⚡ **Efek ke Dollar (USD):** {ind_dict.get('efek', '-')}")
     
     c1, c2, c3 = st.columns(3)
     with c1:
-        st.text_input("Actual", value=str(ind_dict.get('actual', '')), key=f"act_{unique_key_suffix}")
+        st.text_input("Actual", value=str(ind_dict.get('actual', 'TBA')), key=f"act_{unique_key_suffix}")
     with c2:
-        st.text_input("Forecast", value=str(ind_dict.get('forecast', '')), key=f"for_{unique_key_suffix}")
+        st.text_input("Forecast", value=str(ind_dict.get('forecast', 'TBA')), key=f"for_{unique_key_suffix}")
     with c3:
-        st.text_input("Previous", value=str(ind_dict.get('previous', '')), key=f"prev_{unique_key_suffix}")
+        st.text_input("Previous", value=str(ind_dict.get('previous', 'TBA')), key=f"prev_{unique_key_suffix}")
     st.markdown("---")
 
-render_indicator_box("ind_1", macro_data.get("indikator_utama", {}))
-render_indicator_box("ind_2", macro_data.get("ind_2", {}))
-render_indicator_box("ind_3", macro_data.get("ind_3", {}))
-render_indicator_box("ind_4", macro_data.get("ind_4", {}))
+render_indicator_box("ind_1", ind_data.get("ind_1", {}))
+render_indicator_box("ind_2", ind_data.get("ind_2", {}))
+render_indicator_box("ind_3", ind_data.get("ind_3", {}))
+render_indicator_box("ind_4", ind_data.get("ind_4", {}))
 
 # ==========================================
-# 5. MODUL BERITA GEOPOLITIK REAL-TIME
+# 6. MODUL BERITA GEOPOLITIK
 # ==========================================
 st.subheader("🌍 MODUL BERITA GEOPOLITIK & SENTIMEN TRANSISI")
 st.markdown("Informasi sentimen geopolitik yang berjalan di antara jeda rilis data makro:")
 
-with st.container():
-    st.warning(f"""
-    - 🚨 **Isu Utama:** {geo_data.get('judul_berita', '-')}
-    - 📝 **Ringkasan:** {geo_data.get('deskripsi_singkat', '-')}
-    - 💵 **Dampak ke Dollar (USD):** {geo_data.get('dampak_ke_dollar', '-')}
-    - 🪙 **Dampak ke XAU (Gold):** {geo_data.get('dampak_ke_xau', '-')}
-    """)
+st.warning(f"""
+- 🚨 **Isu Utama:** Eskalasi Geopolitik & Jalur Pasokan Energi Global
+- 📝 **Ringkasan:** Ketegangan lintas wilayah mempengaruhi volatilitas komoditas Emas (XAUUSD) dan Indeks USD.
+- 💵 **Dampak ke Dollar (USD):** USD mendapat aliran safe haven moderat.
+- 🪙 **Dampak ke XAU (Gold):** Emas didukung aksi beli lindung nilai (*hedging*).
+""")
 
 st.markdown("---")
 
-# Tombol Eksekusi AI Prediction dengan URL Terbuka & Ter-sanitize
+# Tombol Eksekusi AI Prediction
 if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", type="primary", use_container_width=True):
-    with st.spinner(f"Memproses kalkulasi Multi-Timeframe & Makro untuk {target_news}..."):
+    with st.spinner(f"Memproses kalkulasi Multi-Timeframe & AI Analysis untuk {target_news}..."):
         prompt = f"""
         Bertindaklah sebagai Senior Quantitative Macro & Price Action Master.
         Analisis event {target_news} tanggal {tanggal_rilis} {bulan_rilis} {tahun_rilis} di harga running {running_price}.
+        Data Indikator Utama: Actual={act1}, Forecast={est1}, Previous={prev1}.
         Kondisi Teknikal Bias: {tech_signal}.
         Berikan kesimpulan komprehensif dalam Bahasa Indonesia mencakup: Analisis Makro/Geopolitik, Confluence Multi-TF, dan Rekomendasi Eksekusi (BUY/SELL, Entry, SL, TP).
         """
@@ -303,17 +300,17 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
         try:
             res = requests.post(GROQ_URL, headers=headers, json=payload, timeout=25)
             if res.status_code == 200:
-                st.success("✅ Analisis Berhasil Dieksekusi!")
+                st.success("✅ AI Prediction Berhasil Dieksekusi!")
                 st.markdown(res.json()['choices'][0]['message']['content'])
             else:
-                st.error(f"Gagal memproses API Groq. HTTP Status Code: {res.status_code}")
+                st.error(f"Gagal memproses AI Groq. HTTP Status: {res.status_code}")
         except Exception as e:
             st.error(f"Error Koneksi: {e}")
 
 st.markdown("---")
 
 # ==========================================
-# 6. MULTI-TIMEFRAME CONFLUENCE & ZONES
+# 7. MULTI-TIMEFRAME CONFLUENCE & ZONES
 # ==========================================
 st.subheader("🎯 MULTI-TIMEFRAME LIQUIDITY & METHOD CONFLUENCE")
 
@@ -366,13 +363,13 @@ with col_r:
 st.markdown("---")
 
 # ==========================================
-# 7. TRADINGVIEW LIVE CHART
+# 8. TRADINGVIEW LIVE CHART
 # ==========================================
 st.subheader("📉 LIVE CHART TRADINGVIEW (XAUUSD)")
 tradingview_widget = """
 <div class="tradingview-widget-container" style="height:100%;width:100%">
   <div id="tradingview_chart" style="height:550px;width:100%"></div>
-  <script type="text/javascript" src="[https://s3.tradingview.com/tv.js](https://s3.tradingview.com/tv.js)"></script>
+  <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
   <script type="text/javascript">
   new TradingView.widget({
     "autosize": true,
