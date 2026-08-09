@@ -93,7 +93,7 @@ def generate_astrodox_unified_image(target_date: datetime):
     planet_degrees, planet_positions = compute_planetary_positions(dt_utc)
 
     # Combined Figure: Left = Wheel, Right = Posisi Planet & Keterangan Impact XAUUSD
-    fig = plt.figure(figsize=(14, 7), facecolor='#0e1117')
+    fig = plt.figure(figsize=(15, 8.5), facecolor='#0e1117')
     
     # 1. POLAR ASTRODOX WHEEL (Sebelah Kiri)
     ax = fig.add_subplot(121, polar=True, facecolor='#0e1117')
@@ -140,18 +140,42 @@ def generate_astrodox_unified_image(target_date: datetime):
             rad2 = np.radians(d2)
 
             # Check Major Aspect Orbs
-            if abs(diff - 90) <= 4 or abs(diff - 180) <= 4:  # Square (90) / Opposite (180) -> MERAH
+            if abs(diff - 90) <= 5 or abs(diff - 180) <= 5:  # Square (90) / Opposite (180) -> MERAH
                 ax.plot([rad1, rad2], [0.70, 0.70], color='#ff3333', alpha=0.8, linewidth=1.5)
                 aspect_counts["merah"] += 1
-            elif abs(diff - 120) <= 4:  # Trine (120) -> HIJAU
+            elif abs(diff - 120) <= 5:  # Trine (120) -> HIJAU
                 ax.plot([rad1, rad2], [0.70, 0.70], color='#00ff66', alpha=0.8, linewidth=1.5)
                 aspect_counts["hijau"] += 1
-            elif abs(diff - 60) <= 3:  # Sextile (60) -> BIRU
+            elif abs(diff - 60) <= 4:  # Sextile (60) -> BIRU
                 ax.plot([rad1, rad2], [0.70, 0.70], color='#3399ff', alpha=0.7, linewidth=1.2)
                 aspect_counts["biru"] += 1
-            elif diff <= 4:  # Conjunction (0) -> KUNING
-                ax.plot([rad1, rad2], [0.70, 0.70], color='#ffff00', alpha=0.9, linewidth=2.0)
+            elif diff <= 5:  # Conjunction (0) -> KUNING
+                # Tambahkan penanda visual melingkar di outer wheel untuk Conjunction
+                ax.plot([rad1, rad2], [0.70, 0.70], marker='*', color='#ffff00', alpha=0.9, linewidth=2.5, markersize=8)
                 aspect_counts["kuning"] += 1
+
+    # ==========================================
+    # KALKULASI PROYEKSI RANGE PIPS ASTROLOGI DINAMIS
+    # ==========================================
+    base_sweep = 120 + (aspect_counts["merah"] * 90) + (aspect_counts["kuning"] * 110)
+    base_trend = 180 + (aspect_counts["hijau"] * 130) + (aspect_counts["kuning"] * 80)
+    base_reversal = 100 + (aspect_counts["merah"] * 120) + (aspect_counts["biru"] * 60)
+
+    # Penentuan Bias Dominan
+    if aspect_counts["hijau"] > aspect_counts["merah"]:
+        astro_bias_dir = "BULLISH / CONTINUOUS EXPANSION"
+        est_up_pips = base_trend + 100
+        est_down_pips = base_sweep
+    elif aspect_counts["merah"] > aspect_counts["hijau"]:
+        astro_bias_dir = "BEARISH / HIGH VOLATILITY REVERSAL"
+        est_up_pips = base_sweep
+        est_down_pips = base_trend + 100
+    else:
+        astro_bias_dir = "TWO-SIDED / WHIPSAW RANGE"
+        est_up_pips = base_trend
+        est_down_pips = base_trend
+
+    total_expected_range = est_up_pips + est_down_pips
 
     ax.set_title(
         f"ASTRODOX TRANSIT WHEEL CHART\n{target_date.strftime('%d.%m.%Y %H:%M WIB')}", 
@@ -163,7 +187,7 @@ def generate_astrodox_unified_image(target_date: datetime):
     ax_text.axis('off')
 
     info_text = f"📜 POSISI PLANET TRANSIT ({target_date.strftime('%d %b %Y %H:%M WIB')}):\n"
-    info_text += "─" * 48 + "\n"
+    info_text += "─" * 52 + "\n"
     
     # Grid 2 kolom posisi planet
     pos_items = list(planet_positions.items())
@@ -171,30 +195,32 @@ def generate_astrodox_unified_image(target_date: datetime):
         p1, v1 = pos_items[idx]
         if idx + 1 < len(pos_items):
             p2, v2 = pos_items[idx+1]
-            info_text += f"• {p1:<12}: {v1:<15} | • {p2:<12}: {v2}\n"
+            info_text += f"• {p1:<12}: {v1:<14} | • {p2:<12}: {v2}\n"
         else:
             info_text += f"• {p1:<12}: {v1}\n"
 
-    info_text += "\n" + "─" * 48 + "\n"
+    info_text += "\n" + "─" * 52 + "\n"
     info_text += "💡 DETEKSI ASPEK GEOMETRI & IMPACT KE XAUUSD:\n"
-    info_text += "─" * 48 + "\n"
+    info_text += "─" * 52 + "\n"
     
-    info_text += f"🔴 GARIS MERAH (Square 90° / Opposite 180° - Terdeteksi: {aspect_counts['merah']}):\n"
-    info_text += "   └─ Tensi Tinggi! Potensi KENAIKAN/PENURUNAN TAJAM mendadak\n"
-    info_text += "      (Whipsaw & Liquidity Sweep) sebelum pembalikan arah (Reversal).\n\n"
+    info_text += f"🔴 MERAH (Square 90°/Opp 180° - Count: {aspect_counts['merah']}): High Tension & Reversal\n"
+    info_text += f"🟢 HIJAU (Trine 120° - Count: {aspect_counts['hijau']}): Expansion Trend Rally\n"
+    info_text += f"🔵 BIRU (Sextile 60° - Count: {aspect_counts['biru']}): Support/Demand Retest\n"
+    info_text += f"🟡 KUNING (Conjunction 0° - Count: {aspect_counts['kuning']}): Extreme Cycle Volatility\n"
 
-    info_text += f"🟢 GARIS HIJAU (Trine 120° - Terdeteksi: {aspect_counts['hijau']}):\n"
-    info_text += "   └─ Harmoni Energi! Menunjukkan KENAIKAN / PENURUNAN KONTINU\n"
-    info_text += "      (Expansive Rally / Continuous Trend) tanpa koreksi berarti.\n\n"
-
-    info_text += f"🔵 GARIS BIRU (Sextile 60° - Terdeteksi: {aspect_counts['biru']}):\n"
-    info_text += "   └─ Peluang Entry Konsolidasi! Rejection halus di Support/Demand.\n\n"
-
-    info_text += f"🟡 GARIS KUNING (Conjunction 0° - Terdeteksi: {aspect_counts['kuning']}):\n"
-    info_text += "   └─ Penggabungan Energi Planet! Siklus Volatilitas Ekstrem dimula!"
+    info_text += "\n" + "─" * 52 + "\n"
+    info_text += "📐 PROYEKSI RANGE PERGERAKAN PIPS XAUUSD (ASTROLOGER):\n"
+    info_text += "─" * 52 + "\n"
+    info_text += f"• Potensi Arah Dominan : {astro_bias_dir}\n"
+    info_text += f"• Est. Kenaikan Maks   : +{est_up_pips} Pips (${est_up_pips/10:.1f})\n"
+    info_text += f"• Est. Penurunan Maks  : -{est_down_pips} Pips (${est_down_pips/10:.1f})\n"
+    info_text += f"• Potensi Sweep Liquidity : ~{base_sweep} Pips (${base_sweep/10:.1f})\n"
+    info_text += f"• Potensi Trend Expansion: ~{base_trend} Pips (${base_trend/10:.1f})\n"
+    info_text += f"• Potensi Reversal Bounce : ~{base_reversal} Pips (${base_reversal/10:.1f})\n"
+    info_text += f"• Total Expected Range   : ~{total_expected_range} Pips (${total_expected_range/10:.1f})\n"
 
     ax_text.text(
-        0.02, 0.95, info_text, color='#e0e0e0', fontsize=9.5, 
+        0.01, 0.98, info_text, color='#e0e0e0', fontsize=8.8, 
         fontfamily='monospace', va='top', ha='left',
         bbox=dict(boxstyle='round,pad=0.8', facecolor='#161b22', edgecolor='#30363d')
     )
