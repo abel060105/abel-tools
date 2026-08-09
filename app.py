@@ -37,6 +37,8 @@ if "macro_bias_result" not in st.session_state:
     st.session_state["macro_bias_result"] = ""
 if "score_val" not in st.session_state:
     st.session_state["score_val"] = 0
+if "execute_clicked" not in st.session_state:
+    st.session_state["execute_clicked"] = False
 
 # ==========================================
 # 2. BUILT-IN ASTRODOX CALCULATION & CHART ENGINE
@@ -617,6 +619,9 @@ st.warning(f"""
 st.markdown("---")
 
 if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", type="primary", use_container_width=True):
+    st.session_state["execute_clicked"] = True
+
+if st.session_state["execute_clicked"]:
     with st.spinner("Sintesis Data Makro + Astrodox Aspect Weights + Geopolitik + SMC Technical Structure..."):
         
         rekap_text, macro_bias_result, score_val = calculate_macro_divergence(
@@ -685,7 +690,7 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
         }
         
         try:
-            res = requests.post(GROQ_URL, headers=headers, json=payload, timeout=25)
+            res = requests.post(GROQ_URL, headers=headers, json=payload, timeout=45)
             if res.status_code == 200:
                 parsed_json = json.loads(res.json()['choices'][0]['message']['content'])
                 st.session_state["ai_result"] = parsed_json
