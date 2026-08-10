@@ -550,13 +550,12 @@ if "NFP" in target_news:
         "status_rilis": "SUDAH RILIS" if not is_future_event else "BELUM RILIS",
         "ringkasan": f"NFP Status Rilis: {act1} vs Forecast {est1}.",
         "dampak": "Perubahan sektor tenaga kerja berpengaruh langsung ke ekspektasi Dolar US.",
-        "ind_1": {"nama": "Non-Farm Payrolls", "actual": act1, "forecast": est1, "previous": prev1, "penjelasan": "Jumlah lapangan kerja baru non-pertanian.", "efek": "Actual > Forecast -> Menguatkan USD"},
-        "ind_2": {"nama": "Unemployment Rate", "actual": act2, "forecast": est2, "previous": prev2, "penjelasan": "Persentase angka pengangguran.", "efek": "Actual < Forecast -> Menguatkan USD"},
-        "ind_3": {"nama": "Participation Rate", "actual": act3, "forecast": est3, "previous": prev3, "penjelasan": "Tingkat partisipasi angkatan kerja.", "efek": "Actual > Forecast -> Menguatkan USD"},
-        "ind_4": {"nama": "Average Hourly Earnings m/m", "actual": act4, "forecast": est4, "previous": prev4, "penjelasan": "Pertumbuhan rata-rata upah pekerja per jam.", "efek": "Actual > Forecast -> Menguatkan USD"}
+        "ind_1": {"nama": "Non-Farm Payrolls", "actual": act1, "forecast": est1, "previous": prev1, "penjelasan": "Jumlah lapangan kerja baru non-pertanian.", "efek": "Actual > Forecast -> Menguatkan USD", "jadwal": j1},
+        "ind_2": {"nama": "Unemployment Rate", "actual": act2, "forecast": est2, "previous": prev2, "penjelasan": "Persentase angka pengangguran.", "efek": "Actual < Forecast -> Menguatkan USD", "jadwal": j2},
+        "ind_3": {"nama": "Participation Rate", "actual": act3, "forecast": est3, "previous": prev3, "penjelasan": "Tingkat partisipasi angkatan kerja.", "efek": "Actual > Forecast -> Menguatkan USD", "jadwal": j3},
+        "ind_4": {"nama": "Average Hourly Earnings m/m", "actual": act4, "forecast": est4, "previous": prev4, "penjelasan": "Pertumbuhan rata-rata upah pekerja per jam.", "efek": "Actual > Forecast -> Menguatkan USD", "jadwal": j4}
     }
 elif "CPI" in target_news:
-    # Perbaikan urutan tanggal: Indikator pendukung (PPI & Import Price) diset rilis sebelum tanggal CPI (H-1 & H-2)
     cpi_day = int(tanggal_rilis)
     ppi_day = max(1, cpi_day - 1)
     import_day = max(1, cpi_day - 2)
@@ -570,10 +569,10 @@ elif "CPI" in target_news:
         "status_rilis": "SUDAH RILIS" if not is_future_event else "BELUM RILIS",
         "ringkasan": f"CPI Status Rilis: {act1} vs Forecast {est1}.",
         "dampak": "Perkembangan laju inflasi mempengaruhi kebijakan suku bunga The Fed.",
-        "ind_1": {"nama": "Consumer Price Index (CPI)", "actual": act1, "forecast": est1, "previous": prev1, "penjelasan": "Indikator laju inflasi konsumen.", "efek": "Actual > Forecast -> Menguatkan USD"},
-        "ind_2": {"nama": "Producer Price Index (PPI)", "actual": act2, "forecast": est2, "previous": prev2, "penjelasan": "Indikator inflasi produsen (rilis sebelum CPI).", "efek": "Actual > Forecast -> Menguatkan USD"},
-        "ind_3": {"nama": "Import Price Index", "actual": act3, "forecast": est3, "previous": prev3, "penjelasan": "Harga barang impor masuk (rilis sebelum CPI).", "efek": "Actual > Forecast -> Menguatkan USD"},
-        "ind_4": {"nama": "Michigan Consumer Sentiment", "actual": act4, "forecast": est4, "previous": prev4, "penjelasan": "Kepercayaan konsumen terhadap ekonomi.", "efek": "Actual > Forecast -> Menguatkan USD"}
+        "ind_1": {"nama": "Consumer Price Index (CPI)", "actual": act1, "forecast": est1, "previous": prev1, "penjelasan": "Indikator laju inflasi konsumen.", "efek": "Actual > Forecast -> Menguatkan USD", "jadwal": j1},
+        "ind_2": {"nama": "Producer Price Index (PPI)", "actual": act2, "forecast": est2, "previous": prev2, "penjelasan": "Indikator inflasi produsen (rilis sebelum CPI).", "efek": "Actual > Forecast -> Menguatkan USD", "jadwal": j2},
+        "ind_3": {"nama": "Import Price Index", "actual": act3, "forecast": est3, "previous": prev3, "penjelasan": "Harga barang impor masuk (rilis sebelum CPI).", "efek": "Actual > Forecast -> Menguatkan USD", "jadwal": j3},
+        "ind_4": {"nama": "Michigan Consumer Sentiment", "actual": act4, "forecast": est4, "previous": prev4, "penjelasan": "Kepercayaan konsumen terhadap ekonomi.", "efek": "Actual > Forecast -> Menguatkan USD", "jadwal": j4}
     }
 else:
     act1, est1, prev1, j1 = extract_indicator_smart(calendar_raw, ["fed interest rate", "fed rate decision"], "5.25%", "5.25%", "5.50%", fallback_day=max(1, tanggal_rilis-1))
@@ -585,10 +584,10 @@ else:
         "status_rilis": "SUDAH RILIS" if not is_future_event else "BELUM RILIS",
         "ringkasan": f"FOMC Decision Status: {act1} vs Forecast {est1}.",
         "dampak": "Keputusan suku bunga Fed menentukan arah jangka panjang USD.",
-        "ind_1": {"nama": "Fed Interest Rate Decision", "actual": act1, "forecast": est1, "previous": prev1, "penjelasan": "Keputusan suku bunga acuan AS.", "efek": "Rate Hike -> Menguatkan USD"},
-        "ind_2": {"nama": "Core PCE Price Index", "actual": act2, "forecast": est2, "previous": prev2, "penjelasan": "Inflasi acuan utama pilihan The Fed.", "efek": "Actual > Forecast -> Menguatkan USD"},
-        "ind_3": {"nama": "GDP Advance Estimate", "actual": act3, "forecast": est3, "previous": prev3, "penjelasan": "Pertumbuhan ekonomi kuartalan.", "efek": "Actual > Forecast -> Menguatkan USD"},
-        "ind_4": {"nama": "Retail Sales m/m", "actual": act4, "forecast": est4, "previous": prev4, "penjelasan": "Tingkat belanja konsumen.", "efek": "Actual > Forecast -> Menguatkan USD"}
+        "ind_1": {"nama": "Fed Interest Rate Decision", "actual": act1, "forecast": est1, "previous": prev1, "penjelasan": "Keputusan suku bunga acuan AS.", "efek": "Rate Hike -> Menguatkan USD", "jadwal": j1},
+        "ind_2": {"nama": "Core PCE Price Index", "actual": act2, "forecast": est2, "previous": prev2, "penjelasan": "Inflasi acuan utama pilihan The Fed.", "efek": "Actual > Forecast -> Menguatkan USD", "jadwal": j2},
+        "ind_3": {"nama": "GDP Advance Estimate", "actual": act3, "forecast": est3, "previous": prev3, "penjelasan": "Pertumbuhan ekonomi kuartalan.", "efek": "Actual > Forecast -> Menguatkan USD", "jadwal": j3},
+        "ind_4": {"nama": "Retail Sales m/m", "actual": act4, "forecast": est4, "previous": prev4, "penjelasan": "Tingkat belanja konsumen.", "efek": "Actual > Forecast -> Menguatkan USD", "jadwal": j4}
     }
 
 # ==========================================
@@ -605,12 +604,13 @@ def calculate_macro_divergence(ind1_info, ind2_info, ind3_info, ind4_info, main_
         name = ind_dict.get('nama', 'Indikator')
         act_raw = ind_dict.get('actual', '-')
         est_raw = ind_dict.get('forecast', '-')
+        jadwal_str = ind_dict.get('jadwal', 'Segera')
         
         a = parse_num(act_raw)
         e = parse_num(est_raw)
         
-        if "OTW" in str(act_raw):
-            return f"- **{name}**: Belum Rilis ({act_raw}) ⏳", 0
+        if "OTW" in str(act_raw) or "Belum Rilis" in str(act_raw):
+            return f"- **{name}**: Belum Rilis ({jadwal_str}) ⏳", 0
         if a is None or e is None:
             return f"- **{name}**: Actual ({act_raw}) | Forecast ({est_raw})", 0
         
