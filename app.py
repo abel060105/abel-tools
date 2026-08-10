@@ -556,9 +556,10 @@ if "NFP" in target_news:
         "ind_4": {"nama": "Average Hourly Earnings m/m", "actual": act4, "forecast": est4, "previous": prev4, "penjelasan": "Pertumbuhan rata-rata upah pekerja per jam.", "efek": "Actual > Forecast -> Menguatkan USD", "jadwal": j4}
     }
 elif "CPI" in target_news:
+    # Logika yang benar: Data pendukung rilis SEBELUM tanggal CPI (H-1, H-2)
     cpi_day = int(tanggal_rilis)
-    ppi_day = max(1, cpi_day - 1)
-    import_day = max(1, cpi_day - 2)
+    ppi_day = max(1, cpi_day - 1)      # Contoh: CPI tgl 12, PPI tgl 11
+    import_day = max(1, cpi_day - 2)   # Contoh: CPI tgl 12, Import Price tgl 10
 
     act1, est1, prev1, j1 = extract_indicator_smart(calendar_raw, ["cpi m/m", "cpi y/y", "consumer price index"], "0.2%", "0.2%", "0.1%", fallback_day=cpi_day)
     act2, est2, prev2, j2 = extract_indicator_smart(calendar_raw, ["ppi m/m", "producer price"], "0.1%", "0.2%", "0.2%", fallback_day=ppi_day)
