@@ -1,6 +1,7 @@
 import os
 import json
 import io
+import time
 import calendar
 import requests
 import numpy as np
@@ -320,6 +321,24 @@ def generate_astrodox_unified_image(target_date: datetime, ai_result_data=None):
 with st.sidebar:
     st.header("⚙️ ABEL FX Control Panel")
     
+    # --- FITUR BARU: TOMBOL UPDATE MANUAL & AUTO REFRESH TOGGLE ---
+    st.markdown("### 🔄 Kontrol Update Data")
+    
+    # Tombol Update Manual
+    if st.button("⚡ UPDATE SEKARANG", type="primary", use_container_width=True):
+        st.rerun()
+
+    # Toggle Auto-Refresh On/Off
+    auto_refresh_on = st.toggle("Aktifkan Auto-Refresh", value=False)
+    refresh_interval = st.slider("Interval Refresh (Detik):", min_value=5, max_value=300, value=30, step=5)
+
+    if auto_refresh_on:
+        st.caption(f"🔄 Auto-refresh aktif setiap {refresh_interval} detik.")
+        time.sleep(refresh_interval)
+        st.rerun()
+    # -------------------------------------------------------------
+    
+    st.markdown("---")
     st.markdown("### 1. Target Main Big News")
     target_news = st.selectbox(
         "Pilih Target Big News:",
@@ -857,7 +876,6 @@ if st.session_state["ai_result"]:
     setup_ai = res_ai.get("setup_spesifik", {})
     pips_ai = res_ai.get("proyeksi_pips", {})
 else:
-    # Generate rekap otomatis walau tombol AI belum diklik agar langsung menyesuaikan target_news
     ind1_current = {**ind_data.get("ind_1", {}), "actual": final_act1}
     ind2_current = {**ind_data.get("ind_2", {}), "actual": final_act2}
     ind3_current = {**ind_data.get("ind_3", {}), "actual": final_act3}
