@@ -298,11 +298,15 @@ with st.sidebar:
         st.toast("Cache API dibersihkan!", icon="✅")
 
     st.markdown("---")
-    st.markdown("### 3. Astrodox Engine Settings")
+    st.markdown("### 3. AI Macro & Range Engine Settings")
+    ai_active = st.toggle("Aktifkan AI Macro Engine", value=True)
+
+    st.markdown("---")
+    st.markdown("### 4. Astrodox Engine Settings")
     astrodox_active = st.toggle("Aktifkan Astrodox Engine", value=True)
 
     st.markdown("---")
-    st.markdown("### 4. Multi-Timeframe Technical Engine")
+    st.markdown("### 5. Multi-Timeframe Technical Engine")
     tech_active = st.toggle("Aktifkan Technical Engine", value=True)
 
     market_condition = st.selectbox(
@@ -311,7 +315,7 @@ with st.sidebar:
     )
 
     st.markdown("---")
-    st.markdown("### 5. Price Reference")
+    st.markdown("### 6. Price Reference")
     running_price = st.number_input("Harga Running XAUUSD:", value=4314.00, step=0.5)
 
 # ==========================================
@@ -500,7 +504,6 @@ def calculate_macro_divergence(ind1_info, ind2_info, ind3_info, ind4_info, main_
             return None
 
     def eval_indicator(ind_dict, higher_is_good_for_usd=True):
-        # MENGAMBIL NAMA SPESIFIK DARI DICTIONARY INDIKATOR
         name = ind_dict.get('nama', 'Indikator')
         act_raw = ind_dict.get('actual', '-')
         est_raw = ind_dict.get('forecast', '-')
@@ -528,10 +531,8 @@ def calculate_macro_divergence(ind1_info, ind2_info, ind3_info, ind4_info, main_
             
         return f"- **{name}**: {note} ➔ Impak: **{res}**", score
 
-    # Evaluasi dengan menyebutkan nama asli indikator
     r1, s1 = eval_indicator(ind1_info, higher_is_good_for_usd=True)
     
-    # Khusus Unemployment Rate (ind_2), angka lebih tinggi berarti jelek untuk USD (False)
     is_good_usd_2 = False if "unemployment" in ind2_info.get('nama', '').lower() else True
     r2, s2 = eval_indicator(ind2_info, higher_is_good_for_usd=is_good_usd_2)
     
@@ -666,7 +667,6 @@ st.markdown("---")
 if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", type="primary", use_container_width=True):
     with st.spinner("Sintesis Data Makro + Astrodox Aspect Weights + Geopolitik + SMC Technical Structure..."):
         
-        # Dictionary indikator terkini
         ind1_current = {**ind_data.get("ind_1", {}), "actual": final_act1}
         ind2_current = {**ind_data.get("ind_2", {}), "actual": final_act2}
         ind3_current = {**ind_data.get("ind_3", {}), "actual": final_act3}
@@ -753,7 +753,6 @@ if st.session_state["ai_result"]:
     setup_ai = res_ai.get("setup_spesifik", {})
     pips_ai = res_ai.get("proyeksi_pips", {})
     
-    # Judul Dinamis berdasarkan Status News
     if is_future_event:
         st.subheader("📋 Analysis & Proyeksi Data Pendukung (Pre-Rilis)")
     else:
@@ -835,129 +834,139 @@ fig_astro_unified, img_astro_buf, aspect_counts = generate_astrodox_unified_imag
 )
 
 # ==========================================
-# 6. CONFLUENCE CARDS
+# 6. CONFLUENCE CARDS (DYNAMIC LAYOUT)
 # ==========================================
-st.subheader("🎯 MULTI-TIMEFRAME LIQUIDITY & METHOD CONFLUENCE")
+active_engines = []
+if ai_active:
+    active_engines.append("ai")
+if astrodox_active:
+    active_engines.append("astro")
+if tech_active:
+    active_engines.append("tech")
 
-col_l, col_m, col_r = st.columns(3)
+if active_engines:
+    st.subheader("🎯 MULTI-TIMEFRAME LIQUIDITY & METHOD CONFLUENCE")
+    
+    cols = st.columns(len(active_engines))
+    col_idx = 0
 
-with col_l:
-    st.markdown("### 🤖 AI Macro & Range Engine")
-    if st.session_state["ai_result"]:
-        ai_bias = st.session_state["ai_result"].get("arah_bias", "NEUTRAL")
-        ai_setup = st.session_state["ai_result"].get("setup_spesifik", {})
-        
-        st.markdown(f"• **Bias Utama:** `{ai_bias}`")
-        if "NEUTRAL" in str(ai_bias).upper() or "WHIPSAW" in str(ai_bias).upper():
-            st.warning("⚠️ **Waspada Whipsaw Dua Arah**")
-            st.markdown("#### 🟢 ZONA BUY DEMAND")
-            st.info(f"{ai_setup.get('zona_buy_demand')}")
-            st.markdown("#### 🛑 STOP LOSS BUY")
-            st.error(f"{ai_setup.get('sl_buy')}")
-            st.markdown("#### 🏁 TARGET TP BUY")
-            st.success(f"{ai_setup.get('tp_buy')}")
-            
-            st.markdown("---")
-            st.markdown("#### 🔴 ZONA SELL SUPPLY")
-            st.info(f"{ai_setup.get('zona_sell_supply')}")
-            st.markdown("#### 🛑 STOP LOSS SELL")
-            st.error(f"{ai_setup.get('sl_sell')}")
-            st.markdown("#### 🏁 TARGET TP SELL")
-            st.success(f"{ai_setup.get('tp_sell')}")
-        elif "BULLISH" in str(ai_bias).upper():
-            st.markdown("#### 🟢 ZONA BUY DEMAND")
-            st.info(f"{ai_setup.get('zona_buy_demand')}")
-            st.markdown("#### 🛑 STOP LOSS (SL)")
-            st.error(f"{ai_setup.get('sl_buy')}")
-            st.markdown("#### 🏁 TARGET TP EXPANSION")
-            st.success(f"{ai_setup.get('tp_buy')}")
-        else:
-            st.markdown("#### 🔴 ZONA SELL SUPPLY")
-            st.info(f"{ai_setup.get('zona_sell_supply')}")
-            st.markdown("#### 🛑 STOP LOSS (SL)")
-            st.error(f"{ai_setup.get('sl_sell')}")
-            st.markdown("#### 🏁 TARGET TP EXPANSION")
-            st.success(f"{ai_setup.get('tp_sell')}")
-    else:
-        st.caption("Klik tombol 'EXECUTE MULTI-TF AI PREDICTION' untuk mengaktifkan AI Range Engine.")
-
-with col_m:
-    st.markdown("### 🔮 Astrodox Engine")
-    if astrodox_active:
-        st.markdown(f"• Merah (Square/Opp) : **{aspect_counts['merah']}**")
-        st.markdown(f"• Hijau (Trine)     : **{aspect_counts['hijau']}**")
-        st.markdown(f"• Biru (Sextile)    : **{aspect_counts['biru']}**")
-        st.markdown(f"• Kuning (Conjn)    : **{aspect_counts['kuning']}**")
-        
-        st.markdown("#### 🎯 ZONA BIAS ASTRO")
-        astro_entry_zone = f"{running_price - 3.00:.2f} - {running_price + 3.00:.2f}"
-        st.info(astro_entry_zone)
-        
-        if st.session_state["ai_result"]:
-            ast_setup = st.session_state["ai_result"].get("setup_spesifik", {})
-            ai_b_check = str(st.session_state["ai_result"].get("arah_bias", "")).upper()
-            
-            if "BEARISH" in ai_b_check:
-                st.markdown("#### 🛑 STOP LOSS ASTRO (SELL)")
-                st.error(f"{ast_setup.get('sl_sell')}")
-                st.markdown("#### 🏁 TARGET TP ASTRO (SELL)")
-                st.success(f"{ast_setup.get('tp_sell')}")
+    if "ai" in active_engines:
+        with cols[col_idx]:
+            st.markdown("### 🤖 AI Macro & Range Engine")
+            if st.session_state["ai_result"]:
+                ai_bias = st.session_state["ai_result"].get("arah_bias", "NEUTRAL")
+                ai_setup = st.session_state["ai_result"].get("setup_spesifik", {})
+                
+                st.markdown(f"• **Bias Utama:** `{ai_bias}`")
+                if "NEUTRAL" in str(ai_bias).upper() or "WHIPSAW" in str(ai_bias).upper():
+                    st.warning("⚠️ **Waspada Whipsaw Dua Arah**")
+                    st.markdown("#### 🟢 ZONA BUY DEMAND")
+                    st.info(f"{ai_setup.get('zona_buy_demand')}")
+                    st.markdown("#### 🛑 STOP LOSS BUY")
+                    st.error(f"{ai_setup.get('sl_buy')}")
+                    st.markdown("#### 🏁 TARGET TP BUY")
+                    st.success(f"{ai_setup.get('tp_buy')}")
+                    
+                    st.markdown("---")
+                    st.markdown("#### 🔴 ZONA SELL SUPPLY")
+                    st.info(f"{ai_setup.get('zona_sell_supply')}")
+                    st.markdown("#### 🛑 STOP LOSS SELL")
+                    st.error(f"{ai_setup.get('sl_sell')}")
+                    st.markdown("#### 🏁 TARGET TP SELL")
+                    st.success(f"{ai_setup.get('tp_sell')}")
+                elif "BULLISH" in str(ai_bias).upper():
+                    st.markdown("#### 🟢 ZONA BUY DEMAND")
+                    st.info(f"{ai_setup.get('zona_buy_demand')}")
+                    st.markdown("#### 🛑 STOP LOSS (SL)")
+                    st.error(f"{ai_setup.get('sl_buy')}")
+                    st.markdown("#### 🏁 TARGET TP EXPANSION")
+                    st.success(f"{ai_setup.get('tp_buy')}")
+                else:
+                    st.markdown("#### 🔴 ZONA SELL SUPPLY")
+                    st.info(f"{ai_setup.get('zona_sell_supply')}")
+                    st.markdown("#### 🛑 STOP LOSS (SL)")
+                    st.error(f"{ai_setup.get('sl_sell')}")
+                    st.markdown("#### 🏁 TARGET TP EXPANSION")
+                    st.success(f"{ai_setup.get('tp_sell')}")
             else:
-                st.markdown("#### 🛑 STOP LOSS ASTRO (BUY)")
-                st.error(f"{ast_setup.get('sl_buy')}")
-                st.markdown("#### 🏁 TARGET TP ASTRO (BUY)")
-                st.success(f"{ast_setup.get('tp_buy')}")
-        else:
-            st.markdown("#### 🛑 STOP LOSS & TP")
-            st.caption("Menunggu hasil AI Proyeksi Range...")
-    else:
-        st.info("Astrodox Engine OFF")
+                st.caption("Klik tombol 'EXECUTE MULTI-TF AI PREDICTION' untuk mengaktifkan AI Range Engine.")
+        col_idx += 1
 
-with col_r:
-    st.markdown("### 📐 Multi-TF Technical Engine")
-    if tech_active:
-        if not is_bullish:
-            st.markdown("🔴 **ARAH BIAS: BEARISH (REJECTION)**")
-        else:
-            st.markdown("🟢 **ARAH BIAS: BULLISH (EXPANSION)**")
-        st.write(f"Eksekusi: **{tech_action}**")
-        st.markdown("#### 🎯 ZONA ENTRY PRESISI")
-        st.info(f"{tech_entry - 1.00:.2f} - {tech_entry + 1.50:.2f}")
-        st.markdown("#### 🛑 STOP LOSS (SL)")
-        st.error(f"{tech_sl:.2f}")
-        st.markdown("#### 🏁 TARGET TP EXPANSION")
-        st.success(f"{tech_tp:.2f}")
-    else:
-        st.info("Technical Engine OFF")
+    if "astro" in active_engines:
+        with cols[col_idx]:
+            st.markdown("### 🔮 Astrodox Engine")
+            st.markdown(f"• Merah (Square/Opp) : **{aspect_counts['merah']}**")
+            st.markdown(f"• Hijau (Trine)     : **{aspect_counts['hijau']}**")
+            st.markdown(f"• Biru (Sextile)    : **{aspect_counts['biru']}**")
+            st.markdown(f"• Kuning (Conjn)    : **{aspect_counts['kuning']}**")
+            
+            st.markdown("#### 🎯 ZONA BIAS ASTRO")
+            astro_entry_zone = f"{running_price - 3.00:.2f} - {running_price + 3.00:.2f}"
+            st.info(astro_entry_zone)
+            
+            if st.session_state["ai_result"]:
+                ast_setup = st.session_state["ai_result"].get("setup_spesifik", {})
+                ai_b_check = str(st.session_state["ai_result"].get("arah_bias", "")).upper()
+                
+                if "BEARISH" in ai_b_check:
+                    st.markdown("#### 🛑 STOP LOSS ASTRO (SELL)")
+                    st.error(f"{ast_setup.get('sl_sell')}")
+                    st.markdown("#### 🏁 TARGET TP ASTRO (SELL)")
+                    st.success(f"{ast_setup.get('tp_sell')}")
+                else:
+                    st.markdown("#### 🛑 STOP LOSS ASTRO (BUY)")
+                    st.error(f"{ast_setup.get('sl_buy')}")
+                    st.markdown("#### 🏁 TARGET TP ASTRO (BUY)")
+                    st.success(f"{ast_setup.get('tp_buy')}")
+            else:
+                st.markdown("#### 🛑 STOP LOSS & TP")
+                st.caption("Menunggu hasil AI Proyeksi Range...")
+        col_idx += 1
 
-st.markdown("---")
+    if "tech" in active_engines:
+        with cols[col_idx]:
+            st.markdown("### 📐 Multi-TF Technical Engine")
+            if not is_bullish:
+                st.markdown("🔴 **ARAH BIAS: BEARISH (REJECTION)**")
+            else:
+                st.markdown("🟢 **ARAH BIAS: BULLISH (EXPANSION)**")
+            st.write(f"Eksekusi: **{tech_action}**")
+            st.markdown("#### 🎯 ZONA ENTRY PRESISI")
+            st.info(f"{tech_entry - 1.00:.2f} - {tech_entry + 1.50:.2f}")
+            st.markdown("#### 🛑 STOP LOSS (SL)")
+            st.error(f"{tech_sl:.2f}")
+            st.markdown("#### 🏁 TARGET TP EXPANSION")
+            st.success(f"{tech_tp:.2f}")
+
+    st.markdown("---")
 
 # ==========================================
 # 7. ASTRODOX UNIFIED SECTION & ZOOM DIALOG
 # ==========================================
-st.subheader("🔮 ASTRODOX TRANSIT WHEEL & AI RANGE INTEGRATED ANALYSIS")
+if astrodox_active:
+    st.subheader("🔮 ASTRODOX TRANSIT WHEEL & AI RANGE INTEGRATED ANALYSIS")
 
-st.pyplot(fig_astro_unified)
+    st.pyplot(fig_astro_unified)
 
-@st.dialog("🔍 High-Resolution Astrodox & AI Range Chart (Zoom View)", width="large")
-def show_zoomed_chart(image_bytes):
-    st.image(image_bytes, use_container_width=True)
+    @st.dialog("🔍 High-Resolution Astrodox & AI Range Chart (Zoom View)", width="large")
+    def show_zoomed_chart(image_bytes):
+        st.image(image_bytes, use_container_width=True)
 
-col_d1, col_d2 = st.columns(2)
-with col_d1:
-    if st.button("🔍 Zoom / Perbesar Tampilan Gambar", use_container_width=True):
-        show_zoomed_chart(img_astro_buf)
+    col_d1, col_d2 = st.columns(2)
+    with col_d1:
+        if st.button("🔍 Zoom / Perbesar Tampilan Gambar", use_container_width=True):
+            show_zoomed_chart(img_astro_buf)
 
-with col_d2:
-    st.download_button(
-        label="📥 Download Roda Astrodox & AI Proyeksi Range (.png)",
-        data=img_astro_buf,
-        file_name=f"Astrodox_AI_Range_{event_datetime.strftime('%Y%m%d_%H%M')}.png",
-        mime="image/png",
-        use_container_width=True
-    )
+    with col_d2:
+        st.download_button(
+            label="📥 Download Roda Astrodox & AI Proyeksi Range (.png)",
+            data=img_astro_buf,
+            file_name=f"Astrodox_AI_Range_{event_datetime.strftime('%Y%m%d_%H%M')}.png",
+            mime="image/png",
+            use_container_width=True
+        )
 
-st.markdown("---")
+    st.markdown("---")
 
 # ==========================================
 # 8. LIVE CHART TRADINGVIEW
