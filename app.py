@@ -76,7 +76,7 @@ def fetch_live_xauusd_price():
         res = requests.get(url_ninjas, headers=headers, timeout=5)
         if res.status_code == 200:
             data = res.json()
-            if "price" in data:
+            if "price" in data and data["price"] is not None:
                 return float(data["price"]), "API Ninjas (Realtime)"
     except Exception:
         pass
@@ -86,7 +86,7 @@ def fetch_live_xauusd_price():
         res = requests.get(url_fmp, timeout=5)
         if res.status_code == 200:
             data = res.json()
-            if isinstance(data, list) and len(data) > 0 and "price" in data[0]:
+            if isinstance(data, list) and len(data) > 0 and "price" in data[0] and data[0]["price"] is not None:
                 return float(data[0]["price"]), "Financial Modeling Prep (Realtime)"
     except Exception:
         pass
@@ -305,7 +305,7 @@ def generate_astrodox_unified_image(target_date: datetime, ai_result_data=None):
         pips = ai_result_data.get("proyeksi_pips", {})
         setup = ai_result_data.get("setup_spesifik", {})
         info_text += f"• Bias Utama  : {ai_result_data.get('arah_bias', '-')}\n"
-        info_text += f"• Whipsaw     : {ai_result_data.get('peringatan_whipsaw', '-')[:55]}...\n"
+        info_text += f"• Whipsaw     : {str(ai_result_data.get('peringatan_whipsaw', '-'))[:55]}...\n"
         info_text += f"• Sweep Range : {pips.get('sweep_pips', '-')}\n"
         info_text += f"• Trend Range : {pips.get('trend_pips', '-')}\n"
         info_text += f"• Reversal    : {pips.get('reversal_pips', '-')}\n"
@@ -598,7 +598,7 @@ def calculate_macro_divergence(ind1_info, ind2_info, ind3_info, ind4_info, main_
     def parse_num(val):
         try:
             return float(str(val).replace('%', '').replace('K', '').replace('M', ''))
-        except:
+        except Exception:
             return None
 
     def eval_indicator(ind_dict, higher_is_good_for_usd=True):
@@ -1060,11 +1060,11 @@ if active_engines:
 if astrodox_active:
     st.subheader("🔮 ASTRODOX TRANSIT WHEEL & AI RANGE INTEGRATED ANALYSIS")
 
-    st.pyplot(fig_astro_unified)
+    st.pyplot(fig_astro_unified, use_container_width=True)
 
     @st.dialog("🔍 High-Resolution Astrodox & AI Range Chart (Zoom View)", width="large")
     def show_zoomed_chart(image_bytes):
-        st.image(image_bytes, use_container_width=True)
+        st.image(image_bytes, use_column_width=True)
 
     col_d1, col_d2 = st.columns(2)
     with col_d1:
