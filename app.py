@@ -298,7 +298,7 @@ def generate_astrodox_unified_image(target_date: datetime, ai_result_data=None):
         info_text += f"• Stop Loss   : Buy({setup.get('sl_buy', '-')}) | Sell({setup.get('sl_sell', '-')})\n"
         info_text += f"• Take Profit : Buy({setup.get('tp_buy', '-')}) | Sell({setup.get('tp_sell', '-')})\n"
     else:
-        info_text += "[ Menunggu Eksekusi AI Prediction di Dashboard ]\n"
+        info_text += "[ Menunggu Kalkulasi AI Engine Dashboard ]\n"
 
     ax_text.text(
         0.00, 0.98, info_text, color='#e0e0e0', fontsize=10.0, 
@@ -766,8 +766,13 @@ st.warning(f"""
 
 st.markdown("---")
 
-if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", type="primary", use_container_width=True):
-    with st.spinner("Sintesis Data Makro + Astrodox Aspect Weights + Geopolitik + SMC Technical Structure..."):
+# ==========================================
+# AUTO-EXECUTE AI PREDICTION ENGINE
+# ==========================================
+current_ai_trigger_key = f"{target_news}_{running_price}_{tanggal_rilis}_{final_act1}_{final_act2}"
+
+if "last_ai_trigger" not in st.session_state or st.session_state["last_ai_trigger"] != current_ai_trigger_key or st.session_state["ai_result"] is None:
+    with st.spinner(f"Sintesis Otomatis Data Makro + Astrodox + Geopolitik + SMC untuk {target_news}..."):
         
         ind1_current = {**ind_data.get("ind_1", {}), "actual": final_act1}
         ind2_current = {**ind_data.get("ind_2", {}), "actual": final_act2}
@@ -845,9 +850,9 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
                 st.session_state["rekap_text"] = rekap_text
                 st.session_state["macro_bias_result"] = macro_bias_result
                 st.session_state["score_val"] = score_val
-                st.success("✅ AI & Astrodox Synthesis Success!")
-        except Exception as e:
-            st.error(f"Error Koneksi AI Engine: {e}")
+                st.session_state["last_ai_trigger"] = current_ai_trigger_key
+        except Exception:
+            pass
 
 # ==========================================
 # RENDER HASIL REKAP EVALUASI (DINAMIS MENGIKUTI TARGET NEWS)
@@ -857,7 +862,6 @@ if st.session_state["ai_result"]:
     setup_ai = res_ai.get("setup_spesifik", {})
     pips_ai = res_ai.get("proyeksi_pips", {})
 else:
-    # Generate rekap otomatis walau tombol AI belum diklik agar langsung menyesuaikan target_news
     ind1_current = {**ind_data.get("ind_1", {}), "actual": final_act1}
     ind2_current = {**ind_data.get("ind_2", {}), "actual": final_act2}
     ind3_current = {**ind_data.get("ind_3", {}), "actual": final_act3}
@@ -1004,7 +1008,7 @@ if active_engines:
                     st.markdown("#### 🏁 TARGET TP EXPANSION")
                     st.success(f"{ai_setup.get('tp_sell')}")
             else:
-                st.caption("Klik tombol 'EXECUTE MULTI-TF AI PREDICTION' untuk mengaktifkan AI Range Engine.")
+                st.caption("AI Range Engine sedang melakukan sinkronisasi otomatis...")
         col_idx += 1
 
     if "astro" in active_engines:
