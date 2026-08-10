@@ -307,12 +307,13 @@ with st.sidebar:
 
     market_condition = st.selectbox(
         "Kondisi Market Saat Ini:",
-        ["Auto (Detect via Price Action)", "Force Bearish (Market Junam)", "Force Bullish (Market Pump)"]
+        ["Auto (Detect via Price Action)", "Force Bearish XAU / Bullish DXY", "Force Bullish XAU / Bearish DXY"]
     )
 
     st.markdown("---")
     st.markdown("### 5. Price Reference")
     running_price = st.number_input("Harga Running XAUUSD:", value=4314.00, step=0.5)
+    dxy_running_price = st.number_input("Harga Running DXY (Dollar Index):", value=104.20, step=0.05)
 
 # ==========================================
 # 4. CALENDAR DATA CACHE
@@ -479,15 +480,27 @@ else:
     is_bullish = (int(running_price * 10) % 2 != 0)
 
 if not is_bullish:
-    tech_action = "🔴 SELL LIMIT / PREMIUM ZONE REJECTION"
-    tech_entry = running_price + 3.00
-    tech_sl = tech_entry + 7.50
-    tech_tp = tech_entry - 42.00
+    # XAU Bearish -> DXY Bullish
+    tech_action_xau = "🔴 SELL LIMIT / PREMIUM REJECTION"
+    tech_entry_xau = running_price + 3.00
+    tech_sl_xau = tech_entry_xau + 7.50
+    tech_tp_xau = tech_entry_xau - 42.00
+
+    tech_action_dxy = "🟢 BUY LIMIT / DISCOUNT DEMAND"
+    tech_entry_dxy = dxy_running_price - 0.15
+    tech_sl_dxy = tech_entry_dxy - 0.35
+    tech_tp_dxy = tech_entry_dxy + 1.20
 else:
-    tech_action = "🟢 BUY LIMIT / DISCOUNT ZONE REJECTION"
-    tech_entry = running_price - 3.00
-    tech_sl = running_price - 7.50
-    tech_tp = running_price + 42.00
+    # XAU Bullish -> DXY Bearish
+    tech_action_xau = "🟢 BUY LIMIT / DISCOUNT REJECTION"
+    tech_entry_xau = running_price - 3.00
+    tech_sl_xau = running_price - 7.50
+    tech_tp_xau = running_price + 42.00
+
+    tech_action_dxy = "🔴 SELL LIMIT / PREMIUM SUPPLY"
+    tech_entry_dxy = dxy_running_price + 0.15
+    tech_sl_dxy = tech_entry_dxy + 0.35
+    tech_tp_dxy = tech_entry_dxy - 1.20
 
 # ==========================================
 # FUNGSI KALKULASI REKAP NAMA INDIKATOR SPESIFIK
@@ -500,7 +513,6 @@ def calculate_macro_divergence(ind1_info, ind2_info, ind3_info, ind4_info, main_
             return None
 
     def eval_indicator(ind_dict, higher_is_good_for_usd=True):
-        # MENGAMBIL NAMA SPESIFIK DARI DICTIONARY INDIKATOR
         name = ind_dict.get('nama', 'Indikator')
         act_raw = ind_dict.get('actual', '-')
         est_raw = ind_dict.get('forecast', '-')
@@ -528,20 +540,15 @@ def calculate_macro_divergence(ind1_info, ind2_info, ind3_info, ind4_info, main_
             
         return f"- **{name}**: {note} ➔ Impak: **{res}**", score
 
-    # Evaluasi dengan menyebutkan nama asli indikator
     r1, s1 = eval_indicator(ind1_info, higher_is_good_for_usd=True)
-    
-    # Khusus Unemployment Rate (ind_2), angka lebih tinggi berarti jelek untuk USD (False)
     is_good_usd_2 = False if "unemployment" in ind2_info.get('nama', '').lower() else True
     r2, s2 = eval_indicator(ind2_info, higher_is_good_for_usd=is_good_usd_2)
-    
     r3, s3 = eval_indicator(ind3_info, higher_is_good_for_usd=True)
     r4, s4 = eval_indicator(ind4_info, higher_is_good_for_usd=True)
 
     total_score = s1 + s2 + s3 + s4
     
-    rekap_lines = []
-    rekap_lines.extend([r1, r2, r3, r4])
+    rekap_lines = [r1, r2, r3, r4]
 
     if total_score > 0:
         macro_bias = "BULLISH USD / BEARISH XAUUSD"
@@ -666,7 +673,6 @@ st.markdown("---")
 if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", type="primary", use_container_width=True):
     with st.spinner("Sintesis Data Makro + Astrodox Aspect Weights + Geopolitik + SMC Technical Structure..."):
         
-        # Dictionary indikator terkini
         ind1_current = {**ind_data.get("ind_1", {}), "actual": final_act1}
         ind2_current = {**ind_data.get("ind_2", {}), "actual": final_act2}
         ind3_current = {**ind_data.get("ind_3", {}), "actual": final_act3}
@@ -682,12 +688,13 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
         plt.close(fig_temp)
 
         system_prompt = f"""
-        Kamu adalah Senior Quantitative Trader, Macro Analyst & Financial Astrologer spesialis XAUUSD.
-        Sintesiskan Data Makro + Bobot Garis Aspek Astrodox + Geopolitik + SMC Technical Structure menjadi ESTIMASI RANGE PIPS PRESISI, WHIPSAW WARNING, ZONA ENTRY, SL, DAN TP.
+        Kamu adalah Senior Quantitative Trader, Macro Analyst & Financial Astrologer spesialis XAUUSD & DXY.
+        Sintesiskan Data Makro + Bobot Garis Aspek Astrodox + Geopolitik + SMC Technical Structure menjadi ESTIMASI RANGE PIPS PRESISI, WHIPSAW WARNING, ZONA ENTRY, SL, DAN TP UNTUK XAUUSD DAN DXY.
 
         [INPUT DATA REAL-TIME]
         - Target Event: {target_news} ({status_text})
         - Running Price XAUUSD: {running_price}
+        - Running Price DXY: {dxy_running_price}
         - Posisi Planet Astrodox: {json.dumps(astro_positions_dict)}
         - Hitungan Garis Aspek Astrodox Active:
             * Merah (Square 90° / Opposite 180° - Volatilitas/Tension): {temp_counts['merah']} garis
@@ -701,7 +708,7 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
 
         [INSTRUKSI ENGINE AI]
         1. Baca Garis Astro Dominan.
-        2. Tentukan Bias Trend, Zona Entry Presisi, SL, dan TP berdasarkan konvergensi Astro + SMC.
+        2. Tentukan Bias Trend, Zona Entry Presisi, SL, dan TP berdasarkan konvergensi Astro + SMC (Korelasi terbalik XAUUSD vs DXY).
         3. Berikan jawaban HANYA dalam format JSON MURNI tanpa markdown tambahan:
 
         {{
@@ -753,7 +760,6 @@ if st.session_state["ai_result"]:
     setup_ai = res_ai.get("setup_spesifik", {})
     pips_ai = res_ai.get("proyeksi_pips", {})
     
-    # Judul Dinamis berdasarkan Status News
     if is_future_event:
         st.subheader("📋 Analysis & Proyeksi Data Pendukung (Pre-Rilis)")
     else:
@@ -835,7 +841,7 @@ fig_astro_unified, img_astro_buf, aspect_counts = generate_astrodox_unified_imag
 )
 
 # ==========================================
-# 6. CONFLUENCE CARDS
+# 6. CONFLUENCE CARDS (XAUUSD & DXY ADDED)
 # ==========================================
 st.subheader("🎯 MULTI-TIMEFRAME LIQUIDITY & METHOD CONFLUENCE")
 
@@ -914,19 +920,32 @@ with col_m:
         st.info("Astrodox Engine OFF")
 
 with col_r:
-    st.markdown("### 📐 Multi-TF Technical Engine")
+    st.markdown("### 📐 Multi-TF Technical Engine (XAU & DXY)")
     if tech_active:
+        # XAUUSD Section
+        st.markdown("#### 🥇 XAUUSD ANALYSIS")
         if not is_bullish:
-            st.markdown("🔴 **ARAH BIAS: BEARISH (REJECTION)**")
+            st.markdown("🔴 **ARAH BIAS XAU:** BEARISH (REJECTION)")
         else:
-            st.markdown("🟢 **ARAH BIAS: BULLISH (EXPANSION)**")
-        st.write(f"Eksekusi: **{tech_action}**")
-        st.markdown("#### 🎯 ZONA ENTRY PRESISI")
-        st.info(f"{tech_entry - 1.00:.2f} - {tech_entry + 1.50:.2f}")
-        st.markdown("#### 🛑 STOP LOSS (SL)")
-        st.error(f"{tech_sl:.2f}")
-        st.markdown("#### 🏁 TARGET TP EXPANSION")
-        st.success(f"{tech_tp:.2f}")
+            st.markdown("🟢 **ARAH BIAS XAU:** BULLISH (EXPANSION)")
+        st.caption(f"Eksekusi: **{tech_action_xau}**")
+        st.markdown("🎯 **Zona Entry XAU:**")
+        st.info(f"{tech_entry_xau - 1.00:.2f} - {tech_entry_xau + 1.50:.2f}")
+        st.markdown(f"🛑 **SL XAU:** `{tech_sl_xau:.2f}` | 🏁 **TP XAU:** `{tech_tp_xau:.2f}`")
+
+        st.markdown("---")
+
+        # DXY Section (Inverse Correlation)
+        st.markdown("#### 💵 DXY (DOLLAR INDEX) ANALYSIS")
+        if not is_bullish:
+            st.markdown("🟢 **ARAH BIAS DXY:** BULLISH (EXPANSION)")
+        else:
+            st.markdown("🔴 **ARAH BIAS DXY:** BEARISH (REJECTION)")
+        st.caption(f"Eksekusi: **{tech_action_dxy}**")
+        st.markdown("🎯 **Zona Entry DXY:**")
+        st.info(f"{tech_entry_dxy - 0.05:.2f} - {tech_entry_dxy + 0.05:.2f}")
+        st.markdown(f"🛑 **SL DXY:** `{tech_sl_dxy:.2f}` | 🏁 **TP DXY:** `{tech_tp_dxy:.2f}`")
+
     else:
         st.info("Technical Engine OFF")
 
@@ -964,28 +983,58 @@ st.markdown("---")
 # ==========================================
 st.subheader("📉 LIVE CHART TRADINGVIEW (INTERACTIVE)")
 
-tradingview_widget = """
-<div class="tradingview-widget-container" style="height:620px;width:100%">
-  <div id="tradingview_chart" style="height:100%;width:100%"></div>
-  <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-  <script type="text/javascript">
-  new TradingView.widget({
-    "width": "100%",
-    "height": 600,
-    "symbol": "OANDA:XAUUSD",
-    "interval": "15",
-    "timezone": "Asia/Jakarta",
-    "theme": "dark",
-    "style": "1",
-    "locale": "en",
-    "toolbar_bg": "#f1f3f6",
-    "enable_publishing": false,
-    "allow_symbol_change": true,
-    "container_id": "tradingview_chart",
-    "hide_side_toolbar": false,
-    "studies": []
-  });
-  </script>
-</div>
-"""
-components.html(tradingview_widget, height=620)
+tab1, tab2 = st.tabs(["🥇 XAUUSD Chart", "💵 DXY (Dollar Index) Chart"])
+
+with tab1:
+    tradingview_widget_xau = """
+    <div class="tradingview-widget-container" style="height:620px;width:100%">
+      <div id="tradingview_xau" style="height:100%;width:100%"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+      <script type="text/javascript">
+      new TradingView.widget({
+        "width": "100%",
+        "height": 600,
+        "symbol": "OANDA:XAUUSD",
+        "interval": "15",
+        "timezone": "Asia/Jakarta",
+        "theme": "dark",
+        "style": "1",
+        "locale": "en",
+        "toolbar_bg": "#f1f3f6",
+        "enable_publishing": false,
+        "allow_symbol_change": true,
+        "container_id": "tradingview_xau",
+        "hide_side_toolbar": false,
+        "studies": []
+      });
+      </script>
+    </div>
+    """
+    components.html(tradingview_widget_xau, height=620)
+
+with tab2:
+    tradingview_widget_dxy = """
+    <div class="tradingview-widget-container" style="height:620px;width:100%">
+      <div id="tradingview_dxy" style="height:100%;width:100%"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+      <script type="text/javascript">
+      new TradingView.widget({
+        "width": "100%",
+        "height": 600,
+        "symbol": "CAPITALCOM:DXY",
+        "interval": "15",
+        "timezone": "Asia/Jakarta",
+        "theme": "dark",
+        "style": "1",
+        "locale": "en",
+        "toolbar_bg": "#f1f3f6",
+        "enable_publishing": false,
+        "allow_symbol_change": true,
+        "container_id": "tradingview_dxy",
+        "hide_side_toolbar": false,
+        "studies": []
+      });
+      </script>
+    </div>
+    """
+    components.html(tradingview_widget_dxy, height=620)
