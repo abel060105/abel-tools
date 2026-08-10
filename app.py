@@ -117,7 +117,6 @@ def generate_astrodox_unified_image(target_date: datetime, ai_result_data=None):
     dt_utc = target_date - timedelta(hours=7)
     planet_degrees, planet_positions = compute_planetary_positions(dt_utc)
 
-    # Memperbesar canvas gambar (18 x 9.5) agar box teks informasi lebih luas
     fig = plt.figure(figsize=(18.0, 9.5), facecolor='#0e1117')
     
     # 1. POLAR ASTRODOX WHEEL
@@ -152,7 +151,6 @@ def generate_astrodox_unified_image(target_date: datetime, ai_result_data=None):
 
     aspect_counts = {"merah": 0, "hijau": 0, "biru": 0, "kuning": 0}
 
-    # Orb diperlonggar hingga 7-8 derajat agar lebih presisi mendeteksi garis seperti Astrodox Mobile
     for i in range(len(planets_keys)):
         for j in range(i + 1, len(planets_keys)):
             d1 = deg_list[i]
@@ -164,16 +162,16 @@ def generate_astrodox_unified_image(target_date: datetime, ai_result_data=None):
             rad1 = np.radians(d1)
             rad2 = np.radians(d2)
 
-            if abs(diff - 90) <= 7 or abs(diff - 180) <= 7:  # Square/Opposite -> MERAH
+            if abs(diff - 90) <= 7 or abs(diff - 180) <= 7:
                 ax.plot([rad1, rad2], [0.70, 0.70], color='#ff3333', alpha=0.8, linewidth=1.5)
                 aspect_counts["merah"] += 1
-            elif abs(diff - 120) <= 7:  # Trine -> HIJAU
+            elif abs(diff - 120) <= 7:
                 ax.plot([rad1, rad2], [0.70, 0.70], color='#00ff66', alpha=0.8, linewidth=1.5)
                 aspect_counts["hijau"] += 1
-            elif abs(diff - 60) <= 6:  # Sextile -> BIRU
+            elif abs(diff - 60) <= 6:
                 ax.plot([rad1, rad2], [0.70, 0.70], color='#3399ff', alpha=0.7, linewidth=1.2)
                 aspect_counts["biru"] += 1
-            elif diff <= 7:  # Conjunction -> KUNING
+            elif diff <= 7:
                 ax.plot([rad1, rad2], [0.70, 0.70], marker='*', color='#ffff00', alpha=0.9, linewidth=2.5, markersize=8)
                 aspect_counts["kuning"] += 1
 
@@ -224,7 +222,6 @@ def generate_astrodox_unified_image(target_date: datetime, ai_result_data=None):
     else:
         info_text += "[ Menunggu Eksekusi AI Prediction di Dashboard ]\n"
 
-    # Fontsize disesuaikan agar lebih proporsional & jelas
     ax_text.text(
         0.00, 0.98, info_text, color='#e0e0e0', fontsize=10.0, 
         fontfamily='monospace', va='top', ha='left',
@@ -493,20 +490,28 @@ else:
     tech_sl = running_price - 7.50
     tech_tp = running_price + 42.00
 
-def calculate_macro_divergence(act1, est1, act2, est2, act3, est3, act4, est4):
+# ==========================================
+# REVISI FUNGSI CALCULATE MACRO DIVERGENCE (DENGAN NAMA NAMA INDIKATOR SPESIFIK & STATUS NEWS)
+# ==========================================
+def calculate_macro_divergence(ind1_info, ind2_info, ind3_info, ind4_info, main_news_name, is_future):
     def parse_num(val):
         try:
             return float(str(val).replace('%', '').replace('K', '').replace('M', ''))
         except:
             return None
 
-    def eval_indicator(name, act_raw, est_raw, higher_is_good_for_usd=True):
+    def eval_indicator(ind_dict, higher_is_good_for_usd=True):
+        name = ind_dict.get('nama', 'Indikator')
+        act_raw = ind_dict.get('actual', '-')
+        est_raw = ind_dict.get('forecast', '-')
+        
         a = parse_num(act_raw)
         e = parse_num(est_raw)
+        
         if "OTW" in str(act_raw):
-            return f"- **{name}**: Belum Rilis ({act_raw}) -> Menunggu Jadwal", 0
+            return f"- **{name}**: Belum Rilis ({act_raw}) ⏳", 0
         if a is None or e is None:
-            return f"- **{name}**: Data Status ({act_raw})", 0
+            return f"- **{name}**: Actual ({act_raw}) | Forecast ({est_raw})", 0
         
         if a > e:
             res = "BULLISH USD" if higher_is_good_for_usd else "BEARISH USD"
@@ -521,23 +526,44 @@ def calculate_macro_divergence(act1, est1, act2, est2, act3, est3, act4, est4):
             score = 0
             note = f"Actual ({act_raw}) == Forecast ({est_raw})"
             
-        return f"- **{name}**: {note} -> Impak: **{res}**", score
+        return f"- **{name}**: {note} ➔ Impak: **{res}**", score
 
-    r1, s1 = eval_indicator("Indikator Utama", act1, est1, higher_is_good_for_usd=True)
-    r2, s2 = eval_indicator("Indikator Pendukung 2", act2, est2, higher_is_good_for_usd=True)
-    r3, s3 = eval_indicator("Indikator Pendukung 3", act3, est3, higher_is_good_for_usd=True)
-    r4, s4 = eval_indicator("Indikator Pendukung 4", act4, est4, higher_is_good_for_usd=True)
+    # Evaluasi dengan menyebutkan nama asli indikator
+    r1, s1 = eval_indicator(ind1_info, higher_is_good_for_usd=True)
+    
+    # Khusus Unemployment Rate (ind_2), angka lebih tinggi berarti jelek untuk USD (False)
+    is_good_usd_2 = False if "unemployment" in ind2_info.get('nama', '').lower() else True
+    r2, s2 = eval_indicator(ind2_info, higher_is_good_for_usd=is_good_usd_2)
+    
+    r3, s3 = eval_indicator(ind3_info, higher_is_good_for_usd=True)
+    r4, s4 = eval_indicator(ind4_info, higher_is_good_for_usd=True)
 
-    rekap_text = "\n".join([r1, r2, r3, r4])
     total_score = s1 + s2 + s3 + s4
+    
+    rekap_lines = []
+    if is_future:
+        rekap_lines.append(f"📌 **Status Event:** {main_news_name} **BELUM RILIS** (Menunggu Rilis).")
+        rekap_lines.append("Berikut adalah analisis trend data pendukung awal & arah proyeksi estimasi:")
+    else:
+        rekap_lines.append(f"📌 **Status Event:** {main_news_name} **SUDAH RILIS**.")
+        rekap_lines.append("Berikut adalah rekap evaluasi data aktual yang telah rilis:")
+
+    rekap_lines.extend([r1, r2, r3, r4])
     
     if total_score > 0:
         macro_bias = "BULLISH USD / BEARISH XAUUSD"
+        pred_text = f"💡 **Proyeksi Prediksi News Utama:** Berdasarkan akumulasi data pendukung yang cenderung positif, angka **{main_news_name}** diperkirakan akan berpihak ke **penguatan Dolar US (USD)**."
     elif total_score < 0:
         macro_bias = "BEARISH USD / BULLISH XAUUSD"
+        pred_text = f"💡 **Proyeksi Prediksi News Utama:** Berdasarkan akumulasi data pendukung yang cenderung melemah, angka **{main_news_name}** diperkirakan akan memicu **pelemahan Dolar US (USD)**."
     else:
         macro_bias = "NEUTRAL / MIXED DATA (Whipsaw Risk)"
+        pred_text = f"💡 **Proyeksi Prediksi News Utama:** Data pendukung relatif berimbang/campuran. Waspadai risiko volatilitas dua arah (Whipsaw/False Breakout) saat **{main_news_name}** rilis."
 
+    if is_future:
+        rekap_lines.append(f"\n{pred_text}")
+
+    rekap_text = "\n".join(rekap_lines)
     return rekap_text, macro_bias, total_score
 
 def fetch_geopolitical_analysis(event_name, actual_val, forecast_val):
@@ -647,8 +673,14 @@ st.markdown("---")
 if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", type="primary", use_container_width=True):
     with st.spinner("Sintesis Data Makro + Astrodox Aspect Weights + Geopolitik + SMC Technical Structure..."):
         
+        # Buat dictionary data indikator terkini
+        ind1_current = {**ind_data.get("ind_1", {}), "actual": final_act1}
+        ind2_current = {**ind_data.get("ind_2", {}), "actual": final_act2}
+        ind3_current = {**ind_data.get("ind_3", {}), "actual": final_act3}
+        ind4_current = {**ind_data.get("ind_4", {}), "actual": final_act4}
+
         rekap_text, macro_bias_result, score_val = calculate_macro_divergence(
-            final_act1, est1, final_act2, est2, final_act3, est3, final_act4, est4
+            ind1_current, ind2_current, ind3_current, ind4_current, target_news, is_future_event
         )
         
         _, astro_positions_dict = compute_planetary_positions(event_datetime - timedelta(hours=7))
@@ -676,7 +708,7 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
 
         [INSTRUKSI ENGINE AI]
         1. Baca Garis Astro Dominan:
-           - Jika Garis Merah/Kuning Tinggi: Proyeksikan Sweep Liquidity Pips & Whipsaw Warning yang TINGGI. Berikan peringatan whipsaw spesifik.
+           - Jika Garis Merah/Kuning Tinggi: Proyeksikan Sweep Liquidity Pips & Whipsaw Warning yang TINGGI.
            - Jika Garis Hijau Dominan: Proyeksikan Trend Expansion Pips yang LEBIH BESAR.
         2. Tentukan Bias Trend, Zona Entry Presisi, SL, dan TP berdasarkan konvergensi Astro + SMC.
         3. Berikan jawaban HANYA dalam format JSON MURNI tanpa markdown tambahan:
@@ -729,13 +761,17 @@ if st.session_state["ai_result"]:
     setup_ai = res_ai.get("setup_spesifik", {})
     pips_ai = res_ai.get("proyeksi_pips", {})
     
-    st.subheader("📋 Rekap Evaluasi Data Pendukung Real-Time")
+    # Judul Dinamis berdasarkan Status News (Pre vs Post Rilis)
+    if is_future_event:
+        st.subheader("📋 Analysis & Proyeksi Data Pendukung (Pre-Rilis)")
+    else:
+        st.subheader("📋 Rekap Evaluasi Data Pendukung & Rilis News (Post-Rilis)")
+
     st.markdown(st.session_state["rekap_text"])
     st.info(f"⚖️ **Kesimpulan Bias Makro:** {st.session_state['macro_bias_result']} (Score Net: {st.session_state['score_val']})")
 
     st.markdown("### ⚡ AI PROYEKSI RANGE PIPS (CONFLUENCE ASTRO + TECHNICALS)")
     
-    # PERBAIKAN REVISI 1: Tampilan Pips Card Custom CSS agar teks muat penuh & rapi
     p1, p2, p3, p4 = st.columns(4)
     with p1:
         st.markdown(f"""
@@ -813,7 +849,6 @@ st.subheader("🎯 MULTI-TIMEFRAME LIQUIDITY & METHOD CONFLUENCE")
 
 col_l, col_m, col_r = st.columns(3)
 
-# PERBAIKAN REVISI 2: Pemisahan Kolom Entry, SL, dan TP pada AI Engine
 with col_l:
     st.markdown("### 🤖 AI Macro & Range Engine")
     if st.session_state["ai_result"]:
@@ -912,7 +947,6 @@ st.subheader("🔮 ASTRODOX TRANSIT WHEEL & AI RANGE INTEGRATED ANALYSIS")
 
 st.pyplot(fig_astro_unified)
 
-# PERBAIKAN REVISI 3: Fitur Zoom via Pop-up Modal tanpa perlu download
 @st.dialog("🔍 High-Resolution Astrodox & AI Range Chart (Zoom View)", width="large")
 def show_zoomed_chart(image_bytes):
     st.image(image_bytes, use_container_width=True)
