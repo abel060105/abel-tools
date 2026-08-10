@@ -94,68 +94,63 @@ def fetch_live_xauusd_price():
     return None, "Gagal mengambil data dari kedua API"
 
 # ==========================================
-# 2. ADVANCED TECHNICAL ENGINE (SMC, ICT, SND, SNR & LIQUIDITY)
+# 2. ADVANCED TECHNICAL ENGINE (DUAL-DIRECTIONAL SETUP)
 # ==========================================
 def calculate_advanced_technical_engine(running_price, market_condition):
     """
-    Engine Teknikal Lanjutan menggunakan prinsip:
-    - Liquidity Flow (BSL ke SSL / SSL ke BSL)
-    - ICT (Order Block & Fair Value Gap)
-    - Supply & Demand (SND) + Key Level SNR
-    - Volatility Offset (ATR Dynamic)
+    Engine Teknikal Lanjutan SMC:
+    Menghasilkan 2 ZONA EKSEKUSI SEKALIGUS (Buy Plan & Sell Plan)
+    untuk persiapan pending order menjelang High-Impact News.
     """
-    if "Force Bearish" in market_condition:
-        bias = "BEARISH"
-    elif "Force Bullish" in market_condition:
-        bias = "BULLISH"
-    else:
-        bias = "BEARISH" if (int(running_price * 10) % 2 == 0) else "BULLISH"
-
     atr_val = 18.50
     sl_offset = atr_val * 0.45  # ~$8.30 (83 Pips)
     tp_offset = atr_val * 2.20  # ~$40.70 (407 Pips)
 
-    if bias == "BEARISH":
-        bsl_sweep = running_price + 4.50
-        ssl_target = running_price - tp_offset
-        
-        ict_ob_zone = f"{running_price + 3.00:.2f} - {running_price + 6.00:.2f}"
-        fvg_gap_zone = f"{running_price + 1.50:.2f} - {running_price + 3.00:.2f}"
-        fresh_snd_zone = f"{running_price + 3.50:.2f} - {running_price + 5.50:.2f} (Supply)"
-        key_snr_level = running_price + 3.00
-        
-        entry_price = running_price + 3.50
-        sl_price = entry_price + sl_offset
-        tp_price = entry_price - tp_offset
-        action_title = "🔴 SELL LIMIT / PREMIUM BSL SWEEP & SUPPLY MITIGATION"
+    # 1. METRIK LIQUIDITY & STRUCTURAL ZONES
+    bsl_level = running_price + 4.50
+    ssl_level = running_price - 4.50
+    
+    supply_ob_zone = f"{running_price + 3.00:.2f} - {running_price + 6.00:.2f}"
+    demand_ob_zone = f"{running_price - 6.00:.2f} - {running_price - 3.00:.2f}"
+    
+    fvg_bearish = f"{running_price + 1.50:.2f} - {running_price + 3.00:.2f}"
+    fvg_bullish = f"{running_price - 3.00:.2f} - {running_price - 1.50:.2f}"
+    
+    snd_supply = f"{running_price + 3.50:.2f} - {running_price + 5.50:.2f} (Supply)"
+    snd_demand = f"{running_price - 5.50:.2f} - {running_price - 3.50:.2f} (Demand)"
+    
+    snr_resistance = running_price + 3.00
+    snr_support = running_price - 3.00
 
-    else:
-        ssl_sweep = running_price - 4.50
-        bsl_target = running_price + tp_offset
-        
-        ict_ob_zone = f"{running_price - 6.00:.2f} - {running_price - 3.00:.2f}"
-        fvg_gap_zone = f"{running_price - 3.00:.2f} - {running_price - 1.50:.2f}"
-        fresh_snd_zone = f"{running_price - 5.50:.2f} - {running_price - 3.50:.2f} (Demand)"
-        key_snr_level = running_price - 3.00
-        
-        entry_price = running_price - 3.50
-        sl_price = entry_price - sl_offset
-        tp_price = entry_price + tp_offset
-        action_title = "🟢 BUY LIMIT / DISCOUNT SSL SWEEP & DEMAND MITIGATION"
+    # 2. PLAN A: SELL SETUP (PREMIUM BSL SWEEP / SUPPLY MITIGATION)
+    sell_entry = running_price + 3.50
+    sell_sl = sell_entry + sl_offset
+    sell_tp = sell_entry - tp_offset
+
+    # 3. PLAN B: BUY SETUP (DISCOUNT SSL SWEEP / DEMAND MITIGATION)
+    buy_entry = running_price - 3.50
+    buy_sl = buy_entry - sl_offset
+    buy_tp = buy_entry + tp_offset
 
     return {
-        "bias": bias,
-        "action": action_title,
-        "entry_price": entry_price,
-        "sl_price": sl_price,
-        "tp_price": tp_price,
-        "ict_ob": ict_ob_zone,
-        "fvg_gap": fvg_gap_zone,
-        "snd_zone": fresh_snd_zone,
-        "key_snr": key_snr_level,
-        "bsl_level": running_price + 4.50,
-        "ssl_level": running_price - 4.50,
-        "liquidity_flow": f"SSL ({running_price - 4.50:.2f}) ➔ BSL ({running_price + tp_offset:.2f})" if bias == "BULLISH" else f"BSL ({running_price + 4.50:.2f}) ➔ SSL ({running_price - tp_offset:.2f})"
+        "bsl_level": bsl_level,
+        "ssl_level": ssl_level,
+        "supply_ob": supply_ob_zone,
+        "demand_ob": demand_ob_zone,
+        "fvg_bearish": fvg_bearish,
+        "fvg_bullish": fvg_bullish,
+        "snd_supply": snd_supply,
+        "snd_demand": snd_demand,
+        "snr_res": snr_resistance,
+        "snr_sup": snr_support,
+        # PLAN SELL
+        "sell_entry_zone": f"{sell_entry - 0.75:.2f} - {sell_entry + 0.75:.2f}",
+        "sell_sl": sell_sl,
+        "sell_tp": sell_tp,
+        # PLAN BUY
+        "buy_entry_zone": f"{buy_entry - 0.75:.2f} - {buy_entry + 0.75:.2f}",
+        "buy_sl": buy_sl,
+        "buy_tp": buy_tp,
     }
 
 # ==========================================
@@ -1026,31 +1021,34 @@ if active_engines:
             tech_res = calculate_advanced_technical_engine(running_price, market_condition)
             
             st.markdown("### 📐 Advanced SMC & Liquidity Engine")
-            
-            if tech_res["bias"] == "BULLISH":
-                st.markdown("🟢 **BIAS: BULLISH EXPANSION**")
-            else:
-                st.markdown("🔴 **BIAS: BEARISH REJECTION**")
-                
-            st.caption(f"Eksekusi: **{tech_res['action']}**")
+            st.caption("⚡ Dual-Directional Setup (Persiapan Pending Order H-Menit News)")
             
             st.markdown("---")
-            st.markdown("#### 💧 LIQUIDITY FLOW")
-            st.info(f"**Flow Direction:**\n`{tech_res['liquidity_flow']}`")
-            st.markdown(f"• **Buy-Side Liq (BSL):** `{tech_res['bsl_level']:.2f}`\n• **Sell-Side Liq (SSL):** `{tech_res['ssl_level']:.2f}`")
-            
-            st.markdown("---")
-            st.markdown("#### 🏛️ ICT & SND STRUCTURE")
-            st.markdown(f"• **Order Block (OB):** `{tech_res['ict_ob']}`")
-            st.markdown(f"• **Fair Value Gap (FVG):** `{tech_res['fvg_gap']}`")
-            st.markdown(f"• **Fresh SND Zone:** `{tech_res['snd_zone']}`")
-            st.markdown(f"• **Key Level SNR:** `{tech_res['key_snr']:.2f}`")
+            st.markdown("#### 💧 LIQUIDITY & STRUCTURE ZONES")
+            st.markdown(f"• **Buy-Side Liq (BSL):** `{tech_res['bsl_level']:.2f}` | **Sell-Side Liq (SSL):** `{tech_res['ssl_level']:.2f}`")
+            st.markdown(f"• **Supply OB:** `{tech_res['supply_ob']}` | **Demand OB:** `{tech_res['demand_ob']}`")
+            st.markdown(f"• **FVG Zone:** Supply `{tech_res['fvg_bearish']}` | Demand `{tech_res['fvg_bullish']}`")
 
             st.markdown("---")
-            st.markdown("#### 🎯 EXECUTION & RISK SETUPS")
-            st.info(f"**Entry Zone:** `{tech_res['entry_price'] - 0.75:.2f} - {tech_res['entry_price'] + 0.75:.2f}`")
-            st.error(f"**Stop Loss (SL):** `{tech_res['sl_price']:.2f}`")
-            st.success(f"**Take Profit (TP):** `{tech_res['tp_price']:.2f}`")
+            st.markdown("#### 🎯 TWO-WAY PENDING ORDER SETUPS")
+            
+            c_plan_sell, c_plan_buy = st.columns(2)
+            
+            with c_plan_sell:
+                st.error(f"""
+                🔴 **PLAN A: SELL LIMIT (PREMIUM / SUPPLY)**
+                - **Entry Zone:** `{tech_res['sell_entry_zone']}`
+                - **Stop Loss (SL):** `{tech_res['sell_sl']:.2f}`
+                - **Take Profit (TP):** `{tech_res['sell_tp']:.2f}`
+                """)
+                
+            with c_plan_buy:
+                st.success(f"""
+                🟢 **PLAN B: BUY LIMIT (DISCOUNT / DEMAND)**
+                - **Entry Zone:** `{tech_res['buy_entry_zone']}`
+                - **Stop Loss (SL):** `{tech_res['buy_sl']:.2f}`
+                - **Take Profit (TP):** `{tech_res['buy_tp']:.2f}`
+                """)
 
     st.markdown("---")
 
