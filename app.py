@@ -19,7 +19,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Custom Styling untuk merapikan tampilan Pips Range dan Box Informasi
+# Custom Styling
 st.markdown("""
 <style>
     .range-box {
@@ -64,7 +64,7 @@ if "score_val" not in st.session_state:
     st.session_state["score_val"] = 0
 
 # ==========================================
-# 2. BUILT-IN ASTRODOX CALCULATION & CHART ENGINE
+# 2. BUILT-IN ASTRODOX ENGINE & CHART
 # ==========================================
 ZODIAC_SYMBOLS = ["♈", "♉", "♊", "♋", "♌", "♍", "♎", "♏", "♐", "♑", "♒", "♓"]
 ZODIAC_NAMES = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
@@ -119,7 +119,7 @@ def generate_astrodox_unified_image(target_date: datetime, ai_result_data=None):
 
     fig = plt.figure(figsize=(18.0, 9.5), facecolor='#0e1117')
     
-    # 1. POLAR ASTRODOX WHEEL
+    # Polar Wheel
     ax = fig.add_subplot(121, polar=True, facecolor='#0e1117')
     ax.set_theta_zero_location("W")
     ax.set_theta_direction(-1)
@@ -180,7 +180,6 @@ def generate_astrodox_unified_image(target_date: datetime, ai_result_data=None):
         color='white', fontsize=14, pad=15, fontweight='bold'
     )
 
-    # 2. DETAIL POSISI & AI PROYEKSI RANGE
     ax_text = fig.add_subplot(122, facecolor='#0e1117')
     ax_text.axis('off')
 
@@ -491,7 +490,7 @@ else:
     tech_tp = running_price + 42.00
 
 # ==========================================
-# REVISI FUNGSI CALCULATE MACRO DIVERGENCE (DENGAN NAMA NAMA INDIKATOR SPESIFIK & STATUS NEWS)
+# FUNGSI KALKULASI REKAP NAMA INDIKATOR SPESIFIK
 # ==========================================
 def calculate_macro_divergence(ind1_info, ind2_info, ind3_info, ind4_info, main_news_name, is_future):
     def parse_num(val):
@@ -501,6 +500,7 @@ def calculate_macro_divergence(ind1_info, ind2_info, ind3_info, ind4_info, main_
             return None
 
     def eval_indicator(ind_dict, higher_is_good_for_usd=True):
+        # MENGAMBIL NAMA SPESIFIK DARI DICTIONARY INDIKATOR
         name = ind_dict.get('nama', 'Indikator')
         act_raw = ind_dict.get('actual', '-')
         est_raw = ind_dict.get('forecast', '-')
@@ -541,24 +541,17 @@ def calculate_macro_divergence(ind1_info, ind2_info, ind3_info, ind4_info, main_
     total_score = s1 + s2 + s3 + s4
     
     rekap_lines = []
-    if is_future:
-        rekap_lines.append(f"📌 **Status Event:** {main_news_name} **BELUM RILIS** (Menunggu Rilis).")
-        rekap_lines.append("Berikut adalah analisis trend data pendukung awal & arah proyeksi estimasi:")
-    else:
-        rekap_lines.append(f"📌 **Status Event:** {main_news_name} **SUDAH RILIS**.")
-        rekap_lines.append("Berikut adalah rekap evaluasi data aktual yang telah rilis:")
-
     rekap_lines.extend([r1, r2, r3, r4])
-    
+
     if total_score > 0:
         macro_bias = "BULLISH USD / BEARISH XAUUSD"
-        pred_text = f"💡 **Proyeksi Prediksi News Utama:** Berdasarkan akumulasi data pendukung yang cenderung positif, angka **{main_news_name}** diperkirakan akan berpihak ke **penguatan Dolar US (USD)**."
+        pred_text = f"💡 **Proyeksi Prediksi News Utama:** Berdasarkan data pendukung yang cenderung positif, angka **{main_news_name}** berpotensi menguatkan Dolar US (USD)."
     elif total_score < 0:
         macro_bias = "BEARISH USD / BULLISH XAUUSD"
-        pred_text = f"💡 **Proyeksi Prediksi News Utama:** Berdasarkan akumulasi data pendukung yang cenderung melemah, angka **{main_news_name}** diperkirakan akan memicu **pelemahan Dolar US (USD)**."
+        pred_text = f"💡 **Proyeksi Prediksi News Utama:** Berdasarkan data pendukung yang cenderung melemah, angka **{main_news_name}** berpotensi memicu pelemahan Dolar US (USD)."
     else:
         macro_bias = "NEUTRAL / MIXED DATA (Whipsaw Risk)"
-        pred_text = f"💡 **Proyeksi Prediksi News Utama:** Data pendukung relatif berimbang/campuran. Waspadai risiko volatilitas dua arah (Whipsaw/False Breakout) saat **{main_news_name}** rilis."
+        pred_text = f"💡 **Proyeksi Prediksi News Utama:** Data pendukung berimbang/campuran. Waspadai volatilitas dua arah saat **{main_news_name}** rilis."
 
     if is_future:
         rekap_lines.append(f"\n{pred_text}")
@@ -673,7 +666,7 @@ st.markdown("---")
 if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", type="primary", use_container_width=True):
     with st.spinner("Sintesis Data Makro + Astrodox Aspect Weights + Geopolitik + SMC Technical Structure..."):
         
-        # Buat dictionary data indikator terkini
+        # Dictionary indikator terkini
         ind1_current = {**ind_data.get("ind_1", {}), "actual": final_act1}
         ind2_current = {**ind_data.get("ind_2", {}), "actual": final_act2}
         ind3_current = {**ind_data.get("ind_3", {}), "actual": final_act3}
@@ -707,9 +700,7 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
         - Isu Geopolitik: {geo_info.get('isu_utama')} - {geo_info.get('ringkasan_situasi')}
 
         [INSTRUKSI ENGINE AI]
-        1. Baca Garis Astro Dominan:
-           - Jika Garis Merah/Kuning Tinggi: Proyeksikan Sweep Liquidity Pips & Whipsaw Warning yang TINGGI.
-           - Jika Garis Hijau Dominan: Proyeksikan Trend Expansion Pips yang LEBIH BESAR.
+        1. Baca Garis Astro Dominan.
         2. Tentukan Bias Trend, Zona Entry Presisi, SL, dan TP berdasarkan konvergensi Astro + SMC.
         3. Berikan jawaban HANYA dalam format JSON MURNI tanpa markdown tambahan:
 
@@ -756,12 +747,13 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
         except Exception as e:
             st.error(f"Error Koneksi AI Engine: {e}")
 
+# RENDER HASIL REKAP EVALUASI
 if st.session_state["ai_result"]:
     res_ai = st.session_state["ai_result"]
     setup_ai = res_ai.get("setup_spesifik", {})
     pips_ai = res_ai.get("proyeksi_pips", {})
     
-    # Judul Dinamis berdasarkan Status News (Pre vs Post Rilis)
+    # Judul Dinamis berdasarkan Status News
     if is_future_event:
         st.subheader("📋 Analysis & Proyeksi Data Pendukung (Pre-Rilis)")
     else:
