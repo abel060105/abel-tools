@@ -340,7 +340,7 @@ with st.sidebar:
     st.markdown("### 2. Jadwal Official & Event")
     
     now = datetime.now()
-    tanggal_rilis = st.number_input("Tanggal Rilis:", value=7, min_value=1, max_value=31)
+    tanggal_rilis = st.number_input("Tanggal Rilis:", value=12, min_value=1, max_value=31)
     
     daftar_bulan = [
         "Januari", "Februari", "Maret", "April", "Mei", "Juni",
@@ -541,10 +541,10 @@ def extract_indicator_smart(raw_list, keywords, default_act, default_est, defaul
         return f"OTW ({jadwal_fallback_str})", str(default_est), str(default_prev), jadwal_fallback_str
 
 if "NFP" in target_news:
-    act1, est1, prev1, j1 = extract_indicator_smart(calendar_raw, ["non farm payrolls", "nonfarm payrolls", "nfp"], "-23K", "80K", "20K", fallback_day=7)
-    act2, est2, prev2, j2 = extract_indicator_smart(calendar_raw, ["unemployment rate"], "4.1%", "4.2%", "4.2%", fallback_day=7)
-    act3, est3, prev3, j3 = extract_indicator_smart(calendar_raw, ["participation rate"], "61.4%", "61.6%", "61.5%", fallback_day=7)
-    act4, est4, prev4, j4 = extract_indicator_smart(calendar_raw, ["average hourly earnings"], "0.2%", "0.3%", "0.3%", fallback_day=7)
+    act1, est1, prev1, j1 = extract_indicator_smart(calendar_raw, ["non farm payrolls", "nonfarm payrolls", "nfp"], "-23K", "80K", "20K", fallback_day=max(1, tanggal_rilis-1))
+    act2, est2, prev2, j2 = extract_indicator_smart(calendar_raw, ["unemployment rate"], "4.1%", "4.2%", "4.2%", fallback_day=max(1, tanggal_rilis-1))
+    act3, est3, prev3, j3 = extract_indicator_smart(calendar_raw, ["participation rate"], "61.4%", "61.6%", "61.5%", fallback_day=max(1, tanggal_rilis-1))
+    act4, est4, prev4, j4 = extract_indicator_smart(calendar_raw, ["average hourly earnings"], "0.2%", "0.3%", "0.3%", fallback_day=max(1, tanggal_rilis-1))
     
     ind_data = {
         "status_rilis": "SUDAH RILIS" if not is_future_event else "BELUM RILIS",
@@ -556,25 +556,30 @@ if "NFP" in target_news:
         "ind_4": {"nama": "Average Hourly Earnings m/m", "actual": act4, "forecast": est4, "previous": prev4, "penjelasan": "Pertumbuhan rata-rata upah pekerja per jam.", "efek": "Actual > Forecast -> Menguatkan USD"}
     }
 elif "CPI" in target_news:
-    act1, est1, prev1, j1 = extract_indicator_smart(calendar_raw, ["cpi m/m", "cpi y/y", "consumer price index"], "0.2%", "0.2%", "0.1%", fallback_day=12)
-    act2, est2, prev2, j2 = extract_indicator_smart(calendar_raw, ["ppi m/m", "producer price"], "0.1%", "0.2%", "0.2%", fallback_day=13)
-    act3, est3, prev3, j3 = extract_indicator_smart(calendar_raw, ["import price"], "0.1%", "0.0%", "-0.1%", fallback_day=14)
-    act4, est4, prev4, j4 = extract_indicator_smart(calendar_raw, ["michigan consumer sentiment"], "67.8", "66.5", "66.4", fallback_day=14)
+    # Perbaikan urutan tanggal: Indikator pendukung (PPI & Import Price) diset rilis sebelum tanggal CPI (H-1 & H-2)
+    cpi_day = int(tanggal_rilis)
+    ppi_day = max(1, cpi_day - 1)
+    import_day = max(1, cpi_day - 2)
+
+    act1, est1, prev1, j1 = extract_indicator_smart(calendar_raw, ["cpi m/m", "cpi y/y", "consumer price index"], "0.2%", "0.2%", "0.1%", fallback_day=cpi_day)
+    act2, est2, prev2, j2 = extract_indicator_smart(calendar_raw, ["ppi m/m", "producer price"], "0.1%", "0.2%", "0.2%", fallback_day=ppi_day)
+    act3, est3, prev3, j3 = extract_indicator_smart(calendar_raw, ["import price"], "0.1%", "0.0%", "-0.1%", fallback_day=import_day)
+    act4, est4, prev4, j4 = extract_indicator_smart(calendar_raw, ["michigan consumer sentiment"], "67.8", "66.5", "66.4", fallback_day=import_day, fallback_time="21:00")
     
     ind_data = {
         "status_rilis": "SUDAH RILIS" if not is_future_event else "BELUM RILIS",
         "ringkasan": f"CPI Status Rilis: {act1} vs Forecast {est1}.",
         "dampak": "Perkembangan laju inflasi mempengaruhi kebijakan suku bunga The Fed.",
         "ind_1": {"nama": "Consumer Price Index (CPI)", "actual": act1, "forecast": est1, "previous": prev1, "penjelasan": "Indikator laju inflasi konsumen.", "efek": "Actual > Forecast -> Menguatkan USD"},
-        "ind_2": {"nama": "Producer Price Index (PPI)", "actual": act2, "forecast": est2, "previous": prev2, "penjelasan": "Indikator inflasi produsen.", "efek": "Actual > Forecast -> Menguatkan USD"},
-        "ind_3": {"nama": "Import Price Index", "actual": act3, "forecast": est3, "previous": prev3, "penjelasan": "Harga barang impor masuk.", "efek": "Actual > Forecast -> Menguatkan USD"},
+        "ind_2": {"nama": "Producer Price Index (PPI)", "actual": act2, "forecast": est2, "previous": prev2, "penjelasan": "Indikator inflasi produsen (rilis sebelum CPI).", "efek": "Actual > Forecast -> Menguatkan USD"},
+        "ind_3": {"nama": "Import Price Index", "actual": act3, "forecast": est3, "previous": prev3, "penjelasan": "Harga barang impor masuk (rilis sebelum CPI).", "efek": "Actual > Forecast -> Menguatkan USD"},
         "ind_4": {"nama": "Michigan Consumer Sentiment", "actual": act4, "forecast": est4, "previous": prev4, "penjelasan": "Kepercayaan konsumen terhadap ekonomi.", "efek": "Actual > Forecast -> Menguatkan USD"}
     }
 else:
-    act1, est1, prev1, j1 = extract_indicator_smart(calendar_raw, ["fed interest rate", "fed rate decision"], "5.25%", "5.25%", "5.50%", fallback_day=20)
-    act2, est2, prev2, j2 = extract_indicator_smart(calendar_raw, ["core pce"], "0.2%", "0.2%", "0.2%", fallback_day=30)
-    act3, est3, prev3, j3 = extract_indicator_smart(calendar_raw, ["gdp"], "2.8%", "2.8%", "1.4%", fallback_day=29)
-    act4, est4, prev4, j4 = extract_indicator_smart(calendar_raw, ["retail sales"], "1.0%", "0.3%", "-0.2%", fallback_day=15)
+    act1, est1, prev1, j1 = extract_indicator_smart(calendar_raw, ["fed interest rate", "fed rate decision"], "5.25%", "5.25%", "5.50%", fallback_day=max(1, tanggal_rilis-1))
+    act2, est2, prev2, j2 = extract_indicator_smart(calendar_raw, ["core pce"], "0.2%", "0.2%", "0.2%", fallback_day=max(1, tanggal_rilis-2))
+    act3, est3, prev3, j3 = extract_indicator_smart(calendar_raw, ["gdp"], "2.8%", "2.8%", "1.4%", fallback_day=max(1, tanggal_rilis-3))
+    act4, est4, prev4, j4 = extract_indicator_smart(calendar_raw, ["retail sales"], "1.0%", "0.3%", "-0.2%", fallback_day=max(1, tanggal_rilis-2))
     
     ind_data = {
         "status_rilis": "SUDAH RILIS" if not is_future_event else "BELUM RILIS",
