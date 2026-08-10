@@ -5,28 +5,24 @@ import calendar
 import requests
 import numpy as np
 import pandas as pd
-import yfinance as yf
 import matplotlib.pyplot as plt
 import streamlit as st
 import streamlit.components.v1 as components
+import yfinance as yf
 from datetime import datetime, timezone, timedelta
 
 # ==========================================
 # 1. KONFIGURASI HALAMAN & API KEYS
 # ==========================================
 st.set_page_config(
-    page_title="ABEL FX - Macro, Astrodox & Dynamic Liquidity Predictor",
+    page_title="ABEL FX - Macro & Astrodox Predictor",
     page_icon="📈",
     layout="wide"
 )
 
-# Custom Styling & Responsive CSS
+# Custom Styling
 st.markdown("""
 <style>
-    .stApp {
-        background-color: #0e1117;
-        color: #ffffff;
-    }
     .range-box {
         background-color: #161b22;
         border: 1px solid #30363d;
@@ -45,96 +41,6 @@ st.markdown("""
         color: #58a6ff;
         font-weight: bold;
         word-wrap: break-word;
-    }
-    .card {
-        background-color: #161b22;
-        padding: 20px;
-        border-radius: 12px;
-        border: 1px solid #30363d;
-        margin-bottom: 15px;
-    }
-    .card-title {
-        font-size: 1.15rem;
-        font-weight: bold;
-        margin-bottom: 14px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-    .badge-bullish {
-        background-color: #064e3b;
-        color: #34d399;
-        padding: 3px 8px;
-        border-radius: 4px;
-        font-size: 0.8rem;
-        font-weight: bold;
-    }
-    .badge-bearish {
-        background-color: #7f1d1d;
-        color: #fca5a5;
-        padding: 3px 8px;
-        border-radius: 4px;
-        font-size: 0.8rem;
-        font-weight: bold;
-    }
-    .zone-box {
-        background-color: #1e293b;
-        border-radius: 6px;
-        padding: 12px;
-        text-align: center;
-        color: #60a5fa;
-        font-weight: bold;
-        font-size: 1.15rem;
-        margin: 8px 0;
-    }
-    .sl-box {
-        background-color: #451a1a;
-        border-radius: 6px;
-        padding: 12px;
-        color: #f87171;
-        font-weight: bold;
-        margin: 8px 0;
-    }
-    .tp-box {
-        background-color: #064e3b;
-        border-radius: 6px;
-        padding: 12px;
-        color: #34d399;
-        font-weight: bold;
-        margin: 8px 0;
-    }
-    .liquidity-box {
-        background-color: #0f2744;
-        border-left: 4px solid #3b82f6;
-        border-radius: 4px;
-        padding: 12px;
-        font-size: 0.88rem;
-        color: #93c5fd;
-        margin-top: 12px;
-        line-height: 1.4;
-    }
-    .sltp-inline {
-        display: flex;
-        gap: 10px;
-        margin-top: 10px;
-    }
-    .sltp-item {
-        flex: 1;
-        padding: 8px 12px;
-        border-radius: 6px;
-        font-size: 0.88rem;
-        font-weight: bold;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
-    .sl-inline {
-        background-color: #311313;
-        color: #f87171;
-    }
-    .tp-inline {
-        background-color: #063726;
-        color: #34d399;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -159,80 +65,65 @@ if "score_val" not in st.session_state:
     st.session_state["score_val"] = 0
 
 # ==========================================
-# 2. LIQUIDITY CALCULATION ENGINE (yfinance & Pine Script Logic)
+# FUNGSIONALITAS YFINANCE & ZONA LIKUIDITAS
 # ==========================================
-@st.cache_data(ttl=300, show_spinner=False)
-def fetch_market_data(ticker_symbol):
+def calculate_liquidity_zones(symbol_ticker):
+    """
+    Mengambil data historical dari yfinance dan menghitung ATR serta Liquidity Zones.
+    """
     try:
-        data = yf.download(ticker_symbol, period="1mo", interval="1h", progress=False)
-        if isinstance(data.columns, pd.MultiIndex):
-            data.columns = data.columns.get_level_values(0)
-        return data
-    except Exception:
-        return pd.DataFrame()
+        data = yf.download(symbol_ticker, period="5d", interval="1h", progress=False)
+        if data.empty or len(data) < 14:
+            return None, None, None, None
 
-def calculate_liquidity_zones(df, left_bars=10, right_bars=8, atr_len=14):
-    """
-    Kalkulasi Pivot High/Low & ATR untuk mendeteksi Zona Likuiditas Atas (Supply/Short Liq)
-    dan Bawah (Demand/Long Liq) sesuai logika Pine Script Liquidity Heatmap.
-    """
-    if df.empty or len(df) < (left_bars + right_bars + atr_len):
+        # Menghitung ATR (Average True Range) - 14 Period
+        data['High-Low'] = data['High'] - data['Low']
+        data['High-PC'] = abs(data['High'] - data['Close'].shift(1))
+        data['Low-PC'] = abs(data['Low'] - data['Close'].shift(1))
+        data['TR'] = data[['High-Low', 'High-PC', 'Low-PC']].max(axis=1)
+        data['ATR'] = data['TR'].rolling(window=14).mean()
+
+        latest_close = float(data['Close'].iloc[-1].item() if hasattr(data['Close'].iloc[-1], 'item') else data['Close'].iloc[-1])
+        latest_atr = float(data['ATR'].iloc[-1].item() if hasattr(data['ATR'].iloc[-1], 'item') else data['ATR'].iloc[-1])
+
+        # Zona Likuiditas sederhana berbasis Swing High / Swing Low
+        high_max = float(data['High'].tail(24).max().item() if hasattr(data['High'].tail(24).max(), 'item') else data['High'].tail(24).max())
+        low_min = float(data['Low'].tail(24).min().item() if hasattr(data['Low'].tail(24).min(), 'item') else data['Low'].tail(24).min())
+
+        upper_zone = (round(high_max, 2), round(high_max + (latest_atr * 0.5), 2))
+        lower_zone = (round(low_min - (latest_atr * 0.5), 2), round(low_min, 2))
+
+        return latest_close, latest_atr, upper_zone, lower_zone
+
+    except Exception:
         return None, None, None, None
 
-    high_low = df['High'] - df['Low']
-    high_cp = np.abs(df['High'] - df['Close'].shift(1))
-    low_cp = np.abs(df['Low'] - df['Close'].shift(1))
-    tr = pd.concat([high_low, high_cp, low_cp], axis=1).max(axis=1)
-    atr = tr.rolling(atr_len).mean()
+# Fetch Realtime Data via yfinance
+xau_live_price, xau_atr, xau_upper_liq, xau_lower_liq = calculate_liquidity_zones("GC=F")
+dxy_live_price, dxy_atr, dxy_upper_liq, dxy_lower_liq = calculate_liquidity_zones("DX-Y.NYB")
 
-    pivots_high = []
-    pivots_low = []
-
-    for i in range(left_bars, len(df) - right_bars):
-        window_high = df['High'].iloc[i - left_bars : i + right_bars + 1]
-        window_low = df['Low'].iloc[i - left_bars : i + right_bars + 1]
-        
-        current_high = df['High'].iloc[i]
-        current_low = df['Low'].iloc[i]
-
-        if current_high == window_high.max():
-            pivots_high.append((df.index[i], current_high, atr.iloc[i]))
-        if current_low == window_low.min():
-            pivots_low.append((df.index[i], current_low, atr.iloc[i]))
-
-    latest_price = float(df['Close'].iloc[-1])
-
-    upper_liq = [p for p in pivots_high if p[1] > latest_price]
-    lower_liq = [p for p in pivots_low if p[1] < latest_price]
-
-    nearest_upper = upper_liq[-1] if upper_liq else (None, latest_price + 10.0, atr.iloc[-1])
-    nearest_lower = lower_liq[-1] if lower_liq else (None, latest_price - 10.0, atr.iloc[-1])
-
-    upper_zone = (round(float(nearest_upper[1]), 2), round(float(nearest_upper[1] + (nearest_upper[2] * 0.25)), 2))
-    lower_zone = (round(float(nearest_lower[1] - (nearest_lower[2] * 0.25)), 2), round(float(nearest_lower[1]), 2))
-
-    return latest_price, upper_zone, lower_zone, float(atr.iloc[-1])
-
-# Run Live Fetch Market Data
-xau_df = fetch_market_data("GC=F")
-dxy_df = fetch_market_data("DX-Y.NYB")
-
-xau_live_price, xau_upper_liq, xau_lower_liq, xau_atr = calculate_liquidity_zones(xau_df)
-dxy_live_price, dxy_upper_liq, dxy_lower_liq, dxy_atr = calculate_liquidity_zones(dxy_df)
-
-# Fallback Default jika API yfinance delay
-if not xau_live_price:
+# Fallback Safety jika API yfinance timeout / delay / mengembalikan None
+if xau_live_price is None:
     xau_live_price = 4314.00
+if xau_atr is None:
+    xau_atr = 15.00
+if xau_upper_liq is None:
     xau_upper_liq = (4322.00, 4326.00)
+if xau_lower_liq is None:
     xau_lower_liq = (4302.00, 4306.00)
 
-if not dxy_live_price:
+if dxy_live_price is None:
     dxy_live_price = 104.20
+if dxy_atr is None:
+    dxy_atr = 0.50
+if dxy_upper_liq is None:
     dxy_upper_liq = (104.35, 104.45)
+if dxy_lower_liq is None:
     dxy_lower_liq = (103.95, 104.05)
 
+
 # ==========================================
-# 3. BUILT-IN ASTRODOX ENGINE & CHART
+# 2. BUILT-IN ASTRODOX ENGINE & CHART
 # ==========================================
 ZODIAC_SYMBOLS = ["♈", "♉", "♊", "♋", "♌", "♍", "♎", "♏", "♐", "♑", "♒", "♓"]
 ZODIAC_NAMES = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
@@ -404,7 +295,7 @@ def generate_astrodox_unified_image(target_date: datetime, ai_result_data=None):
     return fig, img_buf, aspect_counts
 
 # ==========================================
-# 4. SIDEBAR & CONTROL PANEL
+# 3. SIDEBAR & CONTROL PANEL
 # ==========================================
 with st.sidebar:
     st.header("⚙️ ABEL FX Control Panel")
@@ -479,12 +370,12 @@ with st.sidebar:
     )
 
     st.markdown("---")
-    st.markdown("### 5. Price Reference (Realtime yfinance Sync)")
+    st.markdown("### 5. Price Reference")
     running_price = st.number_input("Harga Running XAUUSD:", value=float(xau_live_price), step=0.5)
     dxy_running_price = st.number_input("Harga Running DXY (Dollar Index):", value=float(dxy_live_price), step=0.05)
 
 # ==========================================
-# 5. CALENDAR DATA CACHE
+# 4. CALENDAR DATA CACHE
 # ==========================================
 @st.cache_data(ttl=86400, show_spinner="Mengambil data Kalender Ekonomi...")
 def fetch_full_month_calendar(bln_num, thn_num):
@@ -647,28 +538,28 @@ elif "Force Bullish" in market_condition:
 else:
     is_bullish = (int(running_price * 10) % 2 != 0)
 
-# KORELASI TERBALIK XAUUSD DAN DXY BERDASARKAN DYNAMIC PINE SCRIPT LIQUIDITY ZONES
+# KORELASI TERBALIK: DXY HANYA SEBAGAI ACUAN MACRO (NO ENTRY/SL/TP)
 if not is_bullish:
     # XAU Bearish -> DXY Bullish
     tech_action_xau = "🔴 SELL LIMIT / PREMIUM REJECTION"
-    tech_entry_xau = xau_upper_liq[0]
-    tech_sl_xau = round(xau_upper_liq[1] + 6.0, 2)
-    tech_tp_xau = round(xau_lower_liq[0] - 30.0, 2)
+    tech_entry_xau = running_price + 3.00
+    tech_sl_xau = tech_entry_xau + 7.50
+    tech_tp_xau = tech_entry_xau - 42.00
 
     dxy_bias_text = "BULLISH (EXPANSION)"
-    dxy_status_text = f"Mendekati Area Liquidation Supply ({dxy_upper_liq[0]:.2f} - {dxy_upper_liq[1]:.2f})"
+    dxy_status_text = f"Mendekati Area Liquidation Supply ({dxy_running_price + 0.15:.2f} - {dxy_running_price + 0.25:.2f})"
 else:
     # XAU Bullish -> DXY Bearish
     tech_action_xau = "🟢 BUY LIMIT / DISCOUNT REJECTION"
-    tech_entry_xau = xau_lower_liq[1]
-    tech_sl_xau = round(xau_lower_liq[0] - 6.0, 2)
-    tech_tp_xau = round(xau_upper_liq[1] + 30.0, 2)
+    tech_entry_xau = running_price - 3.00
+    tech_sl_xau = running_price - 7.50
+    tech_tp_xau = running_price + 42.00
 
     dxy_bias_text = "BEARISH (REJECTION)"
-    dxy_status_text = f"Mendekati Area Liquidation Demand ({dxy_lower_liq[0]:.2f} - {dxy_lower_liq[1]:.2f})"
+    dxy_status_text = f"Mendekati Area Liquidation Demand ({dxy_running_price - 0.25:.2f} - {dxy_running_price - 0.15:.2f})"
 
 # ==========================================
-# FUNGSI KALKULASI REKAP MACRO DIVERGENCE & GEOPOLITIK
+# FUNGSI KALKULASI REKAP NAMA INDIKATOR SPESIFIK
 # ==========================================
 def calculate_macro_divergence(ind1_info, ind2_info, ind3_info, ind4_info, main_news_name, is_future):
     def parse_num(val):
@@ -738,9 +629,9 @@ def fetch_geopolitical_analysis(event_name, actual_val, forecast_val):
 
     Format jawaban HARUS JSON MURNI tanpa markdown:
     {{
-        "isu_utama": "Eskalasi Selat Hormuz & Ancaman Rudal Iran",
-        "ringkasan_situasi": "Eskalasi militer di Selat Hormuz mendongkrak minat beli aset safe haven.",
-        "dampak_usd": "USD menguat terbatas terdorong arus safe-haven.",
+        "isu_utama": "Eskalasi Perang Dagang AS-Tiongkok & Ketegangan Timur Tengah",
+        "ringkasan_situasi": "Eskalasi militer dan perang tarif memperketat distribusi global serta mendongkrak minat beli safe haven.",
+        "dampak_usd": "USD melemah terbatas namun tetap stabil terdorong arus safe-haven.",
         "dampak_xau": "XAUUSD sangat kuat didukung oleh lonjakan permintaan hedging safe-haven."
     }}
     """
@@ -759,16 +650,16 @@ def fetch_geopolitical_analysis(event_name, actual_val, forecast_val):
         pass
 
     return {
-        "isu_utama": "Ketegangan Selat Hormuz & Eskalasi Perang Timur Tengah",
-        "ringkasan_situasi": "Eskalasi militer memperketat jalur distribusi minyak global dan mendongkrak safe haven.",
-        "dampak_usd": "USD menguat terbatas terdorong arus safe-haven.",
+        "isu_utama": "Perang Dagang AS-Tiongkok & Ketegangan Geopolitik Global",
+        "ringkasan_situasi": "Eskalasi perang tarif dan geopolitik memperketat distribusi global serta mendongkrak minat beli safe haven.",
+        "dampak_usd": "USD melemah terbatas namun tetap stabil terdorong arus safe-haven.",
         "dampak_xau": "XAUUSD sangat kuat didukung oleh lonjakan permintaan hedging safe-haven."
     }
 
 # ==========================================
-# 6. DASHBOARD UI MAIN LAYOUT
+# 5. DASHBOARD UI
 # ==========================================
-st.title("📈 ABEL FX - Macro, Astrodox & Dynamic Liquidity Engine")
+st.title("📈 ABEL FX - Macro & Astrodox Predictor Engine")
 
 status_text = "[ ✅ SUDAH RILIS ]" if ind_data["status_rilis"] == "SUDAH RILIS" else f"[ ⏳ BELUM RILIS ({tanggal_rilis} {bulan_rilis} {tahun_rilis} {jam_rilis_formatted}) ]"
 
@@ -835,8 +726,12 @@ st.warning(f"""
 
 st.markdown("---")
 
+# SAFE VARIABLE ASSIGNMENT UNTUK AI SYSTEM PROMPT
+safe_xau_atr = xau_atr if xau_atr is not None else 15.00
+safe_dxy_atr = dxy_atr if dxy_atr is not None else 0.50
+
 if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", type="primary", use_container_width=True):
-    with st.spinner("Sintesis Data Makro + Astrodox Aspect Weights + Geopolitik + SMC Dynamic Liquidity..."):
+    with st.spinner("Sintesis Data Makro + Astrodox Aspect Weights + Geopolitik + SMC Technical Structure..."):
         
         ind1_current = {**ind_data.get("ind_1", {}), "actual": final_act1}
         ind2_current = {**ind_data.get("ind_2", {}), "actual": final_act2}
@@ -856,13 +751,10 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
         Kamu adalah Senior Quantitative Trader, Macro Analyst & Financial Astrologer spesialis XAUUSD & DXY.
         Sintesiskan Data Makro + Bobot Garis Aspek Astrodox + Geopolitik + SMC Technical Structure menjadi ESTIMASI RANGE PIPS PRESISI, WHIPSAW WARNING, ZONA ENTRY, SL, DAN TP KHUSUS UTAMA UNTUK XAUUSD (Gunakan DXY hanya sebagai acuan korelasi intermarket tanpa memberikan zona transaksi DXY).
 
-        [INPUT DATA REAL-TIME & DYNAMIC LIQUIDITY ZONES]
+        [INPUT DATA REAL-TIME]
         - Target Event: {target_news} ({status_text})
-        - Running Price XAUUSD: {running_price} (ATR: {xau_atr:.2f})
-        - Dynamic Liquidity Supply (Buy-side Liq XAU): {xau_upper_liq[0]} - {xau_upper_liq[1]}
-        - Dynamic Liquidity Demand (Sell-side Liq XAU): {xau_lower_liq[0]} - {xau_lower_liq[1]}
-        - Running Price DXY: {dxy_running_price}
-        - Dynamic Liquidity Zone DXY: Upper ({dxy_upper_liq[0]} - {dxy_upper_liq[1]}) | Lower ({dxy_lower_liq[0]} - {dxy_lower_liq[1]})
+        - Running Price XAUUSD: {running_price} (ATR: {safe_xau_atr:.2f})
+        - Running Price DXY: {dxy_running_price} (ATR: {safe_dxy_atr:.2f})
         - Posisi Planet Astrodox: {json.dumps(astro_positions_dict)}
         - Hitungan Garis Aspek Astrodox Active:
             * Merah (Square 90° / Opposite 180° - Volatilitas/Tension): {temp_counts['merah']} garis
@@ -875,7 +767,7 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
         - Isu Geopolitik: {geo_info.get('isu_utama')} - {geo_info.get('ringkasan_situasi')}
 
         [INSTRUKSI ENGINE AI]
-        1. Baca Garis Astro Dominan dan batas Zona Likuiditas Atas/Bawah.
+        1. Baca Garis Astro Dominan.
         2. Tentukan Bias Trend, Zona Entry Presisi, SL, dan TP KHUSUS UNTUK XAUUSD berdasarkan konvergensi Astro + SMC (DXY dipakai murni untuk konfirmasi korelasi).
         3. Berikan jawaban HANYA dalam format JSON MURNI tanpa markdown tambahan:
 
@@ -892,12 +784,12 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
             "logika_entry_detail": "Penjelasan alasan penentuan angka range Pips dan titik Sweep Liquidity berdasarkan SMC.",
             "setup_spesifik": {{
                 "tipe_eksekusi": "Buy Limit / Sell Limit / Two-Sided Breakout",
-                "zona_buy_demand": "{xau_lower_liq[0]:.2f} - {xau_lower_liq[1]:.2f}",
-                "zona_sell_supply": "{xau_upper_liq[0]:.2f} - {xau_upper_liq[1]:.2f}",
-                "sl_buy": "{xau_lower_liq[0] - 6.00:.2f}",
-                "sl_sell": "{xau_upper_liq[1] + 6.00:.2f}",
-                "tp_buy": "{xau_upper_liq[1] + 25.00:.2f}",
-                "tp_sell": "{xau_lower_liq[0] - 25.00:.2f}"
+                "zona_buy_demand": "{running_price - 12.00:.2f} - {running_price - 6.00:.2f}",
+                "zona_sell_supply": "{running_price + 6.00:.2f} - {running_price + 12.00:.2f}",
+                "sl_buy": "{running_price - 18.00:.2f}",
+                "sl_sell": "{running_price + 18.00:.2f}",
+                "tp_buy": "{running_price + 30.00:.2f}",
+                "tp_sell": "{running_price + 30.00:.2f}"
             }}
         }}
         """
@@ -922,7 +814,7 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
         except Exception as e:
             st.error(f"Error Koneksi AI Engine: {e}")
 
-# RENDER HASIL REKAP EVALUASI AI
+# RENDER HASIL REKAP EVALUASI
 if st.session_state["ai_result"]:
     res_ai = st.session_state["ai_result"]
     setup_ai = res_ai.get("setup_spesifik", {})
@@ -1009,155 +901,117 @@ fig_astro_unified, img_astro_buf, aspect_counts = generate_astrodox_unified_imag
 )
 
 # ==========================================
-# 7. CONFLUENCE CARDS (DYNAMIC LIQUIDITY CARDS)
+# 6. CONFLUENCE CARDS (XAUUSD & DXY FILTERED)
 # ==========================================
 st.subheader("🎯 MULTI-TIMEFRAME LIQUIDITY & METHOD CONFLUENCE")
 
 col_l, col_m, col_r = st.columns(3)
 
-# ---------------------------------------------------------
-# COLUMN 1: AI Macro & Range Engine
-# ---------------------------------------------------------
 with col_l:
+    st.markdown("### 🤖 AI Macro & Range Engine")
     if st.session_state["ai_result"]:
         ai_bias = st.session_state["ai_result"].get("arah_bias", "NEUTRAL")
         ai_setup = st.session_state["ai_result"].get("setup_spesifik", {})
-        bias_badge = f'<span class="badge-bullish">{ai_bias}</span>' if "BULLISH" in str(ai_bias).upper() else f'<span class="badge-bearish">{ai_bias}</span>'
         
-        st.markdown(f"""
-        <div class="card">
-            <div class="card-title">🤖 AI Macro & Range Engine</div>
-            <p style="font-size: 0.9rem;">• <b>Bias Utama:</b> {bias_badge}</p>
+        st.markdown(f"• **Bias Utama:** `{ai_bias}`")
+        if "NEUTRAL" in str(ai_bias).upper() or "WHIPSAW" in str(ai_bias).upper():
+            st.warning("⚠️ **Waspada Whipsaw Dua Arah**")
+            st.markdown("#### 🟢 ZONA BUY DEMAND")
+            st.info(f"{ai_setup.get('zona_buy_demand')}")
+            st.markdown("#### 🛑 STOP LOSS BUY")
+            st.error(f"{ai_setup.get('sl_buy')}")
+            st.markdown("#### 🏁 TARGET TP BUY")
+            st.success(f"{ai_setup.get('tp_buy')}")
             
-            <p style="font-size: 0.85rem; margin-top: 15px; margin-bottom: 2px;">🟢 <b>ZONA BUY DEMAND</b></p>
-            <div class="zone-box">{ai_setup.get('zona_buy_demand', '-')}</div>
-            
-            <p style="font-size: 0.85rem; margin-top: 15px; margin-bottom: 2px;">🛑 <b>STOP LOSS (SL)</b></p>
-            <div class="sl-box">{ai_setup.get('sl_buy', '-')}</div>
-            
-            <p style="font-size: 0.85rem; margin-top: 15px; margin-bottom: 2px;">🏁 <b>TARGET TP EXPANSION</b></p>
-            <div class="tp-box">{ai_setup.get('tp_buy', '-')}</div>
-        </div>
-        """, unsafe_allow_html=True)
+            st.markdown("---")
+            st.markdown("#### 🔴 ZONA SELL SUPPLY")
+            st.info(f"{ai_setup.get('zona_sell_supply')}")
+            st.markdown("#### 🛑 STOP LOSS SELL")
+            st.error(f"{ai_setup.get('sl_sell')}")
+            st.markdown("#### 🏁 TARGET TP SELL")
+            st.success(f"{ai_setup.get('tp_sell')}")
+        elif "BULLISH" in str(ai_bias).upper():
+            st.markdown("#### 🟢 ZONA BUY DEMAND")
+            st.info(f"{ai_setup.get('zona_buy_demand')}")
+            st.markdown("#### 🛑 STOP LOSS (SL)")
+            st.error(f"{ai_setup.get('sl_buy')}")
+            st.markdown("#### 🏁 TARGET TP EXPANSION")
+            st.success(f"{ai_setup.get('tp_buy')}")
+        else:
+            st.markdown("#### 🔴 ZONA SELL SUPPLY")
+            st.info(f"{ai_setup.get('zona_sell_supply')}")
+            st.markdown("#### 🛑 STOP LOSS (SL)")
+            st.error(f"{ai_setup.get('sl_sell')}")
+            st.markdown("#### 🏁 TARGET TP EXPANSION")
+            st.success(f"{ai_setup.get('tp_sell')}")
     else:
-        st.markdown(f"""
-        <div class="card">
-            <div class="card-title">🤖 AI Macro & Range Engine</div>
-            <p style="font-size: 0.9rem;">• <b>Bias Utama:</b> <span class="badge-bullish">BULLISH</span></p>
-            
-            <p style="font-size: 0.85rem; margin-top: 15px; margin-bottom: 2px;">🟢 <b>ZONA BUY DEMAND</b></p>
-            <div class="zone-box">{xau_lower_liq[0]:.2f} - {xau_lower_liq[1]:.2f}</div>
-            
-            <p style="font-size: 0.85rem; margin-top: 15px; margin-bottom: 2px;">🛑 <b>STOP LOSS (SL)</b></p>
-            <div class="sl-box">{xau_lower_liq[0] - 6.0:.2f}</div>
-            
-            <p style="font-size: 0.85rem; margin-top: 15px; margin-bottom: 2px;">🏁 <b>TARGET TP EXPANSION</b></p>
-            <div class="tp-box">{xau_upper_liq[1] + 25.0:.2f}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.caption("Klik tombol 'EXECUTE MULTI-TF AI PREDICTION' untuk mengaktifkan AI Range Engine.")
 
-# ---------------------------------------------------------
-# COLUMN 2: Astrodox Engine
-# ---------------------------------------------------------
 with col_m:
+    st.markdown("### 🔮 Astrodox Engine")
     if astrodox_active:
-        astro_sl_val = xau_lower_liq[0] - 6.00
-        astro_tp_val = xau_upper_liq[1] + 25.00
+        st.markdown(f"• Merah (Square/Opp) : **{aspect_counts['merah']}**")
+        st.markdown(f"• Hijau (Trine)     : **{aspect_counts['hijau']}**")
+        st.markdown(f"• Biru (Sextile)    : **{aspect_counts['biru']}**")
+        st.markdown(f"• Kuning (Conjn)    : **{aspect_counts['kuning']}**")
+        
+        st.markdown("#### 🎯 ZONA BIAS ASTRO")
+        astro_entry_zone = f"{running_price - 3.00:.2f} - {running_price + 3.00:.2f}"
+        st.info(astro_entry_zone)
+        
         if st.session_state["ai_result"]:
             ast_setup = st.session_state["ai_result"].get("setup_spesifik", {})
             ai_b_check = str(st.session_state["ai_result"].get("arah_bias", "")).upper()
+            
             if "BEARISH" in ai_b_check:
-                astro_sl_val = ast_setup.get('sl_sell', astro_sl_val)
-                astro_tp_val = ast_setup.get('tp_sell', astro_tp_val)
+                st.markdown("#### 🛑 STOP LOSS ASTRO (SELL)")
+                st.error(f"{ast_setup.get('sl_sell')}")
+                st.markdown("#### 🏁 TARGET TP ASTRO (SELL)")
+                st.success(f"{ast_setup.get('tp_sell')}")
             else:
-                astro_sl_val = ast_setup.get('sl_buy', astro_sl_val)
-                astro_tp_val = ast_setup.get('tp_buy', astro_tp_val)
-
-        st.markdown(f"""
-        <div class="card">
-            <div class="card-title">🔮 Astrodox Engine</div>
-            <ul style="font-size: 0.85rem; padding-left: 18px; margin-bottom: 15px; color: #cbd5e1;">
-                <li><b>Merah (Square/Opp):</b> {aspect_counts['merah']}</li>
-                <li><b>Hijau (Trine):</b> {aspect_counts['hijau']}</li>
-                <li><b>Biru (Sextile):</b> {aspect_counts['biru']}</li>
-                <li><b>Kuning (Conjn):</b> {aspect_counts['kuning']}</li>
-            </ul>
-            
-            <p style="font-size: 0.85rem; margin-bottom: 2px;">🎯 <b>ZONA BIAS ASTRO</b></p>
-            <div class="zone-box">{running_price - 3.00:.2f} - {running_price + 3.00:.2f}</div>
-            
-            <p style="font-size: 0.85rem; margin-top: 15px; margin-bottom: 2px;">🛑 <b>STOP LOSS ASTRO</b></p>
-            <div class="sl-box">{astro_sl_val}</div>
-            
-            <p style="font-size: 0.85rem; margin-top: 15px; margin-bottom: 2px;">🏁 <b>TARGET TP ASTRO</b></p>
-            <div class="tp-box">{astro_tp_val}</div>
-        </div>
-        """, unsafe_allow_html=True)
+                st.markdown("#### 🛑 STOP LOSS ASTRO (BUY)")
+                st.error(f"{ast_setup.get('sl_buy')}")
+                st.markdown("#### 🏁 TARGET TP ASTRO (BUY)")
+                st.success(f"{ast_setup.get('tp_buy')}")
+        else:
+            st.markdown("#### 🛑 STOP LOSS & TP")
+            st.caption("Menunggu hasil AI Proyeksi Range...")
     else:
         st.info("Astrodox Engine OFF")
 
-# ---------------------------------------------------------
-# COLUMN 3: Multi-TF Technical Engine (XAU & DXY)
-# ---------------------------------------------------------
 with col_r:
+    st.markdown("### 📐 Multi-TF Technical Engine (XAU & DXY)")
     if tech_active:
-        xau_badge = '<span class="badge-bearish">BEARISH (REJECTION)</span>' if not is_bullish else '<span class="badge-bullish">BULLISH (EXPANSION)</span>'
-        dxy_badge = '<span class="badge-bullish">BULLISH (EXPANSION)</span>' if not is_bullish else '<span class="badge-bearish">BEARISH (REJECTION)</span>'
-        
-        liq_reason_text = f"Mendekati Area Liquidation Supply ({xau_upper_liq[0]:.2f} - {xau_upper_liq[1]:.2f}). Berpotensi memicu Sweep Liquidity sebelum pergerakan reversal." if not is_bullish else f"Mendekati Area Liquidation Demand ({xau_lower_liq[0]:.2f} - {xau_lower_liq[1]:.2f}). Berpotensi memicu Sweep Liquidity sebelum pergerakan reversal."
+        # XAUUSD SECTION (MAPPING EKSEKUSI TUNGGAL)
+        st.markdown("#### 🥇 XAUUSD ANALYSIS")
+        if not is_bullish:
+            st.markdown("🔴 **ARAH BIAS XAU:** BEARISH (REJECTION)")
+        else:
+            st.markdown("🟢 **ARAH BIAS XAU:** BULLISH (EXPANSION)")
+        st.caption(f"Eksekusi: **{tech_action_xau}**")
+        st.markdown("🎯 **Zona Entry XAU:**")
+        st.info(f"{tech_entry_xau - 1.00:.2f} - {tech_entry_xau + 1.50:.2f}")
+        st.markdown(f"🛑 **SL XAU:** `{tech_sl_xau:.2f}` | 🏁 **TP XAU:** `{tech_tp_xau:.2f}`")
 
-        st.markdown(f"""
-        <div class="card">
-            <div class="card-title">📐 Multi-TF Technical Engine (XAU & DXY)</div>
-            
-            <!-- SECTION 1: XAUUSD ANALYSIS -->
-            <p style="font-size: 1rem; font-weight: bold; margin-bottom: 5px;">🥇 XAUUSD ANALYSIS</p>
-            <p style="font-size: 0.85rem; margin-bottom: 3px;">
-                🔴 <b>ARAH BIAS XAU:</b> {xau_badge}
-            </p>
-            <p style="font-size: 0.8rem; color: #9ca3af; margin-bottom: 10px;">
-                Eksekusi: {tech_action_xau}
-            </p>
-            
-            <p style="font-size: 0.85rem; margin-bottom: 2px;">🎯 <b>Zona Entry XAU:</b></p>
-            <div class="zone-box">{tech_entry_xau - 1.00:.2f} - {tech_entry_xau + 1.50:.2f}</div>
-            
-            <!-- KOLOM SL & TP TEKNIKAL (In-line Style) -->
-            <div class="sltp-inline">
-                <div class="sltp-item sl-inline">
-                    <span>🛑 SL XAU:</span> <span>{tech_sl_xau:.2f}</span>
-                </div>
-                <div class="sltp-item tp-inline">
-                    <span>🏁 TP XAU:</span> <span>{tech_tp_xau:.2f}</span>
-                </div>
-            </div>
-            
-            <!-- LIQUIDITY AS REASON FOR XAU -->
-            <div class="liquidity-box">
-                📌 <b>Status Liquidity (Confluence Reason):</b><br/>
-                {liq_reason_text}
-            </div>
-            
-            <hr style="border: 0; border-top: 1px solid #30363d; margin: 18px 0 14px 0;">
-            
-            <!-- SECTION 2: DXY DIRECTIONAL VALIDATION -->
-            <p style="font-size: 1rem; font-weight: bold; margin-bottom: 5px;">💵 DXY (DOLLAR INDEX) ANALYSIS & ACUAN</p>
-            <p style="font-size: 0.85rem; margin-bottom: 8px;">
-                🟢 <b>ARAH BIAS DXY:</b> {dxy_badge}
-            </p>
-            
-            <p style="font-size: 0.78rem; color: #fbbf24; margin-top: 12px; line-height: 1.4;">
-                ⚠️ <i>DXY murni dipakai sebagai acuan korelasi macro intermarket ({dxy_status_text}). Tidak ada Zona Entry, SL, atau TP yang dirender untuk DXY.</i>
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("---")
+
+        # DXY SECTION (MURNI ACUAN INTERMARKET - TANPA ZONA ENTRY/SL/TP)
+        st.markdown("#### 💵 DXY (DOLLAR INDEX) ANALYSIS & ACUAN")
+        if not is_bullish:
+            st.markdown("🟢 **ARAH BIAS DXY:** BULLISH (EXPANSION)")
+        else:
+            st.markdown("🔴 **ARAH BIAS DXY:** BEARISH (REJECTION)")
+        
+        st.info(f"📌 **Status Liquidity DXY:** {dxy_status_text}")
+        st.caption("⚠️ *DXY murni dipakai sebagai acuan korelasi macro intermarket. Tidak ada Zona Entry, SL, atau TP yang dirender untuk DXY.*")
+
     else:
         st.info("Technical Engine OFF")
 
 st.markdown("---")
 
 # ==========================================
-# 8. ASTRODOX UNIFIED SECTION & ZOOM DIALOG
+# 7. ASTRODOX UNIFIED SECTION & ZOOM DIALOG
 # ==========================================
 st.subheader("🔮 ASTRODOX TRANSIT WHEEL & AI RANGE INTEGRATED ANALYSIS")
 
@@ -1184,7 +1038,7 @@ with col_d2:
 st.markdown("---")
 
 # ==========================================
-# 9. LIVE CHART TRADINGVIEW
+# 8. LIVE CHART TRADINGVIEW
 # ==========================================
 st.subheader("📉 LIVE CHART TRADINGVIEW (INTERACTIVE)")
 
