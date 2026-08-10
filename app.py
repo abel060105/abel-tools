@@ -44,7 +44,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Integrated Keys
 FMP_API_KEY = "Wr5uNw4BQAo5syaNYXylIqcg8908kPd5"
+NINJAS_API_KEY = "vxwYGQu3VjAJGQdJpaes95RN7YyZu1tvdEMNkC5j"
 FINNHUB_TOKEN = "d9saqq9r01qopv46igd9saqq9r01qopv46gkj0"
 GROQ_API_KEY = "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"
 
@@ -62,6 +64,34 @@ if "macro_bias_result" not in st.session_state:
     st.session_state["macro_bias_result"] = ""
 if "score_val" not in st.session_state:
     st.session_state["score_val"] = 0
+
+# ==========================================
+# DUAL API REALTIME XAUUSD FETCH
+# ==========================================
+def fetch_live_xauusd_price():
+    """Ambil harga XAUUSD secara otomatis via API Ninjas (Primary) -> FMP (Fallback)"""
+    try:
+        url_ninjas = "https://api.api-ninjas.com/v1/commodityprice?name=gold"
+        headers = {"X-Api-Key": NINJAS_API_KEY}
+        res = requests.get(url_ninjas, headers=headers, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            if "price" in data:
+                return float(data["price"]), "API Ninjas (Realtime)"
+    except Exception:
+        pass
+
+    try:
+        url_fmp = f"https://financialmodelingprep.com/api/v3/quote/XAUUSD?apikey={FMP_API_KEY}"
+        res = requests.get(url_fmp, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            if isinstance(data, list) and len(data) > 0 and "price" in data[0]:
+                return float(data[0]["price"]), "Financial Modeling Prep (Realtime)"
+    except Exception:
+        pass
+
+    return None, "Gagal mengambil data dari kedua API"
 
 # ==========================================
 # 2. BUILT-IN ASTRODOX ENGINE & CHART
@@ -119,7 +149,6 @@ def generate_astrodox_unified_image(target_date: datetime, ai_result_data=None):
 
     fig = plt.figure(figsize=(18.0, 9.5), facecolor='#0e1117')
     
-    # Polar Wheel
     ax = fig.add_subplot(121, polar=True, facecolor='#0e1117')
     ax.set_theta_zero_location("W")
     ax.set_theta_direction(-1)
@@ -316,7 +345,29 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("### 6. Price Reference")
-    running_price = st.number_input("Harga Running XAUUSD:", value=4314.00, step=0.5)
+    
+    if "running_price" not in st.session_state:
+        st.session_state["running_price"] = 4314.00
+
+    col_p1, col_p2 = st.columns([2, 1])
+    with col_p1:
+        st.caption("Auto-Fetch Harga XAUUSD Live")
+    with col_p2:
+        if st.button("⚡ Live Price", use_container_width=True):
+            with st.spinner("Fetching..."):
+                price, source = fetch_live_xauusd_price()
+                if price:
+                    st.session_state["running_price"] = price
+                    st.toast(f"Harga updated: {price} via {source}", icon="✅")
+                else:
+                    st.toast("Gagal ambil harga otomatis. Gunakan input manual.", icon="⚠️")
+
+    running_price = st.number_input(
+        "Harga Running XAUUSD:",
+        value=float(st.session_state["running_price"]),
+        step=0.5
+    )
+    st.session_state["running_price"] = running_price
 
 # ==========================================
 # 4. CALENDAR DATA CACHE
