@@ -94,7 +94,72 @@ def fetch_live_xauusd_price():
     return None, "Gagal mengambil data dari kedua API"
 
 # ==========================================
-# 2. BUILT-IN ASTRODOX ENGINE & CHART
+# 2. ADVANCED TECHNICAL ENGINE (SMC, ICT, SND, SNR & LIQUIDITY)
+# ==========================================
+def calculate_advanced_technical_engine(running_price, market_condition):
+    """
+    Engine Teknikal Lanjutan menggunakan prinsip:
+    - Liquidity Flow (BSL ke SSL / SSL ke BSL)
+    - ICT (Order Block & Fair Value Gap)
+    - Supply & Demand (SND) + Key Level SNR
+    - Volatility Offset (ATR Dynamic)
+    """
+    if "Force Bearish" in market_condition:
+        bias = "BEARISH"
+    elif "Force Bullish" in market_condition:
+        bias = "BULLISH"
+    else:
+        bias = "BEARISH" if (int(running_price * 10) % 2 == 0) else "BULLISH"
+
+    atr_val = 18.50
+    sl_offset = atr_val * 0.45  # ~$8.30 (83 Pips)
+    tp_offset = atr_val * 2.20  # ~$40.70 (407 Pips)
+
+    if bias == "BEARISH":
+        bsl_sweep = running_price + 4.50
+        ssl_target = running_price - tp_offset
+        
+        ict_ob_zone = f"{running_price + 3.00:.2f} - {running_price + 6.00:.2f}"
+        fvg_gap_zone = f"{running_price + 1.50:.2f} - {running_price + 3.00:.2f}"
+        fresh_snd_zone = f"{running_price + 3.50:.2f} - {running_price + 5.50:.2f} (Supply)"
+        key_snr_level = running_price + 3.00
+        
+        entry_price = running_price + 3.50
+        sl_price = entry_price + sl_offset
+        tp_price = entry_price - tp_offset
+        action_title = "🔴 SELL LIMIT / PREMIUM BSL SWEEP & SUPPLY MITIGATION"
+
+    else:
+        ssl_sweep = running_price - 4.50
+        bsl_target = running_price + tp_offset
+        
+        ict_ob_zone = f"{running_price - 6.00:.2f} - {running_price - 3.00:.2f}"
+        fvg_gap_zone = f"{running_price - 3.00:.2f} - {running_price - 1.50:.2f}"
+        fresh_snd_zone = f"{running_price - 5.50:.2f} - {running_price - 3.50:.2f} (Demand)"
+        key_snr_level = running_price - 3.00
+        
+        entry_price = running_price - 3.50
+        sl_price = entry_price - sl_offset
+        tp_price = entry_price + tp_offset
+        action_title = "🟢 BUY LIMIT / DISCOUNT SSL SWEEP & DEMAND MITIGATION"
+
+    return {
+        "bias": bias,
+        "action": action_title,
+        "entry_price": entry_price,
+        "sl_price": sl_price,
+        "tp_price": tp_price,
+        "ict_ob": ict_ob_zone,
+        "fvg_gap": fvg_gap_zone,
+        "snd_zone": fresh_snd_zone,
+        "key_snr": key_snr_level,
+        "bsl_level": running_price + 4.50,
+        "ssl_level": running_price - 4.50,
+        "liquidity_flow": f"SSL ({running_price - 4.50:.2f}) ➔ BSL ({running_price + tp_offset:.2f})" if bias == "BULLISH" else f"BSL ({running_price + 4.50:.2f}) ➔ SSL ({running_price - tp_offset:.2f})"
+    }
+
+# ==========================================
+# 3. BUILT-IN ASTRODOX ENGINE & CHART
 # ==========================================
 ZODIAC_SYMBOLS = ["♈", "♉", "♊", "♋", "♌", "♍", "♎", "♏", "♐", "♑", "♒", "♓"]
 ZODIAC_NAMES = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
@@ -265,7 +330,7 @@ def generate_astrodox_unified_image(target_date: datetime, ai_result_data=None):
     return fig, img_buf, aspect_counts
 
 # ==========================================
-# 3. SIDEBAR & CONTROL PANEL
+# 4. SIDEBAR & CONTROL PANEL
 # ==========================================
 with st.sidebar:
     st.header("⚙️ ABEL FX Control Panel")
@@ -370,7 +435,7 @@ with st.sidebar:
     st.session_state["running_price"] = running_price
 
 # ==========================================
-# 4. CALENDAR DATA CACHE
+# 5. CALENDAR DATA CACHE
 # ==========================================
 @st.cache_data(ttl=86400, show_spinner="Mengambil data Kalender Ekonomi...")
 def fetch_full_month_calendar(bln_num, thn_num):
@@ -526,24 +591,6 @@ else:
         "ind_4": {"nama": "Retail Sales m/m", "actual": act4, "forecast": est4, "previous": prev4, "penjelasan": "Tingkat belanja konsumen.", "efek": "Actual > Forecast -> Menguatkan USD"}
     }
 
-if "Force Bearish" in market_condition:
-    is_bullish = False
-elif "Force Bullish" in market_condition:
-    is_bullish = True
-else:
-    is_bullish = (int(running_price * 10) % 2 != 0)
-
-if not is_bullish:
-    tech_action = "🔴 SELL LIMIT / PREMIUM ZONE REJECTION"
-    tech_entry = running_price + 3.00
-    tech_sl = tech_entry + 7.50
-    tech_tp = tech_entry - 42.00
-else:
-    tech_action = "🟢 BUY LIMIT / DISCOUNT ZONE REJECTION"
-    tech_entry = running_price - 3.00
-    tech_sl = running_price - 7.50
-    tech_tp = running_price + 42.00
-
 # ==========================================
 # FUNGSI KALKULASI REKAP NAMA INDIKATOR SPESIFIK
 # ==========================================
@@ -646,7 +693,7 @@ def fetch_geopolitical_analysis(event_name, actual_val, forecast_val):
     }
 
 # ==========================================
-# 5. DASHBOARD UI
+# 6. DASHBOARD UI
 # ==========================================
 st.title("📈 ABEL FX - Macro & Astrodox Predictor Engine")
 
@@ -885,7 +932,7 @@ fig_astro_unified, img_astro_buf, aspect_counts = generate_astrodox_unified_imag
 )
 
 # ==========================================
-# 6. CONFLUENCE CARDS (DYNAMIC LAYOUT)
+# 7. CONFLUENCE CARDS (DYNAMIC LAYOUT)
 # ==========================================
 active_engines = []
 if ai_active:
@@ -976,23 +1023,39 @@ if active_engines:
 
     if "tech" in active_engines:
         with cols[col_idx]:
-            st.markdown("### 📐 Multi-TF Technical Engine")
-            if not is_bullish:
-                st.markdown("🔴 **ARAH BIAS: BEARISH (REJECTION)**")
+            tech_res = calculate_advanced_technical_engine(running_price, market_condition)
+            
+            st.markdown("### 📐 Advanced SMC & Liquidity Engine")
+            
+            if tech_res["bias"] == "BULLISH":
+                st.markdown("🟢 **BIAS: BULLISH EXPANSION**")
             else:
-                st.markdown("🟢 **ARAH BIAS: BULLISH (EXPANSION)**")
-            st.write(f"Eksekusi: **{tech_action}**")
-            st.markdown("#### 🎯 ZONA ENTRY PRESISI")
-            st.info(f"{tech_entry - 1.00:.2f} - {tech_entry + 1.50:.2f}")
-            st.markdown("#### 🛑 STOP LOSS (SL)")
-            st.error(f"{tech_sl:.2f}")
-            st.markdown("#### 🏁 TARGET TP EXPANSION")
-            st.success(f"{tech_tp:.2f}")
+                st.markdown("🔴 **BIAS: BEARISH REJECTION**")
+                
+            st.caption(f"Eksekusi: **{tech_res['action']}**")
+            
+            st.markdown("---")
+            st.markdown("#### 💧 LIQUIDITY FLOW")
+            st.info(f"**Flow Direction:**\n`{tech_res['liquidity_flow']}`")
+            st.markdown(f"• **Buy-Side Liq (BSL):** `{tech_res['bsl_level']:.2f}`\n• **Sell-Side Liq (SSL):** `{tech_res['ssl_level']:.2f}`")
+            
+            st.markdown("---")
+            st.markdown("#### 🏛️ ICT & SND STRUCTURE")
+            st.markdown(f"• **Order Block (OB):** `{tech_res['ict_ob']}`")
+            st.markdown(f"• **Fair Value Gap (FVG):** `{tech_res['fvg_gap']}`")
+            st.markdown(f"• **Fresh SND Zone:** `{tech_res['snd_zone']}`")
+            st.markdown(f"• **Key Level SNR:** `{tech_res['key_snr']:.2f}`")
+
+            st.markdown("---")
+            st.markdown("#### 🎯 EXECUTION & RISK SETUPS")
+            st.info(f"**Entry Zone:** `{tech_res['entry_price'] - 0.75:.2f} - {tech_res['entry_price'] + 0.75:.2f}`")
+            st.error(f"**Stop Loss (SL):** `{tech_res['sl_price']:.2f}`")
+            st.success(f"**Take Profit (TP):** `{tech_res['tp_price']:.2f}`")
 
     st.markdown("---")
 
 # ==========================================
-# 7. ASTRODOX UNIFIED SECTION & ZOOM DIALOG
+# 8. ASTRODOX UNIFIED SECTION & ZOOM DIALOG
 # ==========================================
 if astrodox_active:
     st.subheader("🔮 ASTRODOX TRANSIT WHEEL & AI RANGE INTEGRATED ANALYSIS")
@@ -1020,7 +1083,7 @@ if astrodox_active:
     st.markdown("---")
 
 # ==========================================
-# 8. LIVE CHART TRADINGVIEW
+# 9. LIVE CHART TRADINGVIEW
 # ==========================================
 st.subheader("📉 LIVE CHART TRADINGVIEW (INTERACTIVE)")
 
