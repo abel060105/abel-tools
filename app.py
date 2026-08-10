@@ -1,7 +1,6 @@
 import os
 import json
 import io
-import time
 import calendar
 import requests
 import numpy as np
@@ -321,24 +320,6 @@ def generate_astrodox_unified_image(target_date: datetime, ai_result_data=None):
 with st.sidebar:
     st.header("⚙️ ABEL FX Control Panel")
     
-    # --- FITUR BARU: TOMBOL UPDATE MANUAL & AUTO REFRESH TOGGLE ---
-    st.markdown("### 🔄 Kontrol Update Data")
-    
-    # Tombol Update Manual
-    if st.button("⚡ UPDATE SEKARANG", type="primary", use_container_width=True):
-        st.rerun()
-
-    # Toggle Auto-Refresh On/Off
-    auto_refresh_on = st.toggle("Aktifkan Auto-Refresh", value=False)
-    refresh_interval = st.slider("Interval Refresh (Detik):", min_value=5, max_value=300, value=30, step=5)
-
-    if auto_refresh_on:
-        st.caption(f"🔄 Auto-refresh aktif setiap {refresh_interval} detik.")
-        time.sleep(refresh_interval)
-        st.rerun()
-    # -------------------------------------------------------------
-    
-    st.markdown("---")
     st.markdown("### 1. Target Main Big News")
     target_news = st.selectbox(
         "Pilih Target Big News:",
@@ -876,6 +857,7 @@ if st.session_state["ai_result"]:
     setup_ai = res_ai.get("setup_spesifik", {})
     pips_ai = res_ai.get("proyeksi_pips", {})
 else:
+    # Generate rekap otomatis walau tombol AI belum diklik agar langsung menyesuaikan target_news
     ind1_current = {**ind_data.get("ind_1", {}), "actual": final_act1}
     ind2_current = {**ind_data.get("ind_2", {}), "actual": final_act2}
     ind3_current = {**ind_data.get("ind_3", {}), "actual": final_act3}
@@ -1093,30 +1075,20 @@ if active_engines:
     st.markdown("---")
 
 # ==========================================
-# 8. ASTRODOX UNIFIED SECTION & ZOOM DIALOG
+# 8. ASTRODOX UNIFIED SECTION & DOWNLOAD BUTTON
 # ==========================================
 if astrodox_active:
     st.subheader("🔮 ASTRODOX TRANSIT WHEEL & AI RANGE INTEGRATED ANALYSIS")
 
     st.pyplot(fig_astro_unified, use_container_width=True)
 
-    @st.dialog("🔍 High-Resolution Astrodox & AI Range Chart (Zoom View)", width="large")
-    def show_zoomed_chart(image_bytes):
-        st.image(image_bytes, use_column_width=True)
-
-    col_d1, col_d2 = st.columns(2)
-    with col_d1:
-        if st.button("🔍 Zoom / Perbesar Tampilan Gambar", use_container_width=True):
-            show_zoomed_chart(img_astro_buf)
-
-    with col_d2:
-        st.download_button(
-            label="📥 Download Roda Astrodox & AI Proyeksi Range (.png)",
-            data=img_astro_buf,
-            file_name=f"Astrodox_AI_Range_{event_datetime.strftime('%Y%m%d_%H%M')}.png",
-            mime="image/png",
-            use_container_width=True
-        )
+    st.download_button(
+        label="📥 Download Roda Astrodox & AI Proyeksi Range (.png)",
+        data=img_astro_buf,
+        file_name=f"Astrodox_AI_Range_{event_datetime.strftime('%Y%m%d_%H%M')}.png",
+        mime="image/png",
+        use_container_width=True
+    )
 
     st.markdown("---")
 
