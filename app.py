@@ -846,6 +846,15 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
         except Exception as e:
             st.error(f"Error Koneksi AI Engine: {e}")
 
+# Cek apakah target news berubah, jika berubah reset session AI agar tidak nyangkut
+if "last_target_news" not in st.session_state:
+    st.session_state["last_target_news"] = target_news
+
+if st.session_state["last_target_news"] != target_news:
+    st.session_state["ai_result"] = None
+    st.session_state["last_target_news"] = target_news
+    st.rerun()
+
 # RENDER HASIL REKAP EVALUASI
 if st.session_state["ai_result"]:
     res_ai = st.session_state["ai_result"]
@@ -853,9 +862,9 @@ if st.session_state["ai_result"]:
     pips_ai = res_ai.get("proyeksi_pips", {})
     
     if is_future_event:
-        st.subheader("📋 Analysis & Proyeksi Data Pendukung (Pre-Rilis)")
+        st.subheader(f"📋 Analysis & Proyeksi Data Pendukung ({target_news} - Pre-Rilis)")
     else:
-        st.subheader("📋 Rekap Evaluasi Data Pendukung & Rilis News (Post-Rilis)")
+        st.subheader(f"📋 Rekap Evaluasi Data Pendukung & Rilis News ({target_news} - Post-Rilis)")
 
     st.markdown(st.session_state["rekap_text"])
     st.info(f"⚖️ **Kesimpulan Bias Makro:** {st.session_state['macro_bias_result']} (Score Net: {st.session_state['score_val']})")
