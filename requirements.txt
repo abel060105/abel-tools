@@ -4,3 +4,4 @@ pandas
 matplotlib
 numpy
 python-telegram-bot
+yfinance
