@@ -8,7 +8,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import streamlit as st
 import streamlit.components.v1 as components
-import yfinance as yf
 from datetime import datetime, timezone, timedelta
 
 # ==========================================
@@ -63,64 +62,6 @@ if "macro_bias_result" not in st.session_state:
     st.session_state["macro_bias_result"] = ""
 if "score_val" not in st.session_state:
     st.session_state["score_val"] = 0
-
-# ==========================================
-# FUNGSIONALITAS YFINANCE & ZONA LIKUIDITAS
-# ==========================================
-def calculate_liquidity_zones(symbol_ticker):
-    """
-    Mengambil data historical dari yfinance dan menghitung ATR serta Liquidity Zones.
-    """
-    try:
-        data = yf.download(symbol_ticker, period="5d", interval="1h", progress=False)
-        if data.empty or len(data) < 14:
-            return None, None, None, None
-
-        # Menghitung ATR (Average True Range) - 14 Period
-        data['High-Low'] = data['High'] - data['Low']
-        data['High-PC'] = abs(data['High'] - data['Close'].shift(1))
-        data['Low-PC'] = abs(data['Low'] - data['Close'].shift(1))
-        data['TR'] = data[['High-Low', 'High-PC', 'Low-PC']].max(axis=1)
-        data['ATR'] = data['TR'].rolling(window=14).mean()
-
-        latest_close = float(data['Close'].iloc[-1].item() if hasattr(data['Close'].iloc[-1], 'item') else data['Close'].iloc[-1])
-        latest_atr = float(data['ATR'].iloc[-1].item() if hasattr(data['ATR'].iloc[-1], 'item') else data['ATR'].iloc[-1])
-
-        # Zona Likuiditas sederhana berbasis Swing High / Swing Low
-        high_max = float(data['High'].tail(24).max().item() if hasattr(data['High'].tail(24).max(), 'item') else data['High'].tail(24).max())
-        low_min = float(data['Low'].tail(24).min().item() if hasattr(data['Low'].tail(24).min(), 'item') else data['Low'].tail(24).min())
-
-        upper_zone = (round(high_max, 2), round(high_max + (latest_atr * 0.5), 2))
-        lower_zone = (round(low_min - (latest_atr * 0.5), 2), round(low_min, 2))
-
-        return latest_close, latest_atr, upper_zone, lower_zone
-
-    except Exception:
-        return None, None, None, None
-
-# Fetch Realtime Data via yfinance
-xau_live_price, xau_atr, xau_upper_liq, xau_lower_liq = calculate_liquidity_zones("GC=F")
-dxy_live_price, dxy_atr, dxy_upper_liq, dxy_lower_liq = calculate_liquidity_zones("DX-Y.NYB")
-
-# Fallback Safety jika API yfinance timeout / delay / mengembalikan None
-if xau_live_price is None:
-    xau_live_price = 4314.00
-if xau_atr is None:
-    xau_atr = 15.00
-if xau_upper_liq is None:
-    xau_upper_liq = (4322.00, 4326.00)
-if xau_lower_liq is None:
-    xau_lower_liq = (4302.00, 4306.00)
-
-if dxy_live_price is None:
-    dxy_live_price = 104.20
-if dxy_atr is None:
-    dxy_atr = 0.50
-if dxy_upper_liq is None:
-    dxy_upper_liq = (104.35, 104.45)
-if dxy_lower_liq is None:
-    dxy_lower_liq = (103.95, 104.05)
-
 
 # ==========================================
 # 2. BUILT-IN ASTRODOX ENGINE & CHART
@@ -371,8 +312,8 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("### 5. Price Reference")
-    running_price = st.number_input("Harga Running XAUUSD:", value=float(xau_live_price), step=0.5)
-    dxy_running_price = st.number_input("Harga Running DXY (Dollar Index):", value=float(dxy_live_price), step=0.05)
+    running_price = st.number_input("Harga Running XAUUSD:", value=4314.00, step=0.5)
+    dxy_running_price = st.number_input("Harga Running DXY (Dollar Index):", value=104.20, step=0.05)
 
 # ==========================================
 # 4. CALENDAR DATA CACHE
@@ -629,9 +570,9 @@ def fetch_geopolitical_analysis(event_name, actual_val, forecast_val):
 
     Format jawaban HARUS JSON MURNI tanpa markdown:
     {{
-        "isu_utama": "Eskalasi Perang Dagang AS-Tiongkok & Ketegangan Timur Tengah",
-        "ringkasan_situasi": "Eskalasi militer dan perang tarif memperketat distribusi global serta mendongkrak minat beli safe haven.",
-        "dampak_usd": "USD melemah terbatas namun tetap stabil terdorong arus safe-haven.",
+        "isu_utama": "Eskalasi Selat Hormuz & Ancaman Rudal Iran",
+        "ringkasan_situasi": "Eskalasi militer di Selat Hormuz mendongkrak minat beli aset safe haven.",
+        "dampak_usd": "USD menguat terbatas terdorong arus safe-haven.",
         "dampak_xau": "XAUUSD sangat kuat didukung oleh lonjakan permintaan hedging safe-haven."
     }}
     """
@@ -650,9 +591,9 @@ def fetch_geopolitical_analysis(event_name, actual_val, forecast_val):
         pass
 
     return {
-        "isu_utama": "Perang Dagang AS-Tiongkok & Ketegangan Geopolitik Global",
-        "ringkasan_situasi": "Eskalasi perang tarif dan geopolitik memperketat distribusi global serta mendongkrak minat beli safe haven.",
-        "dampak_usd": "USD melemah terbatas namun tetap stabil terdorong arus safe-haven.",
+        "isu_utama": "Ketegangan Selat Hormuz & Eskalasi Perang Timur Tengah",
+        "ringkasan_situasi": "Eskalasi militer memperketat jalur distribusi minyak global dan mendongkrak safe haven.",
+        "dampak_usd": "USD menguat terbatas terdorong arus safe-haven.",
         "dampak_xau": "XAUUSD sangat kuat didukung oleh lonjakan permintaan hedging safe-haven."
     }
 
@@ -726,10 +667,6 @@ st.warning(f"""
 
 st.markdown("---")
 
-# SAFE VARIABLE ASSIGNMENT UNTUK AI SYSTEM PROMPT
-safe_xau_atr = xau_atr if xau_atr is not None else 15.00
-safe_dxy_atr = dxy_atr if dxy_atr is not None else 0.50
-
 if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", type="primary", use_container_width=True):
     with st.spinner("Sintesis Data Makro + Astrodox Aspect Weights + Geopolitik + SMC Technical Structure..."):
         
@@ -753,8 +690,8 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
 
         [INPUT DATA REAL-TIME]
         - Target Event: {target_news} ({status_text})
-        - Running Price XAUUSD: {running_price} (ATR: {safe_xau_atr:.2f})
-        - Running Price DXY: {dxy_running_price} (ATR: {safe_dxy_atr:.2f})
+        - Running Price XAUUSD: {running_price}
+        - Running Price DXY: {dxy_running_price}
         - Posisi Planet Astrodox: {json.dumps(astro_positions_dict)}
         - Hitungan Garis Aspek Astrodox Active:
             * Merah (Square 90° / Opposite 180° - Volatilitas/Tension): {temp_counts['merah']} garis
