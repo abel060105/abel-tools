@@ -479,6 +479,7 @@ elif "Force Bullish" in market_condition:
 else:
     is_bullish = (int(running_price * 10) % 2 != 0)
 
+# KORELASI TERBALIK: DXY HANYA SEBAGAI ACUAN MACRO (NO ENTRY/SL/TP)
 if not is_bullish:
     # XAU Bearish -> DXY Bullish
     tech_action_xau = "🔴 SELL LIMIT / PREMIUM REJECTION"
@@ -486,10 +487,8 @@ if not is_bullish:
     tech_sl_xau = tech_entry_xau + 7.50
     tech_tp_xau = tech_entry_xau - 42.00
 
-    tech_action_dxy = "🟢 BUY LIMIT / DISCOUNT DEMAND"
-    tech_entry_dxy = dxy_running_price - 0.15
-    tech_sl_dxy = tech_entry_dxy - 0.35
-    tech_tp_dxy = tech_entry_dxy + 1.20
+    dxy_bias_text = "BULLISH (EXPANSION)"
+    dxy_status_text = f"Mendekati Area Liquidation Supply ({dxy_running_price + 0.15:.2f} - {dxy_running_price + 0.25:.2f})"
 else:
     # XAU Bullish -> DXY Bearish
     tech_action_xau = "🟢 BUY LIMIT / DISCOUNT REJECTION"
@@ -497,10 +496,8 @@ else:
     tech_sl_xau = running_price - 7.50
     tech_tp_xau = running_price + 42.00
 
-    tech_action_dxy = "🔴 SELL LIMIT / PREMIUM SUPPLY"
-    tech_entry_dxy = dxy_running_price + 0.15
-    tech_sl_dxy = tech_entry_dxy + 0.35
-    tech_tp_dxy = tech_entry_dxy - 1.20
+    dxy_bias_text = "BEARISH (REJECTION)"
+    dxy_status_text = f"Mendekati Area Liquidation Demand ({dxy_running_price - 0.25:.2f} - {dxy_running_price - 0.15:.2f})"
 
 # ==========================================
 # FUNGSI KALKULASI REKAP NAMA INDIKATOR SPESIFIK
@@ -689,7 +686,7 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
 
         system_prompt = f"""
         Kamu adalah Senior Quantitative Trader, Macro Analyst & Financial Astrologer spesialis XAUUSD & DXY.
-        Sintesiskan Data Makro + Bobot Garis Aspek Astrodox + Geopolitik + SMC Technical Structure menjadi ESTIMASI RANGE PIPS PRESISI, WHIPSAW WARNING, ZONA ENTRY, SL, DAN TP UNTUK XAUUSD DAN DXY.
+        Sintesiskan Data Makro + Bobot Garis Aspek Astrodox + Geopolitik + SMC Technical Structure menjadi ESTIMASI RANGE PIPS PRESISI, WHIPSAW WARNING, ZONA ENTRY, SL, DAN TP KHUSUS UTAMA UNTUK XAUUSD (Gunakan DXY hanya sebagai acuan korelasi intermarket tanpa memberikan zona transaksi DXY).
 
         [INPUT DATA REAL-TIME]
         - Target Event: {target_news} ({status_text})
@@ -708,7 +705,7 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
 
         [INSTRUKSI ENGINE AI]
         1. Baca Garis Astro Dominan.
-        2. Tentukan Bias Trend, Zona Entry Presisi, SL, dan TP berdasarkan konvergensi Astro + SMC (Korelasi terbalik XAUUSD vs DXY).
+        2. Tentukan Bias Trend, Zona Entry Presisi, SL, dan TP KHUSUS UNTUK XAUUSD berdasarkan konvergensi Astro + SMC (DXY dipakai murni untuk konfirmasi korelasi).
         3. Berikan jawaban HANYA dalam format JSON MURNI tanpa markdown tambahan:
 
         {{
@@ -841,7 +838,7 @@ fig_astro_unified, img_astro_buf, aspect_counts = generate_astrodox_unified_imag
 )
 
 # ==========================================
-# 6. CONFLUENCE CARDS (XAUUSD & DXY ADDED)
+# 6. CONFLUENCE CARDS (XAUUSD & DXY FILTERED)
 # ==========================================
 st.subheader("🎯 MULTI-TIMEFRAME LIQUIDITY & METHOD CONFLUENCE")
 
@@ -922,7 +919,7 @@ with col_m:
 with col_r:
     st.markdown("### 📐 Multi-TF Technical Engine (XAU & DXY)")
     if tech_active:
-        # XAUUSD Section
+        # XAUUSD SECTION (MAPPING EKSEKUSI TUNGGAL)
         st.markdown("#### 🥇 XAUUSD ANALYSIS")
         if not is_bullish:
             st.markdown("🔴 **ARAH BIAS XAU:** BEARISH (REJECTION)")
@@ -935,16 +932,15 @@ with col_r:
 
         st.markdown("---")
 
-        # DXY Section (Inverse Correlation)
-        st.markdown("#### 💵 DXY (DOLLAR INDEX) ANALYSIS")
+        # DXY SECTION (MURNI ACUAN INTERMARKET - TANPA ZONA ENTRY/SL/TP)
+        st.markdown("#### 💵 DXY (DOLLAR INDEX) ANALYSIS & ACUAN")
         if not is_bullish:
             st.markdown("🟢 **ARAH BIAS DXY:** BULLISH (EXPANSION)")
         else:
             st.markdown("🔴 **ARAH BIAS DXY:** BEARISH (REJECTION)")
-        st.caption(f"Eksekusi: **{tech_action_dxy}**")
-        st.markdown("🎯 **Zona Entry DXY:**")
-        st.info(f"{tech_entry_dxy - 0.05:.2f} - {tech_entry_dxy + 0.05:.2f}")
-        st.markdown(f"🛑 **SL DXY:** `{tech_sl_dxy:.2f}` | 🏁 **TP DXY:** `{tech_tp_dxy:.2f}`")
+        
+        st.info(f"📌 **Status Liquidity DXY:** {dxy_status_text}")
+        st.caption("⚠️ *DXY murni dipakai sebagai acuan korelasi macro intermarket. Tidak ada Zona Entry, SL, atau TP yang dirender untuk DXY.*")
 
     else:
         st.info("Technical Engine OFF")
