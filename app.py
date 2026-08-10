@@ -44,7 +44,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Integrated Keys
 FMP_API_KEY = "Wr5uNw4BQAo5syaNYXylIqcg8908kPd5"
 NINJAS_API_KEY = "vxwYGQu3VjAJGQdJpaes95RN7YyZu1tvdEMNkC5j"
 FINNHUB_TOKEN = "d9saqq9r01qopv46igd9saqq9r01qopv46gkj0"
@@ -69,7 +68,6 @@ if "score_val" not in st.session_state:
 # DUAL API REALTIME XAUUSD FETCH
 # ==========================================
 def fetch_live_xauusd_price():
-    """Ambil harga XAUUSD secara otomatis via API Ninjas (Primary) -> FMP (Fallback)"""
     try:
         url_ninjas = "https://api.api-ninjas.com/v1/commodityprice?name=gold"
         headers = {"X-Api-Key": NINJAS_API_KEY}
@@ -94,12 +92,12 @@ def fetch_live_xauusd_price():
     return None, "Gagal mengambil data dari kedua API"
 
 # ==========================================
-# 2. ADVANCED TECHNICAL ENGINE (DUAL-DIRECTIONAL SETUP)
+# 2. ADVANCED TECHNICAL ENGINE
 # ==========================================
 def calculate_advanced_technical_engine(running_price, market_condition):
     atr_val = 18.50
-    sl_offset = atr_val * 0.45  # ~$8.30 (83 Pips)
-    tp_offset = atr_val * 2.20  # ~$40.70 (407 Pips)
+    sl_offset = atr_val * 0.45
+    tp_offset = atr_val * 2.20
 
     bsl_level = running_price + 4.50
     ssl_level = running_price - 4.50
@@ -298,7 +296,7 @@ def generate_astrodox_unified_image(target_date: datetime, ai_result_data=None):
         info_text += f"• Stop Loss   : Buy({setup.get('sl_buy', '-')}) | Sell({setup.get('sl_sell', '-')})\n"
         info_text += f"• Take Profit : Buy({setup.get('tp_buy', '-')}) | Sell({setup.get('tp_sell', '-')})\n"
     else:
-        info_text += "[ Menunggu Kalkulasi AI Engine Dashboard ]\n"
+        info_text += "[ Klik Tombol EXECUTE untuk Menjalankan AI Proyeksi Range ]\n"
 
     ax_text.text(
         0.00, 0.98, info_text, color='#e0e0e0', fontsize=10.0, 
@@ -342,7 +340,7 @@ with st.sidebar:
         "September": 9, "Oktober": 10, "November": 11, "Desember": 12
     }
     
-    bulan_rilis = st.selectbox("Bulan Rilis:", daftar_bulan, index=8) # Default September
+    bulan_rilis = st.selectbox("Bulan Rilis:", daftar_bulan, index=8)
     tahun_rilis = st.number_input("Tahun Rilis:", value=2026)
     
     jam_input = st.text_input("Jam Rilis (WIB):", value="01:00" if "FOMC" in target_news else "19:30")
@@ -410,7 +408,7 @@ with st.sidebar:
                     st.session_state["running_price"] = price
                     st.toast(f"Harga updated: {price} via {source}", icon="✅")
                 else:
-                    st.toast("Gagal ambil harga otomatis. Gunakan input manual.", icon="⚠️")
+                    st.toast("Gagal ambil harga otomatis.", icon="⚠️")
 
     running_price = st.number_input(
         "Harga Running XAUUSD:",
@@ -418,20 +416,6 @@ with st.sidebar:
         step=0.5
     )
     st.session_state["running_price"] = running_price
-
-# ==========================================
-# Cek apakah target news berubah, jika berubah reset session AI agar tidak nyangkut
-# ==========================================
-if "last_target_news" not in st.session_state:
-    st.session_state["last_target_news"] = target_news
-
-if st.session_state["last_target_news"] != target_news:
-    st.session_state["ai_result"] = None
-    st.session_state["rekap_text"] = ""
-    st.session_state["macro_bias_result"] = ""
-    st.session_state["score_val"] = 0
-    st.session_state["last_target_news"] = target_news
-    st.rerun()
 
 # ==========================================
 # 5. CALENDAR DATA CACHE
@@ -574,8 +558,8 @@ elif "CPI" in target_news:
         "ringkasan": f"CPI Status Rilis: {act1} vs Forecast {est1}.",
         "dampak": "Perkembangan laju inflasi mempengaruhi kebijakan suku bunga The Fed.",
         "ind_1": {"nama": "Consumer Price Index (CPI)", "actual": act1, "forecast": est1, "previous": prev1, "penjelasan": "Indikator laju inflasi konsumen.", "efek": "Actual > Forecast -> Menguatkan USD", "jadwal": j1},
-        "ind_2": {"nama": "Producer Price Index (PPI)", "actual": act2, "forecast": est2, "previous": prev2, "penjelasan": "Indikator inflasi produsen (rilis sebelum CPI).", "efek": "Actual > Forecast -> Menguatkan USD", "jadwal": j2},
-        "ind_3": {"nama": "Import Price Index", "actual": act3, "forecast": est3, "previous": prev3, "penjelasan": "Harga barang impor masuk (rilis sebelum CPI).", "efek": "Actual > Forecast -> Menguatkan USD", "jadwal": j3},
+        "ind_2": {"nama": "Producer Price Index (PPI)", "actual": act2, "forecast": est2, "previous": prev2, "penjelasan": "Indikator inflasi produsen.", "efek": "Actual > Forecast -> Menguatkan USD", "jadwal": j2},
+        "ind_3": {"nama": "Import Price Index", "actual": act3, "forecast": est3, "previous": prev3, "penjelasan": "Harga barang impor masuk.", "efek": "Actual > Forecast -> Menguatkan USD", "jadwal": j3},
         "ind_4": {"nama": "Michigan Consumer Sentiment", "actual": act4, "forecast": est4, "previous": prev4, "penjelasan": "Kepercayaan konsumen terhadap ekonomi.", "efek": "Actual > Forecast -> Menguatkan USD", "jadwal": j4}
     }
 else:
@@ -594,9 +578,6 @@ else:
         "ind_4": {"nama": "Retail Sales m/m", "actual": act4, "forecast": est4, "previous": prev4, "penjelasan": "Tingkat belanja konsumen.", "efek": "Actual > Forecast -> Menguatkan USD", "jadwal": j4}
     }
 
-# ==========================================
-# FUNGSI KALKULASI REKAP NAMA INDIKATOR SPESIFIK
-# ==========================================
 def calculate_macro_divergence(ind1_info, ind2_info, ind3_info, ind4_info, main_news_name, is_future):
     def parse_num(val):
         try:
@@ -634,45 +615,40 @@ def calculate_macro_divergence(ind1_info, ind2_info, ind3_info, ind4_info, main_
         return f"- **{name}**: {note} ➔ Impak: **{res}**", score
 
     r1, s1 = eval_indicator(ind1_info, higher_is_good_for_usd=True)
-    
     is_good_usd_2 = False if "unemployment" in ind2_info.get('nama', '').lower() else True
     r2, s2 = eval_indicator(ind2_info, higher_is_good_for_usd=is_good_usd_2)
-    
     r3, s3 = eval_indicator(ind3_info, higher_is_good_for_usd=True)
     r4, s4 = eval_indicator(ind4_info, higher_is_good_for_usd=True)
 
     total_score = s1 + s2 + s3 + s4
-    
-    rekap_lines = []
-    rekap_lines.extend([r1, r2, r3, r4])
+    rekap_lines = [r1, r2, r3, r4]
 
     if total_score > 0:
         macro_bias = "BULLISH USD / BEARISH XAUUSD"
-        pred_text = f"💡 **Proyeksi Prediksi News Utama:** Berdasarkan data pendukung yang cenderung positif, angka **{main_news_name}** berpotensi menguatkan Dolar US (USD)."
+        pred_text = f"💡 **Proyeksi Prediksi News Utama:** Berdasarkan data pendukung, angka **{main_news_name}** berpotensi menguatkan Dolar US (USD)."
     elif total_score < 0:
         macro_bias = "BEARISH USD / BULLISH XAUUSD"
-        pred_text = f"💡 **Proyeksi Prediksi News Utama:** Berdasarkan data pendukung yang cenderung melemah, angka **{main_news_name}** berpotensi memicu pelemahan Dolar US (USD)."
+        pred_text = f"💡 **Proyeksi Prediksi News Utama:** Berdasarkan data pendukung, angka **{main_news_name}** berpotensi memicu pelemahan Dolar US (USD)."
     else:
         macro_bias = "NEUTRAL / MIXED DATA (Whipsaw Risk)"
-        pred_text = f"💡 **Proyeksi Prediksi News Utama:** Data pendukung berimbang/campuran. Waspadai volatilitas dua arah saat **{main_news_name}** rilis."
+        pred_text = f"💡 **Proyeksi Prediksi News Utama:** Data pendukung berimbang. Waspadai volatilitas dua arah saat **{main_news_name}** rilis."
 
     if is_future:
         rekap_lines.append(f"\n{pred_text}")
 
-    rekap_text = "\n".join(rekap_lines)
-    return rekap_text, macro_bias, total_score
+    return "\n".join(rekap_lines), macro_bias, total_score
 
 def fetch_geopolitical_analysis(event_name, actual_val, forecast_val):
     prompt = f"""
     Bertindaklah sebagai Senior Geopolitical & Macroeconomic Analyst.
-    Berikan analisis terupdate mengenai isu geopolitik krusial terkini dan kombinasikan dengan dampak rilis data {event_name} (Actual: {actual_val} vs Forecast: {forecast_val}).
+    Berikan analisis terupdate mengenai isu geopolitik terkini dan kombinasikan dengan dampak rilis data {event_name} (Actual: {actual_val} vs Forecast: {forecast_val}).
 
     Format jawaban HARUS JSON MURNI tanpa markdown:
     {{
-        "isu_utama": "Eskalasi Selat Hormuz & Ancaman Rudal Iran",
-        "ringkasan_situasi": "Eskalasi militer di Selat Hormuz mendongkrak minat beli aset safe haven.",
+        "isu_utama": "Eskalasi Selat Hormuz & Ancaman Global",
+        "ringkasan_situasi": "Eskalasi militer mendongkrak minat beli aset safe haven.",
         "dampak_usd": "USD menguat terbatas terdorong arus safe-haven.",
-        "dampak_xau": "XAUUSD sangat kuat didukung oleh lonjakan permintaan hedging safe-haven."
+        "dampak_xau": "XAUUSD sangat kuat didukung permintaan hedging."
     }}
     """
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
@@ -690,10 +666,10 @@ def fetch_geopolitical_analysis(event_name, actual_val, forecast_val):
         pass
 
     return {
-        "isu_utama": "Ketegangan Selat Hormuz & Eskalasi Perang Timur Tengah",
-        "ringkasan_situasi": "Eskalasi militer memperketat jalur distribusi minyak global dan mendongkrak safe haven.",
+        "isu_utama": "Ketegangan Geopolitik Global & Timur Tengah",
+        "ringkasan_situasi": "Eskalasi memperketat pasar komoditas dan mendongkrak safe haven.",
         "dampak_usd": "USD menguat terbatas terdorong arus safe-haven.",
-        "dampak_xau": "XAUUSD sangat kuat didukung oleh lonjakan permintaan hedging safe-haven."
+        "dampak_xau": "XAUUSD sangat kuat didukung permintaan hedging."
     }
 
 # ==========================================
@@ -708,31 +684,28 @@ st.markdown(f"### 📌 TARGET EVENT: {target_news} - {tanggal_rilis} {bulan_rili
 if ind_data["status_rilis"] == "SUDAH RILIS":
     st.success(f"""
     🎯 **HASIL AKHIR NEWS ({target_news}):**
-    - **Status:** Event ini telah rilis / lewat pada {tanggal_rilis} {bulan_rilis} {tahun_rilis} jam {jam_rilis_formatted}.
+    - **Status:** Event ini telah rilis pada {tanggal_rilis} {bulan_rilis} {tahun_rilis} jam {jam_rilis_formatted}.
     - **Ringkasan Data:** {ind_data['ringkasan']}
     - **Dampak Pasar:** {ind_data['dampak']}
-    - **Sumber Feed Data:** {api_source}
     """)
 else:
     st.info(f"""
     ⏳ **PROYEKSI & JADWAL NEWS ({target_news}):**
-    - **Status:** Event baru akan rilis pada **{tanggal_rilis} {bulan_rilis} {tahun_rilis} jam {jam_rilis_formatted}**.
+    - **Status:** Event akan rilis pada **{tanggal_rilis} {bulan_rilis} {tahun_rilis} jam {jam_rilis_formatted}**.
     - **Ringkasan:** {ind_data['ringkasan']}
     - **Dampak Kebijakan:** {ind_data['dampak']}
-    - **Sumber Feed Data:** {api_source}
     """)
 
 st.markdown("---")
 st.subheader(f"📊 Data Indikator Pendukung Real-Time ({target_news})")
-st.caption(f"💡 Synchronized via {api_source} | Waktu Sistem: {now.strftime('%d-%m-%Y %H:%M:%S')} WIB")
 
 actual_inputs = {}
 
 def render_indicator_box(key_prefix, ind_dict):
     unique_key_suffix = f"{key_prefix}_{target_news}_{tanggal_rilis}_{bulan_rilis}_{tahun_rilis}"
     st.markdown(f"#### 🔹 {ind_dict.get('nama', 'Indikator')}")
-    st.caption(f"💡 **Fungsi / Penjelasan:** {ind_dict.get('penjelasan', '-')}")
-    st.info(f"⚡ **Efek ke Dollar (USD):** {ind_dict.get('efek', '-')}")
+    st.caption(f"💡 **Penjelasan:** {ind_dict.get('penjelasan', '-')}")
+    st.info(f"⚡ **Efek ke USD:** {ind_dict.get('efek', '-')}")
     
     c1, c2, c3 = st.columns(3)
     with c1:
@@ -760,19 +733,20 @@ geo_info = fetch_geopolitical_analysis(target_news, final_act1, est1)
 st.warning(f"""
 - 🚨 **Isu Utama:** {geo_info.get('isu_utama')}
 - 📝 **Ringkasan Situasi:** {geo_info.get('ringkasan_situasi')}
-- 💵 **Dampak Gabungan ke USD:** {geo_info.get('dampak_usd')}
-- 🪙 **Dampak Gabungan ke XAUUSD:** {geo_info.get('dampak_xau')}
+- 💵 **Dampak ke USD:** {geo_info.get('dampak_usd')}
+- 🪙 **Dampak ke XAUUSD:** {geo_info.get('dampak_xau')}
 """)
 
 st.markdown("---")
 
 # ==========================================
-# AUTO-EXECUTE AI PREDICTION ENGINE
+# TOMBOL MANUAL EXECUTE AI PREDICTION
 # ==========================================
-current_ai_trigger_key = f"{target_news}_{running_price}_{tanggal_rilis}_{final_act1}_{final_act2}"
+st.markdown("### 🚀 AI Macro & Range Engine Trigger")
+st.markdown("Klik tombol di bawah ini untuk mengeksekusi kalkulasi AI Macro, Astrodox, dan SMC secara manual:")
 
-if "last_ai_trigger" not in st.session_state or st.session_state["last_ai_trigger"] != current_ai_trigger_key or st.session_state["ai_result"] is None:
-    with st.spinner(f"Sintesis Otomatis Data Makro + Astrodox + Geopolitik + SMC untuk {target_news}..."):
+if st.button("🚀 EXECUTE MULTI-TF AI PREDICTION", use_container_width=True):
+    with st.spinner(f"Sintesis Data Makro + Astrodox + Geopolitik + SMC untuk {target_news}..."):
         
         ind1_current = {**ind_data.get("ind_1", {}), "actual": final_act1}
         ind2_current = {**ind_data.get("ind_2", {}), "actual": final_act2}
@@ -850,26 +824,28 @@ if "last_ai_trigger" not in st.session_state or st.session_state["last_ai_trigge
                 st.session_state["rekap_text"] = rekap_text
                 st.session_state["macro_bias_result"] = macro_bias_result
                 st.session_state["score_val"] = score_val
-                st.session_state["last_ai_trigger"] = current_ai_trigger_key
-        except Exception:
-            pass
+                st.success("AI Proyeksi Range Berhasil Diekseskusi!")
+            else:
+                st.error(f"Gagal memanggil API Groq (Status: {res.status_code}). Coba beberapa saat lagi (Rate Limit).")
+        except Exception as e:
+            st.error(f"Error koneksi ke API Groq: {e}")
 
 # ==========================================
-# RENDER HASIL REKAP EVALUASI (DINAMIS MENGIKUTI TARGET NEWS)
+# RENDER HASIL REKAP EVALUASI
 # ==========================================
-if st.session_state["ai_result"]:
-    res_ai = st.session_state["ai_result"]
-    setup_ai = res_ai.get("setup_spesifik", {})
-    pips_ai = res_ai.get("proyeksi_pips", {})
-else:
-    ind1_current = {**ind_data.get("ind_1", {}), "actual": final_act1}
-    ind2_current = {**ind_data.get("ind_2", {}), "actual": final_act2}
-    ind3_current = {**ind_data.get("ind_3", {}), "actual": final_act3}
-    ind4_current = {**ind_data.get("ind_4", {}), "actual": final_act4}
-    
-    st.session_state["rekap_text"], st.session_state["macro_bias_result"], st.session_state["score_val"] = calculate_macro_divergence(
-        ind1_current, ind2_current, ind3_current, ind4_current, target_news, is_future_event
-    )
+ind1_current = {**ind_data.get("ind_1", {}), "actual": final_act1}
+ind2_current = {**ind_data.get("ind_2", {}), "actual": final_act2}
+ind3_current = {**ind_data.get("ind_3", {}), "actual": final_act3}
+ind4_current = {**ind_data.get("ind_4", {}), "actual": final_act4}
+
+default_rekap, default_bias, default_score = calculate_macro_divergence(
+    ind1_current, ind2_current, ind3_current, ind4_current, target_news, is_future_event
+)
+
+if not st.session_state["rekap_text"]:
+    st.session_state["rekap_text"] = default_rekap
+    st.session_state["macro_bias_result"] = default_bias
+    st.session_state["score_val"] = default_score
 
 if is_future_event:
     st.subheader(f"📋 Analysis & Proyeksi Data Pendukung ({target_news} - Pre-Rilis)")
@@ -880,6 +856,10 @@ st.markdown(st.session_state["rekap_text"])
 st.info(f"⚖️ **Kesimpulan Bias Makro:** {st.session_state['macro_bias_result']} (Score Net: {st.session_state['score_val']})")
 
 if st.session_state["ai_result"]:
+    res_ai = st.session_state["ai_result"]
+    setup_ai = res_ai.get("setup_spesifik", {})
+    pips_ai = res_ai.get("proyeksi_pips", {})
+
     st.markdown("### ⚡ AI PROYEKSI RANGE PIPS (CONFLUENCE ASTRO + TECHNICALS)")
     
     p1, p2, p3, p4 = st.columns(4)
@@ -913,37 +893,22 @@ if st.session_state["ai_result"]:
         """, unsafe_allow_html=True)
 
     st.markdown("---")
-    st.warning(f"⚠️ **Peringatan Whipsaw & False Breakout:** {res_ai.get('peringatan_whipsaw', '-')}")
+    st.warning(f"⚠️ **Peringatan Whipsaw:** {res_ai.get('peringatan_whipsaw', '-')}")
     st.markdown(f"• **Arah Bias Utama AI:** `{res_ai.get('arah_bias')}`")
     st.markdown(f"• **Sintesis Makro, Astro & Geopolitik:** {res_ai.get('ringkasan_sintesis')}")
     st.markdown(f"• **Reasoning & Liquidity Trigger:** {res_ai.get('logika_entry_detail')}")
 
     st.markdown("### 🎯 Specific Execution Setup (XAUUSD)")
-    
-    if "NEUTRAL" in str(res_ai.get('arah_bias')).upper() or "WHIPSAW" in str(res_ai.get('arah_bias')).upper():
-        c_buy, c_sell = st.columns(2)
-        with c_buy:
-            st.success(f"""
-            🟢 **PLAN A: BUY LIMIT (ZONA DISCOUNT / DEMAND)**
-            - **Entry Zone Buy:** {setup_ai.get('zona_buy_demand')}
-            - **Stop Loss (SL):** {setup_ai.get('sl_buy')}
-            - **Take Profit (TP):** {setup_ai.get('tp_buy')}
-            """)
-        with c_sell:
-            st.error(f"""
-            🔴 **PLAN B: SELL LIMIT (ZONA PREMIUM / SUPPLY)**
-            - **Entry Zone Sell:** {setup_ai.get('zona_sell_supply')}
-            - **Stop Loss (SL):** {setup_ai.get('sl_sell')}
-            - **Take Profit (TP):** {setup_ai.get('tp_sell')}
-            """)
-    else:
-        st.info(f"""
-        - **Execution Type:** {setup_ai.get('tipe_eksekusi')}
-        - **Zona Buy Demand:** {setup_ai.get('zona_buy_demand')}
-        - **Zona Sell Supply:** {setup_ai.get('zona_sell_supply')}
-        - **Stop Loss:** Buy SL ({setup_ai.get('sl_buy')}) | Sell SL ({setup_ai.get('sl_sell')})
-        - **Take Profit:** Buy TP ({setup_ai.get('tp_buy')}) | Sell TP ({setup_ai.get('tp_sell')})
-        """)
+    st.info(f"""
+    - **Execution Type:** {setup_ai.get('tipe_eksekusi')}
+    - **Zona Buy Demand:** {setup_ai.get('zona_buy_demand')}
+    - **Zona Sell Supply:** {setup_ai.get('zona_sell_supply')}
+    - **Stop Loss:** Buy SL ({setup_ai.get('sl_buy')}) | Sell SL ({setup_ai.get('sl_sell')})
+    - **Take Profit:** Buy TP ({setup_ai.get('tp_buy')}) | Sell TP ({setup_ai.get('tp_sell')})
+    """)
+else:
+    st.markdown("---")
+    st.warning("⚠️ **AI Macro & Range Engine belum dijalankan.** Silakan klik tombol **'EXECUTE MULTI-TF AI PREDICTION'** di atas untuk memunculkan proyeksi range lengkap, SL, TP, dan skema entry.")
 
 st.markdown("---")
 
@@ -953,7 +918,7 @@ fig_astro_unified, img_astro_buf, aspect_counts = generate_astrodox_unified_imag
 )
 
 # ==========================================
-# 7. CONFLUENCE CARDS (DYNAMIC LAYOUT)
+# 7. CONFLUENCE CARDS
 # ==========================================
 active_engines = []
 if ai_active:
@@ -975,40 +940,13 @@ if active_engines:
             if st.session_state["ai_result"]:
                 ai_bias = st.session_state["ai_result"].get("arah_bias", "NEUTRAL")
                 ai_setup = st.session_state["ai_result"].get("setup_spesifik", {})
-                
                 st.markdown(f"• **Bias Utama:** `{ai_bias}`")
-                if "NEUTRAL" in str(ai_bias).upper() or "WHIPSAW" in str(ai_bias).upper():
-                    st.warning("⚠️ **Waspada Whipsaw Dua Arah**")
-                    st.markdown("#### 🟢 ZONA BUY DEMAND")
-                    st.info(f"{ai_setup.get('zona_buy_demand')}")
-                    st.markdown("#### 🛑 STOP LOSS BUY")
-                    st.error(f"{ai_setup.get('sl_buy')}")
-                    st.markdown("#### 🏁 TARGET TP BUY")
-                    st.success(f"{ai_setup.get('tp_buy')}")
-                    
-                    st.markdown("---")
-                    st.markdown("#### 🔴 ZONA SELL SUPPLY")
-                    st.info(f"{ai_setup.get('zona_sell_supply')}")
-                    st.markdown("#### 🛑 STOP LOSS SELL")
-                    st.error(f"{ai_setup.get('sl_sell')}")
-                    st.markdown("#### 🏁 TARGET TP SELL")
-                    st.success(f"{ai_setup.get('tp_sell')}")
-                elif "BULLISH" in str(ai_bias).upper():
-                    st.markdown("#### 🟢 ZONA BUY DEMAND")
-                    st.info(f"{ai_setup.get('zona_buy_demand')}")
-                    st.markdown("#### 🛑 STOP LOSS (SL)")
-                    st.error(f"{ai_setup.get('sl_buy')}")
-                    st.markdown("#### 🏁 TARGET TP EXPANSION")
-                    st.success(f"{ai_setup.get('tp_buy')}")
-                else:
-                    st.markdown("#### 🔴 ZONA SELL SUPPLY")
-                    st.info(f"{ai_setup.get('zona_sell_supply')}")
-                    st.markdown("#### 🛑 STOP LOSS (SL)")
-                    st.error(f"{ai_setup.get('sl_sell')}")
-                    st.markdown("#### 🏁 TARGET TP EXPANSION")
-                    st.success(f"{ai_setup.get('tp_sell')}")
+                st.markdown("#### 🟢 ZONA BUY DEMAND")
+                st.info(f"{ai_setup.get('zona_buy_demand')}")
+                st.markdown("#### 🔴 ZONA SELL SUPPLY")
+                st.info(f"{ai_setup.get('zona_sell_supply')}")
             else:
-                st.caption("AI Range Engine sedang melakukan sinkronisasi otomatis...")
+                st.caption("Klik tombol 'EXECUTE MULTI-TF AI PREDICTION' untuk mengaktifkan AI Range Engine.")
         col_idx += 1
 
     if "astro" in active_engines:
@@ -1020,25 +958,13 @@ if active_engines:
             st.markdown(f"• Kuning (Conjn)    : **{aspect_counts['kuning']}**")
             
             st.markdown("#### 🎯 ZONA BIAS ASTRO")
-            astro_entry_zone = f"{running_price - 3.00:.2f} - {running_price + 3.00:.2f}"
-            st.info(astro_entry_zone)
+            st.info(f"{running_price - 3.00:.2f} - {running_price + 3.00:.2f}")
             
+            st.markdown("#### 🛑 STOP LOSS & TP")
             if st.session_state["ai_result"]:
                 ast_setup = st.session_state["ai_result"].get("setup_spesifik", {})
-                ai_b_check = str(st.session_state["ai_result"].get("arah_bias", "")).upper()
-                
-                if "BEARISH" in ai_b_check:
-                    st.markdown("#### 🛑 STOP LOSS ASTRO (SELL)")
-                    st.error(f"{ast_setup.get('sl_sell')}")
-                    st.markdown("#### 🏁 TARGET TP ASTRO (SELL)")
-                    st.success(f"{ast_setup.get('tp_sell')}")
-                else:
-                    st.markdown("#### 🛑 STOP LOSS ASTRO (BUY)")
-                    st.error(f"{ast_setup.get('sl_buy')}")
-                    st.markdown("#### 🏁 TARGET TP ASTRO (BUY)")
-                    st.success(f"{ast_setup.get('tp_buy')}")
+                st.markdown(f"SL: `{ast_setup.get('sl_buy')}` | TP: `{ast_setup.get('tp_buy')}`")
             else:
-                st.markdown("#### 🛑 STOP LOSS & TP")
                 st.caption("Menunggu hasil AI Proyeksi Range...")
         col_idx += 1
 
@@ -1047,34 +973,18 @@ if active_engines:
             tech_res = calculate_advanced_technical_engine(running_price, market_condition)
             
             st.markdown("### 📐 Advanced SMC & Liquidity Engine")
-            st.caption("⚡ Dual-Directional Setup (Persiapan Pending Order H-Menit News)")
+            st.caption("⚡ Dual-Directional Setup")
             
             st.markdown("---")
             st.markdown("#### 💧 LIQUIDITY & STRUCTURE ZONES")
-            st.markdown(f"• **Buy-Side Liq (BSL):** `{tech_res['bsl_level']:.2f}` | **Sell-Side Liq (SSL):** `{tech_res['ssl_level']:.2f}`")
-            st.markdown(f"• **Supply OB:** `{tech_res['supply_ob']}` | **Demand OB:** `{tech_res['demand_ob']}`")
-            st.markdown(f"• **FVG Zone:** Supply `{tech_res['fvg_bearish']}` | Demand `{tech_res['fvg_bullish']}`")
+            st.markdown(f"• **BSL:** `{tech_res['bsl_level']:.2f}` | **SSL:** `{tech_res['ssl_level']:.2f}`")
+            st.markdown(f"• **Supply OB:** `{tech_res['supply_ob']}`")
+            st.markdown(f"• **Demand OB:** `{tech_res['demand_ob']}`")
 
             st.markdown("---")
-            st.markdown("#### 🎯 TWO-WAY PENDING ORDER SETUPS")
-            
-            c_plan_sell, c_plan_buy = st.columns(2)
-            
-            with c_plan_sell:
-                st.error(f"""
-                🔴 **PLAN A: SELL LIMIT (PREMIUM / SUPPLY)**
-                - **Entry Zone:** `{tech_res['sell_entry_zone']}`
-                - **Stop Loss (SL):** `{tech_res['sell_sl']:.2f}`
-                - **Take Profit (TP):** `{tech_res['sell_tp']:.2f}`
-                """)
-                
-            with c_plan_buy:
-                st.success(f"""
-                🟢 **PLAN B: BUY LIMIT (DISCOUNT / DEMAND)**
-                - **Entry Zone:** `{tech_res['buy_entry_zone']}`
-                - **Stop Loss (SL):** `{tech_res['buy_sl']:.2f}`
-                - **Take Profit (TP):** `{tech_res['buy_tp']:.2f}`
-                """)
+            st.markdown("#### 🎯 PENDING ORDER SETUPS")
+            st.error(f"Sell Limit: `{tech_res['sell_entry_zone']}`")
+            st.success(f"Buy Limit: `{tech_res['buy_entry_zone']}`")
 
     st.markdown("---")
 
