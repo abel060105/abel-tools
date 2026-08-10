@@ -97,16 +97,10 @@ def fetch_live_xauusd_price():
 # 2. ADVANCED TECHNICAL ENGINE (DUAL-DIRECTIONAL SETUP)
 # ==========================================
 def calculate_advanced_technical_engine(running_price, market_condition):
-    """
-    Engine Teknikal Lanjutan SMC:
-    Menghasilkan 2 ZONA EKSEKUSI SEKALIGUS (Buy Plan & Sell Plan)
-    untuk persiapan pending order menjelang High-Impact News.
-    """
     atr_val = 18.50
     sl_offset = atr_val * 0.45  # ~$8.30 (83 Pips)
     tp_offset = atr_val * 2.20  # ~$40.70 (407 Pips)
 
-    # 1. METRIK LIQUIDITY & STRUCTURAL ZONES
     bsl_level = running_price + 4.50
     ssl_level = running_price - 4.50
     
@@ -122,12 +116,10 @@ def calculate_advanced_technical_engine(running_price, market_condition):
     snr_resistance = running_price + 3.00
     snr_support = running_price - 3.00
 
-    # 2. PLAN A: SELL SETUP (PREMIUM BSL SWEEP / SUPPLY MITIGATION)
     sell_entry = running_price + 3.50
     sell_sl = sell_entry + sl_offset
     sell_tp = sell_entry - tp_offset
 
-    # 3. PLAN B: BUY SETUP (DISCOUNT SSL SWEEP / DEMAND MITIGATION)
     buy_entry = running_price - 3.50
     buy_sl = buy_entry - sl_offset
     buy_tp = buy_entry + tp_offset
@@ -143,11 +135,9 @@ def calculate_advanced_technical_engine(running_price, market_condition):
         "snd_demand": snd_demand,
         "snr_res": snr_resistance,
         "snr_sup": snr_support,
-        # PLAN SELL
         "sell_entry_zone": f"{sell_entry - 0.75:.2f} - {sell_entry + 0.75:.2f}",
         "sell_sl": sell_sl,
         "sell_tp": sell_tp,
-        # PLAN BUY
         "buy_entry_zone": f"{buy_entry - 0.75:.2f} - {buy_entry + 0.75:.2f}",
         "buy_sl": buy_sl,
         "buy_tp": buy_tp,
@@ -340,7 +330,7 @@ with st.sidebar:
     st.markdown("### 2. Jadwal Official & Event")
     
     now = datetime.now()
-    tanggal_rilis = st.number_input("Tanggal Rilis:", value=12, min_value=1, max_value=31)
+    tanggal_rilis = st.number_input("Tanggal Rilis:", value=4, min_value=1, max_value=31)
     
     daftar_bulan = [
         "Januari", "Februari", "Maret", "April", "Mei", "Juni",
@@ -352,13 +342,13 @@ with st.sidebar:
         "September": 9, "Oktober": 10, "November": 11, "Desember": 12
     }
     
-    bulan_rilis = st.selectbox("Bulan Rilis:", daftar_bulan, index=7)
+    bulan_rilis = st.selectbox("Bulan Rilis:", daftar_bulan, index=8) # Default September
     tahun_rilis = st.number_input("Tahun Rilis:", value=2026)
     
     jam_input = st.text_input("Jam Rilis (WIB):", value="01:00" if "FOMC" in target_news else "19:30")
     jam_rilis_formatted = f"{jam_input} WIB"
 
-    bulan_num = bulan_dict.get(bulan_rilis, 8)
+    bulan_num = bulan_dict.get(bulan_rilis, 9)
     try:
         if ":" in jam_input:
             jam_str, menit_str = jam_input.strip().split(":")
@@ -428,6 +418,20 @@ with st.sidebar:
         step=0.5
     )
     st.session_state["running_price"] = running_price
+
+# ==========================================
+# Cek apakah target news berubah, jika berubah reset session AI agar tidak nyangkut
+# ==========================================
+if "last_target_news" not in st.session_state:
+    st.session_state["last_target_news"] = target_news
+
+if st.session_state["last_target_news"] != target_news:
+    st.session_state["ai_result"] = None
+    st.session_state["rekap_text"] = ""
+    st.session_state["macro_bias_result"] = ""
+    st.session_state["score_val"] = 0
+    st.session_state["last_target_news"] = target_news
+    st.rerun()
 
 # ==========================================
 # 5. CALENDAR DATA CACHE
@@ -556,10 +560,9 @@ if "NFP" in target_news:
         "ind_4": {"nama": "Average Hourly Earnings m/m", "actual": act4, "forecast": est4, "previous": prev4, "penjelasan": "Pertumbuhan rata-rata upah pekerja per jam.", "efek": "Actual > Forecast -> Menguatkan USD", "jadwal": j4}
     }
 elif "CPI" in target_news:
-    # Logika yang benar: Data pendukung rilis SEBELUM tanggal CPI (H-1, H-2)
     cpi_day = int(tanggal_rilis)
-    ppi_day = max(1, cpi_day - 1)      # Contoh: CPI tgl 12, PPI tgl 11
-    import_day = max(1, cpi_day - 2)   # Contoh: CPI tgl 12, Import Price tgl 10
+    ppi_day = max(1, cpi_day - 1)
+    import_day = max(1, cpi_day - 2)
 
     act1, est1, prev1, j1 = extract_indicator_smart(calendar_raw, ["cpi m/m", "cpi y/y", "consumer price index"], "0.2%", "0.2%", "0.1%", fallback_day=cpi_day)
     act2, est2, prev2, j2 = extract_indicator_smart(calendar_raw, ["ppi m/m", "producer price"], "0.1%", "0.2%", "0.2%", fallback_day=ppi_day)
@@ -846,29 +849,33 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
         except Exception as e:
             st.error(f"Error Koneksi AI Engine: {e}")
 
-# Cek apakah target news berubah, jika berubah reset session AI agar tidak nyangkut
-if "last_target_news" not in st.session_state:
-    st.session_state["last_target_news"] = target_news
-
-if st.session_state["last_target_news"] != target_news:
-    st.session_state["ai_result"] = None
-    st.session_state["last_target_news"] = target_news
-    st.rerun()
-
-# RENDER HASIL REKAP EVALUASI
+# ==========================================
+# RENDER HASIL REKAP EVALUASI (DINAMIS MENGIKUTI TARGET NEWS)
+# ==========================================
 if st.session_state["ai_result"]:
     res_ai = st.session_state["ai_result"]
     setup_ai = res_ai.get("setup_spesifik", {})
     pips_ai = res_ai.get("proyeksi_pips", {})
+else:
+    # Generate rekap otomatis walau tombol AI belum diklik agar langsung menyesuaikan target_news
+    ind1_current = {**ind_data.get("ind_1", {}), "actual": final_act1}
+    ind2_current = {**ind_data.get("ind_2", {}), "actual": final_act2}
+    ind3_current = {**ind_data.get("ind_3", {}), "actual": final_act3}
+    ind4_current = {**ind_data.get("ind_4", {}), "actual": final_act4}
     
-    if is_future_event:
-        st.subheader(f"📋 Analysis & Proyeksi Data Pendukung ({target_news} - Pre-Rilis)")
-    else:
-        st.subheader(f"📋 Rekap Evaluasi Data Pendukung & Rilis News ({target_news} - Post-Rilis)")
+    st.session_state["rekap_text"], st.session_state["macro_bias_result"], st.session_state["score_val"] = calculate_macro_divergence(
+        ind1_current, ind2_current, ind3_current, ind4_current, target_news, is_future_event
+    )
 
-    st.markdown(st.session_state["rekap_text"])
-    st.info(f"⚖️ **Kesimpulan Bias Makro:** {st.session_state['macro_bias_result']} (Score Net: {st.session_state['score_val']})")
+if is_future_event:
+    st.subheader(f"📋 Analysis & Proyeksi Data Pendukung ({target_news} - Pre-Rilis)")
+else:
+    st.subheader(f"📋 Rekap Evaluasi Data Pendukung & Rilis News ({target_news} - Post-Rilis)")
 
+st.markdown(st.session_state["rekap_text"])
+st.info(f"⚖️ **Kesimpulan Bias Makro:** {st.session_state['macro_bias_result']} (Score Net: {st.session_state['score_val']})")
+
+if st.session_state["ai_result"]:
     st.markdown("### ⚡ AI PROYEKSI RANGE PIPS (CONFLUENCE ASTRO + TECHNICALS)")
     
     p1, p2, p3, p4 = st.columns(4)
