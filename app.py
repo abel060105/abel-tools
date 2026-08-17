@@ -857,6 +857,7 @@ if st.session_state["ai_result"]:
     setup_ai = res_ai.get("setup_spesifik", {})
     pips_ai = res_ai.get("proyeksi_pips", {})
 else:
+    # Generate rekap otomatis walau tombol AI belum diklik agar langsung menyesuaikan target_news
     ind1_current = {**ind_data.get("ind_1", {}), "actual": final_act1}
     ind2_current = {**ind_data.get("ind_2", {}), "actual": final_act2}
     ind3_current = {**ind_data.get("ind_3", {}), "actual": final_act3}
