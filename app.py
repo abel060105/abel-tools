@@ -48,7 +48,7 @@ st.markdown("""
 FMP_API_KEY = "Wr5uNw4BQAo5syaNYXylIqcg8908kPd5"
 NINJAS_API_KEY = "vxwYGQu3VjAJGQdJpaes95RN7YyZu1tvdEMNkC5j"
 FINNHUB_TOKEN = "d9saqq9r01qopv46igd9saqq9r01qopv46gkj0"
-GROQ_API_KEY = "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"
+GROQ_API_KEY = "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"
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
@@ -677,7 +677,7 @@ def fetch_geopolitical_analysis(event_name, actual_val, forecast_val):
     """
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
     payload = {
-        "model": "llama3-70b-8192",
+        "model": "llama-3.3-70b-versatile",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.2,
         "response_format": {"type": "json_object"}
@@ -846,10 +846,8 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
                 st.session_state["macro_bias_result"] = macro_bias_result
                 st.session_state["score_val"] = score_val
                 st.success("✅ AI & Astrodox Synthesis Success!")
-            else:
-                st.error(f"⚠️ Groq API Responded with Error Status {res.status_code}: {res.text}")
         except Exception as e:
-            st.error(f"❌ Error Koneksi AI Engine: {e}")
+            st.error(f"Error Koneksi AI Engine: {e}")
 
 # ==========================================
 # RENDER HASIL REKAP EVALUASI (DINAMIS MENGIKUTI TARGET NEWS)
