@@ -846,8 +846,10 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
                 st.session_state["macro_bias_result"] = macro_bias_result
                 st.session_state["score_val"] = score_val
                 st.success("✅ AI & Astrodox Synthesis Success!")
+            else:
+                st.error(f"⚠️ Groq API Responded with Error Status {res.status_code}: {res.text}")
         except Exception as e:
-            st.error(f"Error Koneksi AI Engine: {e}")
+            st.error(f"❌ Error Koneksi AI Engine: {e}")
 
 # ==========================================
 # RENDER HASIL REKAP EVALUASI (DINAMIS MENGIKUTI TARGET NEWS)
@@ -1075,20 +1077,30 @@ if active_engines:
     st.markdown("---")
 
 # ==========================================
-# 8. ASTRODOX UNIFIED SECTION & DOWNLOAD BUTTON
+# 8. ASTRODOX UNIFIED SECTION & ZOOM DIALOG
 # ==========================================
 if astrodox_active:
     st.subheader("🔮 ASTRODOX TRANSIT WHEEL & AI RANGE INTEGRATED ANALYSIS")
 
     st.pyplot(fig_astro_unified, use_container_width=True)
 
-    st.download_button(
-        label="📥 Download Roda Astrodox & AI Proyeksi Range (.png)",
-        data=img_astro_buf,
-        file_name=f"Astrodox_AI_Range_{event_datetime.strftime('%Y%m%d_%H%M')}.png",
-        mime="image/png",
-        use_container_width=True
-    )
+    @st.dialog("🔍 High-Resolution Astrodox & AI Range Chart (Zoom View)", width="large")
+    def show_zoomed_chart(image_bytes):
+        st.image(image_bytes, use_column_width=True)
+
+    col_d1, col_d2 = st.columns(2)
+    with col_d1:
+        if st.button("🔍 Zoom / Perbesar Tampilan Gambar", use_container_width=True):
+            show_zoomed_chart(img_astro_buf)
+
+    with col_d2:
+        st.download_button(
+            label="📥 Download Roda Astrodox & AI Proyeksi Range (.png)",
+            data=img_astro_buf,
+            file_name=f"Astrodox_AI_Range_{event_datetime.strftime('%Y%m%d_%H%M')}.png",
+            mime="image/png",
+            use_container_width=True
+        )
 
     st.markdown("---")
 
