@@ -677,7 +677,7 @@ def fetch_geopolitical_analysis(event_name, actual_val, forecast_val):
     """
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
     payload = {
-        "model": "llama-3.3-70b-versatile",
+        "model": "llama3-70b-8192",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.2,
         "response_format": {"type": "json_object"}
@@ -831,7 +831,7 @@ if st.button(f"🚀 EXECUTE MULTI-TF AI PREDICTION FOR {target_news.upper()}", t
 
         headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
         payload = {
-            "model": "llama-3.3-70b-versatile",
+            "model": "llama3-70b-8192",
             "messages": [{"role": "user", "content": system_prompt}],
             "temperature": 0.15,
             "response_format": {"type": "json_object"}
