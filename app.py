@@ -186,6 +186,7 @@ col1, col2, col3, col4, col5 = st.columns(5)
 
 with col1:
     tanggal = st.number_input("Tanggal", min_value=1, max_value=31, value=12)
+
 with col2:
     daftar_bulan = [
         "Januari", "Februari", "Maret", "April", "Mei", "Juni",
@@ -194,10 +195,13 @@ with col2:
     bulan_dict = {nama: i + 1 for i, nama in enumerate(daftar_bulan)}
     bulan_nama = st.selectbox("Bulan", daftar_bulan, index=7)  # default Agustus
     bulan = bulan_dict[bulan_nama]
+
 with col3:
     tahun = st.number_input("Tahun", min_value=2000, max_value=2100, value=2026)
+
 with col4:
     jam = st.number_input("Jam (WIB)", min_value=0, max_value=23, value=19)
+
 with col5:
     menit = st.number_input("Menit", min_value=0, max_value=59, value=30)
 
@@ -268,8 +272,9 @@ st.markdown("---")
 # ----- Papan Prompt Teks (Copyable) -----
 st.subheader("📋 Papan Prompt Teks (Copy ke AI eksternal)")
 
-prompt_template = f"""Kamu adalah Senior Quantitative Trader + Financial Astrologer spesialis XAUUSD.
-Gunakan data Astrodox di bawah ini + pengetahuan teknikal & makro kamu untuk memberikan proyeksi range pips yang presisi.
+prompt_template = f"""Kamu adalah Senior Quantitative Trader + Macro Analyst + Financial Astrologer spesialis XAUUSD.
+
+Gunakan data Astrodox di bawah ini + pengetahuan teknikal, makro, dan geopolitik terbaru kamu untuk menghasilkan analisis lengkap.
 
 === DATA ASTRODOX TRANSIT ===
 Waktu: {event_datetime.strftime('%d %B %Y %H:%M WIB')}
@@ -280,25 +285,53 @@ POSISI PLANET:
 REKAP GARIS ASPEK GEOMETRI:
 {aspek_text}
 
-=== INSTRUKSI OUTPUT ===
-Berikan jawaban dalam format ringkas dan jelas:
+=== INSTRUKSI OUTPUT (WAJIB LENGKAP) ===
 
-1. **Bias Utama** : BULLISH / BEARISH / WHIPSAW / NEUTRAL
-2. **Peringatan Whipsaw** : (hanya jika ada risiko whipsaw yang signifikan, jika tidak ada cukup tulis "Tidak signifikan")
-3. **Sweep Range** : contoh 80-150 Pips ($8.0-$15.0)
-4. **Trend Range** : contoh 200-350 Pips ($20.0-$35.0)
-5. **Reversal Range** : contoh 80-130 Pips ($8.0-$13.0)
+1. **Rekap Data News & Indikator Pendukung**
+   - Tentukan sendiri news utama yang relevan (NFP / CPI / FOMC / dll) berdasarkan waktu di atas.
+   - Tampilkan data pendukung yang paling relevan (Actual | Forecast | Previous).
+   - AI yang menentukan indikator mana yang paling penting.
 
-Catatan:
-- Fokus hanya pada confluence Astro + Price Action / SMC structure.
-- Tidak perlu memberikan zona entry, SL, atau TP (sudah di-handle di sistem lain).
-- Jelaskan singkat alasan bias berdasarkan aspek dominan (Merah/Hijau/Biru/Kuning).
+2. **Analisis Makro**
+   - Bias makro saat ini (Bullish USD / Bearish USD / Neutral).
+   - Skor dan alasan singkat berdasarkan data pendukung.
+
+3. **Update Geopolitik Terbaru**
+   - Isu geopolitik krusial terkini yang mempengaruhi XAUUSD & USD.
+   - Dampak gabungan ke USD dan XAUUSD.
+
+4. **Kesimpulan AI untuk Entry**
+   - Bias utama: BULLISH / BEARISH / WHIPSAW / NEUTRAL
+   - Peringatan Whipsaw (jika ada)
+   - Proyeksi Range:
+     • Sweep Range
+     • Trend Range
+     • Reversal Range
+
+5. **3 Setup Entry Lengkap**
+   A. Setup dari AI Macro Engine
+      - Zona Entry
+      - Stop Loss
+      - Take Profit
+
+   B. Setup dari Astrodox Engine
+      - Zona Entry (berdasarkan aspek dominan)
+      - Stop Loss
+      - Take Profit
+
+   C. Setup dari Orderflow / SMC / Liquidity
+      - BSL / SSL
+      - Supply & Demand / Order Block
+      - FVG
+      - Entry Zone + SL + TP (dua arah jika whipsaw)
+
+Format jawaban harus rapi, jelas, dan siap dibaca trader.
+Fokus pada confluence Astro + Makro + Orderflow.
 """
 
 st.markdown("Salin prompt di bawah ini lalu paste ke AI (Grok / Claude / GPT / dll):")
 st.code(prompt_template, language="text")
 
-# Tombol copy via Streamlit native (muncul otomatis di st.code)
 st.caption("Klik ikon copy di pojok kanan atas blok kode di atas untuk menyalin prompt.")
 
 st.markdown("---")
