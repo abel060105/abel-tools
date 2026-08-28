@@ -269,10 +269,12 @@ st.markdown(info_html, unsafe_allow_html=True)
 
 st.markdown("---")
 
-# ----- Papan Prompt Teks (Copyable) -----
-st.subheader("📋 Papan Prompt Teks (Copy ke AI eksternal)")
+# ==========================================
+# PAPAN PROMPT 1 — FULL (Lengkap seperti fitur lama)
+# ==========================================
+st.subheader("📋 Papan Prompt 1 — Full Analysis (Makro + Geopolitik + 3 Setup)")
 
-prompt_template = f"""Kamu adalah Senior Quantitative Trader + Macro Analyst + Financial Astrologer spesialis XAUUSD.
+prompt_full = f"""Kamu adalah Senior Quantitative Trader + Macro Analyst + Financial Astrologer spesialis XAUUSD.
 
 Gunakan data Astrodox di bawah ini + pengetahuan teknikal, makro, dan geopolitik terbaru kamu untuk menghasilkan analisis lengkap.
 
@@ -330,8 +332,46 @@ Fokus pada confluence Astro + Makro + Orderflow.
 """
 
 st.markdown("Salin prompt di bawah ini lalu paste ke AI (Grok / Claude / GPT / dll):")
-st.code(prompt_template, language="text")
+st.code(prompt_full, language="text")
+st.caption("Klik ikon copy di pojok kanan atas blok kode di atas untuk menyalin prompt.")
 
+st.markdown("---")
+
+# ==========================================
+# PAPAN PROMPT 2 — SIMPLE (Hanya Astrodox)
+# ==========================================
+st.subheader("📋 Papan Prompt 2 — Simple Astrodox Only")
+
+prompt_simple = f"""Kamu adalah Senior Quantitative Trader + Financial Astrologer spesialis XAUUSD.
+
+Gunakan data Astrodox di bawah ini + pengetahuan teknikal & makro kamu untuk memberikan proyeksi range pips yang presisi.
+
+=== DATA ASTRODOX TRANSIT ===
+Waktu: {event_datetime.strftime('%d %B %Y %H:%M WIB')}
+
+POSISI PLANET:
+{pos_text}
+
+REKAP GARIS ASPEK GEOMETRI:
+{aspek_text}
+
+=== INSTRUKSI OUTPUT ===
+Berikan jawaban dalam format ringkas dan jelas:
+
+1. **Bias Utama** : BULLISH / BEARISH / WHIPSAW / NEUTRAL
+2. **Peringatan Whipsaw** : (hanya jika ada risiko whipsaw yang signifikan, jika tidak ada cukup tulis "Tidak signifikan")
+3. **Sweep Range** : contoh 80-150 Pips ($8.0-$15.0)
+4. **Trend Range** : contoh 200-350 Pips ($20.0-$35.0)
+5. **Reversal Range** : contoh 80-130 Pips ($8.0-$13.0)
+
+Catatan:
+- Fokus hanya pada confluence Astro + Price Action / SMC structure.
+- Tidak perlu memberikan zona entry, SL, atau TP (sudah di-handle di sistem lain).
+- Jelaskan singkat alasan bias berdasarkan aspek dominan (Merah/Hijau/Biru/Kuning).
+"""
+
+st.markdown("Salin prompt di bawah ini lalu paste ke AI (Grok / Claude / GPT / dll):")
+st.code(prompt_simple, language="text")
 st.caption("Klik ikon copy di pojok kanan atas blok kode di atas untuk menyalin prompt.")
 
 st.markdown("---")
