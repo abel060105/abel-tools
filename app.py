@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import io
 from datetime import datetime, timedelta
 import requests
+import pandas as pd
 
 # ==========================================
 # KONFIGURASI HALAMAN
@@ -28,19 +29,17 @@ st.markdown("""
         color: #e0e0e0;
         line-height: 1.55;
     }
-    .prompt-box {
-        background-color: #0d1117;
-        border: 1px solid #30363d;
-        border-radius: 10px;
-        padding: 16px 20px;
-        font-family: 'Courier New', monospace;
-        font-size: 13px;
-        color: #c9d1d9;
-        white-space: pre-wrap;
-        line-height: 1.5;
-    }
     .stTextInput > div > div > input, .stNumberInput > div > div > input {
         background-color: #0d1117;
+    }
+    /* Orderbook table style */
+    .bid-table th {
+        background-color: #0d3b2e !important;
+        color: #00ff9d !important;
+    }
+    .ask-table th {
+        background-color: #3b0d0d !important;
+        color: #ff4d4d !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -175,54 +174,57 @@ def generate_astrodox_wheel_only(target_date: datetime):
 # ORDERBOOK XAUT
 # ==========================================
 
-def get_binance_orderbook(limit=15):
+def get_binance_orderbook(limit=20):
     try:
         url = f"https://api.binance.com/api/v3/depth?symbol=XAUTUSDT&limit={limit}"
         r = requests.get(url, timeout=8)
         data = r.json()
         if "bids" not in data:
-            return [], [], data.get("msg", "Binance error")
+            return None, None, data.get("msg", "Binance error")
         bids = [[float(p), float(q)] for p, q in data["bids"]]
         asks = [[float(p), float(q)] for p, q in data["asks"]]
         return bids, asks, None
     except Exception as e:
-        return [], [], str(e)
+        return None, None, str(e)
 
-def get_bybit_orderbook(limit=15):
+def get_bybit_orderbook(limit=20):
     try:
         url = f"https://api.bybit.com/v5/market/orderbook?category=spot&symbol=XAUTUSDT&limit={limit}"
         r = requests.get(url, timeout=8)
         data = r.json()
         if data.get("retCode") != 0:
-            return [], [], data.get("retMsg", "Bybit error")
+            return None, None, data.get("retMsg", "Bybit error")
         result = data["result"]
         bids = [[float(p), float(q)] for p, q in result.get("b", [])]
         asks = [[float(p), float(q)] for p, q in result.get("a", [])]
         return bids, asks, None
     except Exception as e:
-        return [], [], str(e)
+        return None, None, str(e)
 
-def get_okx_orderbook(limit=15):
+def get_okx_orderbook(limit=20):
     try:
         url = f"https://www.okx.com/api/v5/market/books?instId=XAUT-USDT&sz={limit}"
         r = requests.get(url, timeout=8)
         data = r.json()
         if data.get("code") != "0":
-            return [], [], data.get("msg", "OKX error")
+            return None, None, data.get("msg", "OKX error")
         book = data["data"][0]
         bids = [[float(p), float(q)] for p, q, *_ in book["bids"]]
         asks = [[float(p), float(q)] for p, q, *_ in book["asks"]]
         return bids, asks, None
     except Exception as e:
-        return [], [], str(e)
+        return None, None, str(e)
 
-def display_orderbook(bids, asks, exchange_name, error=None):
+
+def show_orderbook_table(bids, asks, exchange_name, error=None):
+    st.markdown(f"### {exchange_name}")
+
     if error:
-        st.error(f"**{exchange_name}**: {error}")
+        st.error(f"Error: {error}")
         return
 
     if not bids or not asks:
-        st.warning(f"**{exchange_name}**: Data kosong")
+        st.warning("Data kosong")
         return
 
     best_bid = bids[0][0]
@@ -230,19 +232,36 @@ def display_orderbook(bids, asks, exchange_name, error=None):
     spread = best_ask - best_bid
     mid = (best_bid + best_ask) / 2
 
-    st.markdown(f"**{exchange_name}** | Mid: `{mid:.2f}` | Spread: `{spread:.2f}`")
+    st.markdown(f"**Mid:** `{mid:,.2f}` &nbsp;&nbsp;|&nbsp;&nbsp; **Spread:** `{spread:.2f}`")
+
+    # Buat DataFrame
+    bid_df = pd.DataFrame(bids[:20], columns=["Harga Beli", "Jumlah (XAUT)"])
+    ask_df = pd.DataFrame(asks[:20], columns=["Harga Jual", "Jumlah (XAUT)"])
+
+    bid_df["Harga Beli"] = bid_df["Harga Beli"].map("{:,.2f}".format)
+    ask_df["Harga Jual"] = ask_df["Harga Jual"].map("{:,.2f}".format)
+    bid_df["Jumlah (XAUT)"] = bid_df["Jumlah (XAUT)"].map("{:.4f}".format)
+    ask_df["Jumlah (XAUT)"] = ask_df["Jumlah (XAUT)"].map("{:.4f}".format)
 
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown("**Bids (Buy)**")
-        for price, qty in bids[:10]:
-            st.write(f"`{price:.2f}` — {qty:.4f}")
+        st.markdown("**🟢 Pembeli (Bids)**")
+        st.dataframe(
+            bid_df,
+            use_container_width=True,
+            height=420,
+            hide_index=True
+        )
 
     with col2:
-        st.markdown("**Asks (Sell)**")
-        for price, qty in asks[:10]:
-            st.write(f"`{price:.2f}` — {qty:.4f}")
+        st.markdown("**🔴 Penjual (Asks)**")
+        st.dataframe(
+            ask_df,
+            use_container_width=True,
+            height=420,
+            hide_index=True
+        )
 
 
 # ==========================================
@@ -282,7 +301,7 @@ with col5:
 try:
     event_datetime = datetime(int(tahun), int(bulan), int(tanggal), int(jam), int(menit))
 except ValueError:
-    st.error("Tanggal tidak valid (cek jumlah hari di bulan tersebut).")
+    st.error("Tanggal tidak valid.")
     st.stop()
 
 st.markdown(f"**Waktu yang dipilih:** `{event_datetime.strftime('%d %B %Y %H:%M WIB')}`")
@@ -310,30 +329,35 @@ st.markdown("---")
 # ----- ORDERBOOK XAUT -----
 st.subheader("📊 Orderbook XAUT/USDT (Realtime)")
 
-refresh = st.button("🔄 Refresh Orderbook")
+col_set1, col_set2 = st.columns([1, 3])
+with col_set1:
+    limit_level = st.selectbox("Jumlah Level", [10, 15, 20, 30], index=2)
+
+refresh = st.button("🔄 Refresh Orderbook", type="primary")
 
 if refresh or "orderbook_loaded" not in st.session_state:
-    with st.spinner("Mengambil data orderbook..."):
-        st.session_state.binance = get_binance_orderbook()
-        st.session_state.bybit = get_bybit_orderbook()
-        st.session_state.okx = get_okx_orderbook()
+    with st.spinner("Mengambil data orderbook dari exchange..."):
+        st.session_state.binance = get_binance_orderbook(limit_level)
+        st.session_state.bybit = get_bybit_orderbook(limit_level)
+        st.session_state.okx = get_okx_orderbook(limit_level)
         st.session_state.orderbook_loaded = True
 
-col_a, col_b, col_c = st.columns(3)
+# Tampilkan 3 exchange
+tab1, tab2, tab3 = st.tabs(["Binance", "Bybit", "OKX"])
 
-with col_a:
+with tab1:
     b, a, e = st.session_state.binance
-    display_orderbook(b, a, "Binance", e)
+    show_orderbook_table(b, a, "Binance", e)
 
-with col_b:
+with tab2:
     b, a, e = st.session_state.bybit
-    display_orderbook(b, a, "Bybit", e)
+    show_orderbook_table(b, a, "Bybit", e)
 
-with col_c:
+with tab3:
     b, a, e = st.session_state.okx
-    display_orderbook(b, a, "OKX", e)
+    show_orderbook_table(b, a, "OKX", e)
 
-st.caption("Data diambil langsung dari public API exchange (Binance, Bybit, OKX). Klik Refresh untuk update.")
+st.caption("Data diambil langsung dari public API exchange. Tabel bisa di-scroll.")
 
 st.markdown("---")
 
@@ -372,9 +396,9 @@ st.markdown(info_html, unsafe_allow_html=True)
 st.markdown("---")
 
 # ==========================================
-# PAPAN PROMPT 1
+# PAPAN PROMPT
 # ==========================================
-st.subheader("📋 Papan Prompt 1 — Full Analysis (Makro + Geopolitik + 3 Setup)")
+st.subheader("📋 Papan Prompt 1 — Full Analysis")
 
 prompt_full = f"""Kamu adalah Senior Quantitative Trader + Macro Analyst + Financial Astrologer spesialis XAUUSD.
 
@@ -392,61 +416,21 @@ REKAP GARIS ASPEK GEOMETRI:
 === INSTRUKSI OUTPUT (WAJIB LENGKAP) ===
 
 1. **Rekap Data News & Indikator Pendukung**
-   - Tentukan sendiri news utama yang relevan (NFP / CPI / FOMC / dll) berdasarkan waktu di atas.
-   - Tampilkan data pendukung yang paling relevan (Actual | Forecast | Previous).
-   - AI yang menentukan indikator mana yang paling penting.
-
 2. **Analisis Makro**
-   - Bias makro saat ini (Bullish USD / Bearish USD / Neutral).
-   - Skor dan alasan singkat berdasarkan data pendukung.
-
 3. **Update Geopolitik Terbaru**
-   - Isu geopolitik krusial terkini yang mempengaruhi XAUUSD & USD.
-   - Dampak gabungan ke USD dan XAUUSD.
+4. **Kesimpulan AI untuk Entry** (Bias + Range)
+5. **3 Setup Entry Lengkap** (Macro + Astrodox + Orderflow/SMC)
 
-4. **Kesimpulan AI untuk Entry**
-   - Bias utama: BULLISH / BEARISH / WHIPSAW / NEUTRAL
-   - Peringatan Whipsaw (jika ada)
-   - Proyeksi Range:
-     • Sweep Range
-     • Trend Range
-     • Reversal Range
-
-5. **3 Setup Entry Lengkap**
-   A. Setup dari AI Macro Engine
-      - Zona Entry
-      - Stop Loss
-      - Take Profit
-
-   B. Setup dari Astrodox Engine
-      - Zona Entry (berdasarkan aspek dominan)
-      - Stop Loss
-      - Take Profit
-
-   C. Setup dari Orderflow / SMC / Liquidity
-      - BSL / SSL
-      - Supply & Demand / Order Block
-      - FVG
-      - Entry Zone + SL + TP (dua arah jika whipsaw)
-
-Format jawaban harus rapi, jelas, dan siap dibaca trader.
-Fokus pada confluence Astro + Makro + Orderflow.
+Format jawaban harus rapi dan siap dibaca trader.
 """
 
-st.markdown("Salin prompt di bawah ini lalu paste ke AI (Grok / Claude / GPT / dll):")
 st.code(prompt_full, language="text")
-st.caption("Klik ikon copy di pojok kanan atas blok kode di atas untuk menyalin prompt.")
 
 st.markdown("---")
 
-# ==========================================
-# PAPAN PROMPT 2
-# ==========================================
 st.subheader("📋 Papan Prompt 2 — Simple Astrodox Only")
 
 prompt_simple = f"""Kamu adalah Senior Quantitative Trader + Financial Astrologer spesialis XAUUSD.
-
-Gunakan data Astrodox di bawah ini + pengetahuan teknikal & makro kamu untuk memberikan proyeksi range pips yang presisi.
 
 === DATA ASTRODOX TRANSIT ===
 Waktu: {event_datetime.strftime('%d %B %Y %H:%M WIB')}
@@ -458,23 +442,14 @@ REKAP GARIS ASPEK GEOMETRI:
 {aspek_text}
 
 === INSTRUKSI OUTPUT ===
-Berikan jawaban dalam format ringkas dan jelas:
-
 1. **Bias Utama** : BULLISH / BEARISH / WHIPSAW / NEUTRAL
-2. **Peringatan Whipsaw** : (hanya jika ada risiko whipsaw yang signifikan, jika tidak ada cukup tulis "Tidak signifikan")
-3. **Sweep Range** : contoh 80-150 Pips ($8.0-$15.0)
-4. **Trend Range** : contoh 200-350 Pips ($20.0-$35.0)
-5. **Reversal Range** : contoh 80-130 Pips ($8.0-$13.0)
-
-Catatan:
-- Fokus hanya pada confluence Astro + Price Action / SMC structure.
-- Tidak perlu memberikan zona entry, SL, atau TP (sudah di-handle di sistem lain).
-- Jelaskan singkat alasan bias berdasarkan aspek dominan (Merah/Hijau/Biru/Kuning).
+2. **Peringatan Whipsaw**
+3. **Sweep Range**
+4. **Trend Range**
+5. **Reversal Range**
 """
 
-st.markdown("Salin prompt di bawah ini lalu paste ke AI (Grok / Claude / GPT / dll):")
 st.code(prompt_simple, language="text")
-st.caption("Klik ikon copy di pojok kanan atas blok kode di atas untuk menyalin prompt.")
 
 st.markdown("---")
-st.caption("ABEL FX Astrodox Wheel • Simplified • Ready for external AI prompt")
+st.caption("ABEL FX Astrodox Wheel")
