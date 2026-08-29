@@ -16,10 +16,9 @@ st.set_page_config(
 
 # ================= THEME & VIDEO BACKGROUND CONFIG =================
 def apply_theme_and_background(theme_mode, video_file):
-    # Inisialisasi CSS dasar
-    css = """
+    # Styling Sidebar & Komponen Dasar (Tanpa kurung kurawal f-string berbahaya)
+    css_base = """
     <style>
-        /* Styling Sidebar Default */
         section[data-testid="stSidebar"] {
             backdrop-filter: blur(12px);
             border-right: 1px solid #1e293b !important;
@@ -41,7 +40,28 @@ def apply_theme_and_background(theme_mode, video_file):
             font-size: 12px;
             margin-bottom: 20px;
         }
+        .welcome-box {
+            border-radius: 18px;
+            padding: 55px 30px;
+            text-align: center;
+            margin-top: 20px;
+        }
+        .custom-card {
+            border-radius: 14px;
+            padding: 24px;
+            margin-top: 15px;
+        }
+        .info-box {
+            border-radius: 12px;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+    </style>
     """
+    
+    st.markdown(css_base, unsafe_allow_html=True)
 
     if theme_mode == "🖼️ Wallpaper Mode":
         try:
@@ -49,7 +69,9 @@ def apply_theme_and_background(theme_mode, video_file):
                 data = f.read()
             encoded = base64.b64encode(data).decode()
             
-            css += f"""
+            # Menggunakan string biasa + format manual agar aman dari error f-string
+            css_wallpaper = """
+            <style>
                 .stApp {
                     background: transparent !important;
                 }
@@ -60,11 +82,11 @@ def apply_theme_and_background(theme_mode, video_file):
                     width: 100vw;
                     height: 100vh;
                     z-index: -999;
-                    object-fit: cover; /* Responsif untuk Laptop */
+                    object-fit: cover;
                 }
                 @media only screen and (max-width: 768px) {
                     #bg-video {
-                        object-fit: fill; /* Menyesuaikan layar HP Portrait */
+                        object-fit: fill;
                     }
                 }
                 section[data-testid="stSidebar"] {
@@ -78,13 +100,17 @@ def apply_theme_and_background(theme_mode, video_file):
                 }
             </style>
             <video autoplay muted loop id="bg-video">
-                <source src="data:video/mp4;base64,{encoded}" type="video/mp4">
+                <source src="data:video/mp4;base64,REPLACE_BASE64" type="video/mp4">
             </video>
-            """
+            """.replace("REPLACE_BASE64", encoded)
+            
+            st.markdown(css_wallpaper, unsafe_allow_html=True)
         except:
             pass
+            
     elif theme_mode == "🌙 Dark Clean":
-        css += """
+        css_dark = """
+        <style>
             .stApp {
                 background-color: #0e1117 !important;
             }
@@ -97,8 +123,11 @@ def apply_theme_and_background(theme_mode, video_file):
             }
         </style>
         """
+        st.markdown(css_dark, unsafe_allow_html=True)
+        
     else: # Light Clean
-        css += """
+        css_light = """
+        <style>
             .stApp {
                 background-color: #ffffff !important;
                 color: #000000 !important;
@@ -113,31 +142,7 @@ def apply_theme_and_background(theme_mode, video_file):
             }
         </style>
         """
-
-    # Tambahan komponen card umum
-    css += """
-        <style>
-            .welcome-box {
-                border-radius: 18px;
-                padding: 55px 30px;
-                text-align: center;
-                margin-top: 20px;
-            }
-            .custom-card {
-                border-radius: 14px;
-                padding: 24px;
-                margin-top: 15px;
-            }
-            .info-box {
-                border-radius: 12px;
-                padding: 20px;
-                font-family: 'Courier New', monospace;
-                font-size: 14px;
-                line-height: 1.6;
-            }
-        </style>
-    """
-    st.markdown(css, unsafe_allow_html=True)
+        st.markdown(css_light, unsafe_allow_html=True)
 
 # ==========================================
 # SIDEBAR & THEME SWITCHER
@@ -145,7 +150,6 @@ def apply_theme_and_background(theme_mode, video_file):
 st.sidebar.markdown('<div class="sidebar-brand">⚡ ABEL FX</div>', unsafe_allow_html=True)
 st.sidebar.markdown('<div class="sidebar-sub">Trading Tools</div>', unsafe_allow_html=True)
 
-# Pilihan Menu Tema Wallpaper / Tampilan Standar
 st.sidebar.markdown("### 🎨 Tema Tampilan")
 selected_theme = st.sidebar.selectbox(
     "Pilih Tema",
@@ -154,7 +158,6 @@ selected_theme = st.sidebar.selectbox(
     label_visibility="collapsed"
 )
 
-# Eksekusi Tema & Background
 apply_theme_and_background(selected_theme, "bg.mp4")
 
 st.sidebar.markdown("---")
@@ -169,7 +172,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="text-align:center; color:#94a3b8; font-size:12px; padding-top:5px;">
     ABEL FX Tools<br>
-    <span style="color:#64748b;">v1.1 (Theme Switcher)</span>
+    <span style="color:#64748b;">v1.2 (Fixed Syntax)</span>
 </div>
 """, unsafe_allow_html=True)
 
