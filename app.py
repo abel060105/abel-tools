@@ -16,7 +16,6 @@ st.set_page_config(
 
 # ================= THEME & VIDEO BACKGROUND CONFIG =================
 def apply_theme_and_background(theme_mode, video_file):
-    # Styling Sidebar & Komponen Dasar (Tanpa kurung kurawal f-string berbahaya)
     css_base = """
     <style>
         section[data-testid="stSidebar"] {
@@ -42,14 +41,9 @@ def apply_theme_and_background(theme_mode, video_file):
         }
         .welcome-box {
             border-radius: 18px;
-            padding: 55px 30px;
+            padding: 75px 30px;
             text-align: center;
-            margin-top: 20px;
-        }
-        .custom-card {
-            border-radius: 14px;
-            padding: 24px;
-            margin-top: 15px;
+            margin-top: 40px;
         }
         .info-box {
             border-radius: 12px;
@@ -57,6 +51,10 @@ def apply_theme_and_background(theme_mode, video_file):
             font-family: 'Courier New', monospace;
             font-size: 14px;
             line-height: 1.6;
+        }
+        /* Sembunyikan radio button bawaan streamlit untuk navigasi */
+        div.row-widget.stRadio > div {
+            display: none;
         }
     </style>
     """
@@ -69,7 +67,6 @@ def apply_theme_and_background(theme_mode, video_file):
                 data = f.read()
             encoded = base64.b64encode(data).decode()
             
-            # Menggunakan string biasa + format manual agar aman dari error f-string
             css_wallpaper = """
             <style>
                 .stApp {
@@ -92,7 +89,7 @@ def apply_theme_and_background(theme_mode, video_file):
                 section[data-testid="stSidebar"] {
                     background: rgba(10, 15, 28, 0.85) !important;
                 }
-                .welcome-box, .custom-card, .info-box {
+                .welcome-box, .info-box {
                     background: rgba(11, 16, 30, 0.92) !important;
                     backdrop-filter: blur(12px);
                     border: 1px solid rgba(0, 212, 255, 0.3) !important;
@@ -117,7 +114,7 @@ def apply_theme_and_background(theme_mode, video_file):
             section[data-testid="stSidebar"] {
                 background-color: #161b22 !important;
             }
-            .welcome-box, .custom-card, .info-box {
+            .welcome-box, .info-box {
                 background: #161b22 !important;
                 border: 1px solid #30363d !important;
             }
@@ -135,7 +132,7 @@ def apply_theme_and_background(theme_mode, video_file):
             section[data-testid="stSidebar"] {
                 background-color: #f0f2f6 !important;
             }
-            .welcome-box, .custom-card, .info-box {
+            .welcome-box, .info-box {
                 background: #f8f9fa !important;
                 border: 1px solid #d1d5db !important;
                 color: #111827 !important;
@@ -162,17 +159,52 @@ apply_theme_and_background(selected_theme, "bg.mp4")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📌 Navigasi Menu")
-menu = st.sidebar.radio(
-    "menu",
-    ["🏠  Menu Utama", "🔮  Astrodox", "📊  Orderbook"],
-    index=0,
-    label_visibility="collapsed"
-)
+
+# Inisialisasi state halaman aktif
+if "active_menu" not in st.session_state:
+    st.session_state.active_menu = "🏠 Menu Utama"
+
+# Desain Tombol Menu Kustom di Sidebar
+def sidebar_menu_button(label, icon, target_key):
+    is_active = st.session_state.active_menu == target_key
+    bg_color = "rgba(0, 212, 255, 0.15)" if is_active else "transparent"
+    border_color = "#00d4ff" if is_active else "transparent"
+    text_color = "#00d4ff" if is_active else "inherit"
+    font_weight = "bold" if is_active else "normal"
+    
+    button_html = f"""
+    <div style="
+        background-color: {bg_color};
+        border-left: 4px solid {border_color};
+        padding: 10px 14px;
+        margin: 6px 0;
+        border-radius: 6px;
+        color: {text_color};
+        font-weight: {font_weight};
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+    ">
+        {icon} &nbsp; {label}
+    </div>
+    """
+    if st.sidebar.button(f"nav_{target_key}", use_container_width=True, label_visibility="collapsed"):
+        st.session_state.active_menu = target_key
+        st.rerun()
+    st.sidebar.markdown(button_html, unsafe_allow_html=True)
+
+# Render Tombol Navigasi Kustom
+sidebar_menu_button("Menu Utama", "🏠", "🏠 Menu Utama")
+sidebar_menu_button("Astrodox", "🔮", "🔮 Astrodox")
+sidebar_menu_button("Orderbook", "📊", "📊 Orderbook")
+
+menu = st.session_state.active_menu
+
 st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="text-align:center; color:#94a3b8; font-size:12px; padding-top:5px;">
     ABEL FX Tools<br>
-    <span style="color:#64748b;">v1.2 (Fixed Syntax)</span>
+    <span style="color:#64748b;">v1.3 (Clean & Custom Nav)</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -370,33 +402,17 @@ def show_orderbook_visual(bids, asks, min_cum=0.0, sort_order="Default (Harga)")
 # ==========================================
 # HALAMAN UTAMA
 # ==========================================
-if menu == "🏠  Menu Utama":
+if menu == "🏠 Menu Utama":
     st.markdown("""
     <div class="welcome-box">
-        <h1 style="color:#00d4ff;font-size:42px;margin-bottom:12px;">Welcome to ABEL Tools</h1>
-        <p style="font-size:18px;">Tools trading berbasis Astrodox & Market Data</p>
-        <p style="font-size:15px;margin-top:12px;opacity:0.8;">Pilih menu di sidebar kiri untuk mulai</p>
+        <h1 style="color:#00d4ff;font-size:46px;margin-bottom:12px;">Welcome to ABEL Tools</h1>
+        <p style="font-size:18px;opacity:0.9;">Tools trading profesional berbasis Astrodox & Market Data</p>
+        <p style="font-size:15px;margin-top:16px;opacity:0.7;">Silakan pilih menu di sidebar kiri untuk mulai menganalisa</p>
     </div>
     """, unsafe_allow_html=True)
-    st.markdown("<br>", unsafe_allow_html=True)
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown("""
-        <div class="custom-card">
-            <h3 style="color:#00d4ff;margin-bottom:8px;">🔮 Astrodox</h3>
-            <p style="font-size:15px;">Roda transit planet + rekap aspek geometri untuk analisa XAUUSD.</p>
-        </div>
-        """, unsafe_allow_html=True)
-    with c2:
-        st.markdown("""
-        <div class="custom-card">
-            <h3 style="color:#00d4ff;margin-bottom:8px;">📊 Orderbook</h3>
-            <p style="font-size:15px;">Orderbook realtime, ticker, volume, recent trades & dominasi buyer/seller.</p>
-        </div>
-        """, unsafe_allow_html=True)
-    st.markdown("<br><div style='text-align:center; opacity:0.7;'>ABEL FX Tools • Powered by OKX Public API</div>", unsafe_allow_html=True)
+    st.markdown("<br><br><div style='text-align:center; opacity:0.6;'>ABEL FX Tools • Powered by OKX Public API</div>", unsafe_allow_html=True)
 
-elif menu == "🔮  Astrodox":
+elif menu == "🔮 Astrodox":
     st.title("🔮 Astrodox Wheel")
     st.caption("Roda Transit Planet + Rekap Aspek Geometri")
     st.markdown("---")
@@ -443,7 +459,7 @@ elif menu == "🔮  Astrodox":
     <strong>REKAP ASPEK</strong><br>{"─"*60}<br>
     {aspek_text.replace(chr(10),"<br>")}</div>""", unsafe_allow_html=True)
 
-elif menu == "📊  Orderbook":
+elif menu == "📊 Orderbook":
     st.title("📊 Orderbook & Market Data")
     c1,c2,c3,c4 = st.columns([2,2,2,1])
     with c1: symbol = st.selectbox("Pair", ["XAUT-USDT","BTC-USDT"])
