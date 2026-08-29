@@ -189,7 +189,7 @@ def add_cumulative(orders):
     return result
 
 
-def show_orderbook_visual(bids, asks, min_cum=0.0):
+def show_orderbook_visual(bids, asks, min_cum=0.0, sort_order="Default (Harga)"):
     if not bids or not asks:
         st.warning("Data kosong")
         return
@@ -206,6 +206,15 @@ def show_orderbook_visual(bids, asks, min_cum=0.0):
         st.warning(f"Tidak ada level dengan cumulative ≥ {min_cum}")
         return
 
+    # Sorting
+    if sort_order == "Size Kecil → Besar":
+        bids_data = sorted(bids_data, key=lambda x: x["size"])
+        asks_data = sorted(asks_data, key=lambda x: x["size"])
+    elif sort_order == "Size Besar → Kecil":
+        bids_data = sorted(bids_data, key=lambda x: x["size"], reverse=True)
+        asks_data = sorted(asks_data, key=lambda x: x["size"], reverse=True)
+    # Default = urutan harga (sudah dari API)
+
     best_bid = bids[0][0]
     best_ask = asks[0][0]
     mid = (best_bid + best_ask) / 2
@@ -220,36 +229,43 @@ def show_orderbook_visual(bids, asks, min_cum=0.0):
 
     st.markdown("---")
 
-    # Ambil max cumulative untuk scaling bar
+    # Max untuk scaling bar
     max_cum = max(
-        max([x["cumulative"] for x in bids_data[:25]], default=1),
-        max([x["cumulative"] for x in asks_data[:25]], default=1)
+        max([x["cumulative"] for x in bids_data[:30]], default=1),
+        max([x["cumulative"] for x in asks_data[:30]], default=1)
     )
 
     col_bid, col_ask = st.columns(2)
 
     with col_bid:
         st.markdown("### 🟢 Beli (Bids)")
-        for item in bids_data[:25]:
+        for item in bids_data[:30]:
             pct = min(item["cumulative"] / max_cum, 1.0)
-            bar = "█" * int(pct * 20)
             st.markdown(
-                f"<div style='display:flex; justify-content:space-between; background:linear-gradient(90deg, #0d3b2e {pct*100}%, transparent 0%); padding:4px 8px; margin:2px 0; border-radius:4px;'>"
-                f"<span style='color:#00ff9d'>{item['cumulative']:,.0f}</span>"
-                f"<span style='color:white'>{item['price']:,.2f}</span>"
-                f"</div>",
+                f"""
+                <div style="display:flex; justify-content:space-between; align-items:center;
+                            background:linear-gradient(90deg, #0d3b2e {pct*100}%, transparent 0%);
+                            padding:6px 10px; margin:3px 0; border-radius:6px;">
+                    <span style="color:#00ff9d; font-weight:bold;">{item['cumulative']:,.0f}</span>
+                    <span style="color:white;">{item['price']:,.2f}</span>
+                </div>
+                """,
                 unsafe_allow_html=True
             )
 
     with col_ask:
         st.markdown("### 🔴 Jual (Asks)")
-        for item in asks_data[:25]:
+        for item in asks_data[:30]:
             pct = min(item["cumulative"] / max_cum, 1.0)
             st.markdown(
-                f"<div style='display:flex; justify-content:space-between; background:linear-gradient(270deg, #3b0d0d {pct*100}%, transparent 0%); padding:4px 8px; margin:2px 0; border-radius:4px;'>"
-                f"<span style='color:white'>{item['price']:,.2f}</span>"
-                f"<span style='color:#ff4d4d'>{item['cumulative']:,.0f}</span>"
-                f"</div>",
+                f"""
+                <div style="display:flex; justify-content:space-between; align-items:center;
+                            background:linear-gradient(270deg, #3b0d0d {pct*100}%, transparent 0%);
+                            padding:6px 10px; margin:3px 0; border-radius:6px;">
+                    <span style="color:white;">{item['price']:,.2f}</span>
+                    <span style="color:#ff4d4d; font-weight:bold;">{item['cumulative']:,.0f}</span>
+                </div>
+                """,
                 unsafe_allow_html=True
             )
 
@@ -328,12 +344,18 @@ if menu == "🔮 Astrodox":
 elif menu == "📊 Orderbook":
     st.title("📊 Orderbook")
 
-    col1, col2, col3 = st.columns([2, 2, 1])
+    col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
     with col1:
         symbol = st.selectbox("Pair", ["XAUT-USDT", "BTC-USDT"], index=0)
     with col2:
-        min_cum = st.number_input("Min Cumulative (XAUT/BTC)", min_value=0.0, value=0.0, step=1.0)
+        min_cum = st.number_input("Min Cumulative", min_value=0.0, value=0.0, step=1.0)
     with col3:
+        sort_order = st.selectbox("Urutan Tampilan", [
+            "Default (Harga)",
+            "Size Kecil → Besar",
+            "Size Besar → Kecil"
+        ])
+    with col4:
         st.write("")
         st.write("")
         auto_refresh = st.checkbox("Auto Refresh", value=False)
@@ -349,10 +371,10 @@ elif menu == "📊 Orderbook":
     if err:
         st.error(err)
     else:
-        show_orderbook_visual(bids, asks, min_cum)
+        show_orderbook_visual(bids, asks, min_cum, sort_order)
 
     if auto_refresh:
         time.sleep(3)
         st.rerun()
 
-    st.caption("Semakin panjang bar = semakin besar cumulative volume. Mirip tampilan di aplikasi exchange.")
+    st.caption("Pilih urutan tampilan di atas untuk mengurutkan berdasarkan ukuran order.")
