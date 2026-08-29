@@ -146,10 +146,10 @@ def generate_astrodox_wheel_only(target_date: datetime):
 
 
 # ==========================================
-# ORDERBOOK OKX
+# ORDERBOOK OKX + CUMULATIVE
 # ==========================================
 
-def get_okx_orderbook(limit=30):
+def get_okx_orderbook(limit=50):
     try:
         url = f"https://www.okx.com/api/v5/market/books?instId=XAUT-USDT&sz={limit}"
         r = requests.get(url, timeout=8)
@@ -164,13 +164,17 @@ def get_okx_orderbook(limit=30):
         return None, None, str(e)
 
 
-def filter_by_min_size(orders, min_size):
-    if min_size <= 0:
-        return orders
-    return [o for o in orders if o[1] >= min_size]
+def add_cumulative(orders):
+    """Tambah kolom cumulative quantity"""
+    result = []
+    cumulative = 0.0
+    for price, size in orders:
+        cumulative += size
+        result.append([price, size, cumulative])
+    return result
 
 
-def show_orderbook(bids, asks, error=None, min_size=0.0):
+def show_orderbook(bids, asks, error=None, min_cum=0.0):
     if error:
         st.error(f"Gagal: {error}")
         return
@@ -179,12 +183,17 @@ def show_orderbook(bids, asks, error=None, min_size=0.0):
         st.warning("Data kosong")
         return
 
-    # Filter minimum size
-    bids = filter_by_min_size(bids, min_size)
-    asks = filter_by_min_size(asks, min_size)
+    # Tambah cumulative
+    bids_cum = add_cumulative(bids)
+    asks_cum = add_cumulative(asks)
 
-    if not bids or not asks:
-        st.warning(f"Tidak ada order ≥ {min_size} XAUT")
+    # Filter berdasarkan cumulative (mirip di HP)
+    if min_cum > 0:
+        bids_cum = [x for x in bids_cum if x[2] >= min_cum]
+        asks_cum = [x for x in asks_cum if x[2] >= min_cum]
+
+    if not bids_cum or not asks_cum:
+        st.warning(f"Tidak ada level dengan cumulative ≥ {min_cum} XAUT")
         return
 
     best_bid = bids[0][0]
@@ -197,16 +206,18 @@ def show_orderbook(bids, asks, error=None, min_size=0.0):
     col2.metric("Best Ask", f"{best_ask:,.2f}")
     col3.metric("Spread", f"{spread:.2f}")
 
-    st.markdown(f"**Mid Price:** `{mid:,.2f}` USDT &nbsp;&nbsp;|&nbsp;&nbsp; Filter Min Size: `{min_size}` XAUT")
+    st.markdown(f"**Mid Price:** `{mid:,.2f}` USDT")
 
-    # DataFrame
-    bid_df = pd.DataFrame(bids[:30], columns=["Harga Beli", "Jumlah XAUT"])
-    ask_df = pd.DataFrame(asks[:30], columns=["Harga Jual", "Jumlah XAUT"])
+    # DataFrame dengan Cumulative
+    bid_df = pd.DataFrame(bids_cum[:40], columns=["Harga", "Size", "Cumulative"])
+    ask_df = pd.DataFrame(asks_cum[:40], columns=["Harga", "Size", "Cumulative"])
 
-    bid_df["Harga Beli"] = bid_df["Harga Beli"].map("{:,.2f}".format)
-    ask_df["Harga Jual"] = ask_df["Harga Jual"].map("{:,.2f}".format)
-    bid_df["Jumlah XAUT"] = bid_df["Jumlah XAUT"].map("{:.4f}".format)
-    ask_df["Jumlah XAUT"] = ask_df["Jumlah XAUT"].map("{:.4f}".format)
+    bid_df["Harga"] = bid_df["Harga"].map("{:,.2f}".format)
+    ask_df["Harga"] = ask_df["Harga"].map("{:,.2f}".format)
+    bid_df["Size"] = bid_df["Size"].map("{:.4f}".format)
+    ask_df["Size"] = ask_df["Size"].map("{:.4f}".format)
+    bid_df["Cumulative"] = bid_df["Cumulative"].map("{:,.2f}".format)
+    ask_df["Cumulative"] = ask_df["Cumulative"].map("{:,.2f}".format)
 
     c1, c2 = st.columns(2)
     with c1:
@@ -260,14 +271,14 @@ st.download_button("📥 Download Roda", img_buf, f"Astrodox_{event_datetime.str
 st.markdown("---")
 
 # ====================== ORDERBOOK ======================
-st.subheader("📊 Orderbook XAUT/USDT (OKX)")
+st.subheader("📊 Orderbook XAUT/USDT (OKX) - dengan Cumulative")
 
 col_set1, col_set2, col_set3 = st.columns(3)
 with col_set1:
-    limit = st.selectbox("Jumlah Level", [15, 20, 30, 50], index=1)
+    limit = st.selectbox("Jumlah Level", [20, 30, 50, 100], index=2)
 with col_set2:
-    min_size = st.number_input("Min Quantity (XAUT)", min_value=0.0, value=0.0, step=0.1,
-                               help="Hanya tampilkan order yang jumlahnya ≥ nilai ini")
+    min_cum = st.number_input("Min Cumulative (XAUT)", min_value=0.0, value=0.0, step=1.0,
+                              help="Hanya tampilkan level yang cumulative-nya ≥ nilai ini (mirip filter di aplikasi OKX)")
 with col_set3:
     auto_refresh = st.checkbox("Auto Refresh (3 detik)", value=False)
 
@@ -276,13 +287,13 @@ if st.button("🔄 Refresh Sekarang", type="primary") or auto_refresh or "ob_dat
         st.session_state.ob_data = get_okx_orderbook(limit)
 
 bids, asks, err = st.session_state.ob_data
-show_orderbook(bids, asks, err, min_size)
+show_orderbook(bids, asks, err, min_cum)
 
 if auto_refresh:
     time.sleep(3)
     st.rerun()
 
-st.caption("Data dari OKX public API. Binance & Bybit diblokir oleh lokasi server Streamlit Cloud. Centang Auto Refresh untuk update otomatis setiap 3 detik.")
+st.caption("Cumulative = total volume dari harga terbaik sampai level tersebut. Mirip tampilan di aplikasi OKX.")
 
 st.markdown("---")
 
