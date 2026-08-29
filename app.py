@@ -31,6 +31,21 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
+# SIDEBAR NAVIGASI
+# ==========================================
+st.sidebar.title("ABEL FX")
+st.sidebar.markdown("---")
+
+menu = st.sidebar.radio(
+    "Pilih Halaman",
+    ["🔮 Astrodox", "📊 Orderbook XAUT"],
+    index=0
+)
+
+st.sidebar.markdown("---")
+st.sidebar.caption("ABEL FX Tools")
+
+# ==========================================
 # ASTRODOX ENGINE
 # ==========================================
 ZODIAC_SYMBOLS = ["♈", "♉", "♊", "♋", "♌", "♍", "♎", "♏", "♐", "♑", "♒", "♓"]
@@ -146,7 +161,7 @@ def generate_astrodox_wheel_only(target_date: datetime):
 
 
 # ==========================================
-# ORDERBOOK OKX + CUMULATIVE
+# ORDERBOOK FUNCTIONS
 # ==========================================
 
 def get_okx_orderbook(limit=50):
@@ -165,7 +180,6 @@ def get_okx_orderbook(limit=50):
 
 
 def add_cumulative(orders):
-    """Tambah kolom cumulative quantity"""
     result = []
     cumulative = 0.0
     for price, size in orders:
@@ -183,11 +197,9 @@ def show_orderbook(bids, asks, error=None, min_cum=0.0):
         st.warning("Data kosong")
         return
 
-    # Tambah cumulative
     bids_cum = add_cumulative(bids)
     asks_cum = add_cumulative(asks)
 
-    # Filter berdasarkan cumulative (mirip di HP)
     if min_cum > 0:
         bids_cum = [x for x in bids_cum if x[2] >= min_cum]
         asks_cum = [x for x in asks_cum if x[2] >= min_cum]
@@ -208,7 +220,6 @@ def show_orderbook(bids, asks, error=None, min_cum=0.0):
 
     st.markdown(f"**Mid Price:** `{mid:,.2f}` USDT")
 
-    # DataFrame dengan Cumulative
     bid_df = pd.DataFrame(bids_cum[:40], columns=["Harga", "Size", "Cumulative"])
     ask_df = pd.DataFrame(asks_cum[:40], columns=["Harga", "Size", "Cumulative"])
 
@@ -229,102 +240,106 @@ def show_orderbook(bids, asks, error=None, min_cum=0.0):
 
 
 # ==========================================
-# HALAMAN UTAMA
+# HALAMAN ASTRODOX
 # ==========================================
-st.title("🔮 ABEL FX — Astrodox Wheel")
-st.caption("Roda Transit + Orderbook XAUT Realtime (OKX)")
+if menu == "🔮 Astrodox":
+    st.title("🔮 ABEL FX — Astrodox Wheel")
+    st.caption("Roda Transit Planet + Rekap Aspek Geometri")
 
-st.markdown("---")
+    st.markdown("---")
 
-# Tanggal
-st.subheader("📅 Atur Waktu Transit")
-c1, c2, c3, c4, c5 = st.columns(5)
-with c1:
-    tanggal = st.number_input("Tanggal", 1, 31, 12)
-with c2:
-    bulan_list = ["Januari", "Februari", "Maret", "April", "Mei", "Juni",
-                  "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
-    bulan_nama = st.selectbox("Bulan", bulan_list, index=7)
-    bulan = bulan_list.index(bulan_nama) + 1
-with c3:
-    tahun = st.number_input("Tahun", 2000, 2100, 2026)
-with c4:
-    jam = st.number_input("Jam", 0, 23, 19)
-with c5:
-    menit = st.number_input("Menit", 0, 59, 30)
+    st.subheader("📅 Atur Waktu Transit")
+    c1, c2, c3, c4, c5 = st.columns(5)
+    with c1:
+        tanggal = st.number_input("Tanggal", 1, 31, 12)
+    with c2:
+        bulan_list = ["Januari", "Februari", "Maret", "April", "Mei", "Juni",
+                      "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
+        bulan_nama = st.selectbox("Bulan", bulan_list, index=7)
+        bulan = bulan_list.index(bulan_nama) + 1
+    with c3:
+        tahun = st.number_input("Tahun", 2000, 2100, 2026)
+    with c4:
+        jam = st.number_input("Jam", 0, 23, 19)
+    with c5:
+        menit = st.number_input("Menit", 0, 59, 30)
 
-try:
-    event_datetime = datetime(int(tahun), int(bulan), int(tanggal), int(jam), int(menit))
-except:
-    st.error("Tanggal tidak valid")
-    st.stop()
+    try:
+        event_datetime = datetime(int(tahun), int(bulan), int(tanggal), int(jam), int(menit))
+    except:
+        st.error("Tanggal tidak valid")
+        st.stop()
 
-st.markdown(f"**Waktu:** `{event_datetime.strftime('%d %B %Y %H:%M WIB')}`")
-st.markdown("---")
+    st.markdown(f"**Waktu:** `{event_datetime.strftime('%d %B %Y %H:%M WIB')}`")
+    st.markdown("---")
 
-# Roda
-fig, img_buf, aspect_counts, planet_positions = generate_astrodox_wheel_only(event_datetime)
-st.subheader("🔮 Roda Astrodox Transit")
-st.pyplot(fig, use_container_width=True)
-st.download_button("📥 Download Roda", img_buf, f"Astrodox_{event_datetime.strftime('%Y%m%d_%H%M')}.png", "image/png")
+    fig, img_buf, aspect_counts, planet_positions = generate_astrodox_wheel_only(event_datetime)
+    st.subheader("🔮 Roda Astrodox Transit")
+    st.pyplot(fig, use_container_width=True)
+    st.download_button("📥 Download Roda", img_buf, f"Astrodox_{event_datetime.strftime('%Y%m%d_%H%M')}.png", "image/png")
 
-st.markdown("---")
+    st.markdown("---")
 
-# ====================== ORDERBOOK ======================
-st.subheader("📊 Orderbook XAUT/USDT (OKX) - dengan Cumulative")
+    # Dashboard Info
+    st.subheader("📋 Dashboard Info Astrodox")
+    pos_lines = []
+    pos_items = list(planet_positions.items())
+    for i in range(0, len(pos_items), 2):
+        p1, v1 = pos_items[i]
+        if i + 1 < len(pos_items):
+            p2, v2 = pos_items[i + 1]
+            pos_lines.append(f"• {p1:<12}: {v1:<16}  |  • {p2:<12}: {v2}")
+        else:
+            pos_lines.append(f"• {p1:<12}: {v1}")
+    pos_text = "\n".join(pos_lines)
 
-col_set1, col_set2, col_set3 = st.columns(3)
-with col_set1:
-    limit = st.selectbox("Jumlah Level", [20, 30, 50, 100], index=2)
-with col_set2:
-    min_cum = st.number_input("Min Cumulative (XAUT)", min_value=0.0, value=0.0, step=1.0,
-                              help="Hanya tampilkan level yang cumulative-nya ≥ nilai ini (mirip filter di aplikasi OKX)")
-with col_set3:
-    auto_refresh = st.checkbox("Auto Refresh (3 detik)", value=False)
-
-if st.button("🔄 Refresh Sekarang", type="primary") or auto_refresh or "ob_data" not in st.session_state:
-    with st.spinner("Mengambil data OKX..."):
-        st.session_state.ob_data = get_okx_orderbook(limit)
-
-bids, asks, err = st.session_state.ob_data
-show_orderbook(bids, asks, err, min_cum)
-
-if auto_refresh:
-    time.sleep(3)
-    st.rerun()
-
-st.caption("Cumulative = total volume dari harga terbaik sampai level tersebut. Mirip tampilan di aplikasi OKX.")
-
-st.markdown("---")
-
-# Dashboard Info
-st.subheader("📋 Dashboard Info Astrodox")
-pos_lines = []
-pos_items = list(planet_positions.items())
-for i in range(0, len(pos_items), 2):
-    p1, v1 = pos_items[i]
-    if i + 1 < len(pos_items):
-        p2, v2 = pos_items[i + 1]
-        pos_lines.append(f"• {p1:<12}: {v1:<16}  |  • {p2:<12}: {v2}")
-    else:
-        pos_lines.append(f"• {p1:<12}: {v1}")
-pos_text = "\n".join(pos_lines)
-
-aspek_text = f"""• MERAH  (Square/Opp) : {aspect_counts['merah']} → Volatilitas Tinggi
+    aspek_text = f"""• MERAH  (Square/Opp) : {aspect_counts['merah']} → Volatilitas Tinggi
 • HIJAU  (Trine)      : {aspect_counts['hijau']} → Expansion
 • BIRU   (Sextile)    : {aspect_counts['biru']} → Retest
 • KUNING (Conjunction): {aspect_counts['kuning']} → Turning Point"""
 
-st.markdown(f"""
-<div class="info-box">
-<strong>POSISI PLANET ({event_datetime.strftime('%d %b %Y %H:%M WIB')})</strong><br>
-{"─"*60}<br>
-{pos_text.replace(chr(10), "<br>")}<br><br>
-<strong>REKAP ASPEK</strong><br>
-{"─"*60}<br>
-{aspek_text.replace(chr(10), "<br>")}
-</div>
-""", unsafe_allow_html=True)
+    st.markdown(f"""
+    <div class="info-box">
+    <strong>POSISI PLANET ({event_datetime.strftime('%d %b %Y %H:%M WIB')})</strong><br>
+    {"─"*60}<br>
+    {pos_text.replace(chr(10), "<br>")}<br><br>
+    <strong>REKAP ASPEK</strong><br>
+    {"─"*60}<br>
+    {aspek_text.replace(chr(10), "<br>")}
+    </div>
+    """, unsafe_allow_html=True)
 
-st.markdown("---")
-st.caption("ABEL FX Astrodox Wheel")
+    st.markdown("---")
+    st.caption("ABEL FX Astrodox Wheel")
+
+
+# ==========================================
+# HALAMAN ORDERBOOK
+# ==========================================
+elif menu == "📊 Orderbook XAUT":
+    st.title("📊 Orderbook XAUT/USDT")
+    st.caption("Data realtime dari OKX • dengan Cumulative Quantity")
+
+    st.markdown("---")
+
+    col_set1, col_set2, col_set3 = st.columns(3)
+    with col_set1:
+        limit = st.selectbox("Jumlah Level", [20, 30, 50, 100], index=2)
+    with col_set2:
+        min_cum = st.number_input("Min Cumulative (XAUT)", min_value=0.0, value=0.0, step=1.0,
+                                  help="Hanya tampilkan level yang cumulative-nya ≥ nilai ini")
+    with col_set3:
+        auto_refresh = st.checkbox("Auto Refresh (3 detik)", value=False)
+
+    if st.button("🔄 Refresh Sekarang", type="primary") or auto_refresh or "ob_data" not in st.session_state:
+        with st.spinner("Mengambil data OKX..."):
+            st.session_state.ob_data = get_okx_orderbook(limit)
+
+    bids, asks, err = st.session_state.ob_data
+    show_orderbook(bids, asks, err, min_cum)
+
+    if auto_refresh:
+        time.sleep(3)
+        st.rerun()
+
+    st.caption("Cumulative = total volume dari harga terbaik sampai level tersebut.")
