@@ -6,9 +6,6 @@ from datetime import datetime, timedelta
 import requests
 import pandas as pd
 
-# ==========================================
-# KONFIGURASI HALAMAN
-# ==========================================
 st.set_page_config(
     page_title="ABEL FX - Astrodox Wheel",
     page_icon="🔮",
@@ -28,18 +25,6 @@ st.markdown("""
         font-size: 14px;
         color: #e0e0e0;
         line-height: 1.55;
-    }
-    .stTextInput > div > div > input, .stNumberInput > div > div > input {
-        background-color: #0d1117;
-    }
-    /* Orderbook table style */
-    .bid-table th {
-        background-color: #0d3b2e !important;
-        color: #00ff9d !important;
-    }
-    .ask-table th {
-        background-color: #3b0d0d !important;
-        color: #ff4d4d !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -121,9 +106,6 @@ def generate_astrodox_wheel_only(target_date: datetime):
             color='white', fontsize=16, ha='center', va='center', fontweight='bold'
         )
 
-    planets_keys = list(planet_degrees.keys())
-    deg_list = list(planet_degrees.values())
-
     for name, deg in planet_degrees.items():
         rad = np.radians(deg)
         ax.plot(rad, 0.70, marker='o', color='#00ffff', markersize=7)
@@ -131,6 +113,8 @@ def generate_astrodox_wheel_only(target_date: datetime):
         ax.text(rad, 0.60, short_symbol, color='white', fontsize=13, ha='center', va='center', fontweight='bold')
 
     aspect_counts = {"merah": 0, "hijau": 0, "biru": 0, "kuning": 0}
+    planets_keys = list(planet_degrees.keys())
+    deg_list = list(planet_degrees.values())
 
     for i in range(len(planets_keys)):
         for j in range(i + 1, len(planets_keys)):
@@ -139,7 +123,6 @@ def generate_astrodox_wheel_only(target_date: datetime):
             diff = abs(d1 - d2) % 360
             if diff > 180:
                 diff = 360 - diff
-
             rad1 = np.radians(d1)
             rad2 = np.radians(d2)
 
@@ -156,55 +139,23 @@ def generate_astrodox_wheel_only(target_date: datetime):
                 ax.plot([rad1, rad2], [0.70, 0.70], marker='*', color='#ffff00', alpha=0.9, linewidth=2.2, markersize=9)
                 aspect_counts["kuning"] += 1
 
-    ax.set_title(
-        f"{target_date.strftime('%d.%m.%Y %H:%M WIB')}",
-        color='white', fontsize=16, pad=18, fontweight='bold'
-    )
-
+    ax.set_title(f"{target_date.strftime('%d.%m.%Y %H:%M WIB')}", color='white', fontsize=16, pad=18, fontweight='bold')
     plt.tight_layout()
 
     img_buf = io.BytesIO()
     plt.savefig(img_buf, format='png', dpi=220, bbox_inches='tight', facecolor='#0e1117')
     img_buf.seek(0)
-
     return fig, img_buf, aspect_counts, planet_positions
 
 
 # ==========================================
-# ORDERBOOK XAUT
+# ORDERBOOK - OKX (paling stabil di Streamlit Cloud)
 # ==========================================
-
-def get_binance_orderbook(limit=20):
-    try:
-        url = f"https://api.binance.com/api/v3/depth?symbol=XAUTUSDT&limit={limit}"
-        r = requests.get(url, timeout=8)
-        data = r.json()
-        if "bids" not in data:
-            return None, None, data.get("msg", "Binance error")
-        bids = [[float(p), float(q)] for p, q in data["bids"]]
-        asks = [[float(p), float(q)] for p, q in data["asks"]]
-        return bids, asks, None
-    except Exception as e:
-        return None, None, str(e)
-
-def get_bybit_orderbook(limit=20):
-    try:
-        url = f"https://api.bybit.com/v5/market/orderbook?category=spot&symbol=XAUTUSDT&limit={limit}"
-        r = requests.get(url, timeout=8)
-        data = r.json()
-        if data.get("retCode") != 0:
-            return None, None, data.get("retMsg", "Bybit error")
-        result = data["result"]
-        bids = [[float(p), float(q)] for p, q in result.get("b", [])]
-        asks = [[float(p), float(q)] for p, q in result.get("a", [])]
-        return bids, asks, None
-    except Exception as e:
-        return None, None, str(e)
 
 def get_okx_orderbook(limit=20):
     try:
         url = f"https://www.okx.com/api/v5/market/books?instId=XAUT-USDT&sz={limit}"
-        r = requests.get(url, timeout=8)
+        r = requests.get(url, timeout=10)
         data = r.json()
         if data.get("code") != "0":
             return None, None, data.get("msg", "OKX error")
@@ -216,15 +167,13 @@ def get_okx_orderbook(limit=20):
         return None, None, str(e)
 
 
-def show_orderbook_table(bids, asks, exchange_name, error=None):
-    st.markdown(f"### {exchange_name}")
-
+def show_orderbook(bids, asks, error=None):
     if error:
-        st.error(f"Error: {error}")
+        st.error(f"Gagal mengambil data: {error}")
         return
 
     if not bids or not asks:
-        st.warning("Data kosong")
+        st.warning("Data orderbook kosong")
         return
 
     best_bid = bids[0][0]
@@ -232,132 +181,104 @@ def show_orderbook_table(bids, asks, exchange_name, error=None):
     spread = best_ask - best_bid
     mid = (best_bid + best_ask) / 2
 
-    st.markdown(f"**Mid:** `{mid:,.2f}` &nbsp;&nbsp;|&nbsp;&nbsp; **Spread:** `{spread:.2f}`")
+    # Header info
+    col_info1, col_info2, col_info3 = st.columns(3)
+    with col_info1:
+        st.metric("Best Bid", f"{best_bid:,.2f}")
+    with col_info2:
+        st.metric("Best Ask", f"{best_ask:,.2f}")
+    with col_info3:
+        st.metric("Spread", f"{spread:.2f}")
 
-    # Buat DataFrame
-    bid_df = pd.DataFrame(bids[:20], columns=["Harga Beli", "Jumlah (XAUT)"])
-    ask_df = pd.DataFrame(asks[:20], columns=["Harga Jual", "Jumlah (XAUT)"])
+    st.markdown(f"**Mid Price:** `{mid:,.2f}` USDT")
 
-    bid_df["Harga Beli"] = bid_df["Harga Beli"].map("{:,.2f}".format)
-    ask_df["Harga Jual"] = ask_df["Harga Jual"].map("{:,.2f}".format)
+    # Tabel
+    bid_df = pd.DataFrame(bids[:25], columns=["Harga Beli (USDT)", "Jumlah (XAUT)"])
+    ask_df = pd.DataFrame(asks[:25], columns=["Harga Jual (USDT)", "Jumlah (XAUT)"])
+
+    bid_df["Harga Beli (USDT)"] = bid_df["Harga Beli (USDT)"].map("{:,.2f}".format)
+    ask_df["Harga Jual (USDT)"] = ask_df["Harga Jual (USDT)"].map("{:,.2f}".format)
     bid_df["Jumlah (XAUT)"] = bid_df["Jumlah (XAUT)"].map("{:.4f}".format)
     ask_df["Jumlah (XAUT)"] = ask_df["Jumlah (XAUT)"].map("{:.4f}".format)
 
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown("**🟢 Pembeli (Bids)**")
-        st.dataframe(
-            bid_df,
-            use_container_width=True,
-            height=420,
-            hide_index=True
-        )
+        st.markdown("### 🟢 Pembeli (Bids)")
+        st.dataframe(bid_df, use_container_width=True, height=500, hide_index=True)
 
     with col2:
-        st.markdown("**🔴 Penjual (Asks)**")
-        st.dataframe(
-            ask_df,
-            use_container_width=True,
-            height=420,
-            hide_index=True
-        )
+        st.markdown("### 🔴 Penjual (Asks)")
+        st.dataframe(ask_df, use_container_width=True, height=500, hide_index=True)
 
 
 # ==========================================
-# BERANDA UTAMA
+# HALAMAN UTAMA
 # ==========================================
 st.title("🔮 ABEL FX — Astrodox Wheel")
-st.caption("Roda Transit Planet + Rekap Aspek Geometri | Siap untuk di-copy ke AI eksternal")
+st.caption("Roda Transit Planet + Orderbook XAUT Realtime")
 
 st.markdown("---")
 
-# ----- Selector Tanggal & Jam -----
+# ----- Selector Tanggal -----
 st.subheader("📅 Atur Waktu Transit")
 
 col1, col2, col3, col4, col5 = st.columns(5)
-
 with col1:
     tanggal = st.number_input("Tanggal", min_value=1, max_value=31, value=12)
-
 with col2:
-    daftar_bulan = [
-        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
-    ]
+    daftar_bulan = ["Januari", "Februari", "Maret", "April", "Mei", "Juni",
+                    "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
     bulan_dict = {nama: i + 1 for i, nama in enumerate(daftar_bulan)}
     bulan_nama = st.selectbox("Bulan", daftar_bulan, index=7)
     bulan = bulan_dict[bulan_nama]
-
 with col3:
     tahun = st.number_input("Tahun", min_value=2000, max_value=2100, value=2026)
-
 with col4:
     jam = st.number_input("Jam (WIB)", min_value=0, max_value=23, value=19)
-
 with col5:
     menit = st.number_input("Menit", min_value=0, max_value=59, value=30)
 
 try:
     event_datetime = datetime(int(tahun), int(bulan), int(tanggal), int(jam), int(menit))
 except ValueError:
-    st.error("Tanggal tidak valid.")
+    st.error("Tanggal tidak valid")
     st.stop()
 
 st.markdown(f"**Waktu yang dipilih:** `{event_datetime.strftime('%d %B %Y %H:%M WIB')}`")
 
 st.markdown("---")
 
-# ----- Generate Roda -----
+# ----- Roda -----
 fig, img_buf, aspect_counts, planet_positions = generate_astrodox_wheel_only(event_datetime)
 
 st.subheader("🔮 Roda Astrodox Transit")
 st.pyplot(fig, use_container_width=True)
 
-col_dl1, col_dl2 = st.columns([1, 3])
-with col_dl1:
-    st.download_button(
-        label="📥 Download Roda (.png)",
-        data=img_buf,
-        file_name=f"Astrodox_Wheel_{event_datetime.strftime('%Y%m%d_%H%M')}.png",
-        mime="image/png",
-        use_container_width=True
-    )
+st.download_button(
+    label="📥 Download Roda (.png)",
+    data=img_buf,
+    file_name=f"Astrodox_Wheel_{event_datetime.strftime('%Y%m%d_%H%M')}.png",
+    mime="image/png"
+)
 
 st.markdown("---")
 
-# ----- ORDERBOOK XAUT -----
-st.subheader("📊 Orderbook XAUT/USDT (Realtime)")
+# ----- ORDERBOOK -----
+st.subheader("📊 Orderbook XAUT/USDT (OKX - Realtime)")
 
-col_set1, col_set2 = st.columns([1, 3])
-with col_set1:
-    limit_level = st.selectbox("Jumlah Level", [10, 15, 20, 30], index=2)
+col_a, col_b = st.columns([1, 3])
+with col_a:
+    limit_level = st.selectbox("Jumlah Level", [10, 15, 20, 30, 50], index=2)
 
-refresh = st.button("🔄 Refresh Orderbook", type="primary")
+if st.button("🔄 Refresh Orderbook", type="primary") or "ob_data" not in st.session_state:
+    with st.spinner("Mengambil data dari OKX..."):
+        st.session_state.ob_data = get_okx_orderbook(limit_level)
 
-if refresh or "orderbook_loaded" not in st.session_state:
-    with st.spinner("Mengambil data orderbook dari exchange..."):
-        st.session_state.binance = get_binance_orderbook(limit_level)
-        st.session_state.bybit = get_bybit_orderbook(limit_level)
-        st.session_state.okx = get_okx_orderbook(limit_level)
-        st.session_state.orderbook_loaded = True
+bids, asks, error = st.session_state.ob_data
+show_orderbook(bids, asks, error)
 
-# Tampilkan 3 exchange
-tab1, tab2, tab3 = st.tabs(["Binance", "Bybit", "OKX"])
-
-with tab1:
-    b, a, e = st.session_state.binance
-    show_orderbook_table(b, a, "Binance", e)
-
-with tab2:
-    b, a, e = st.session_state.bybit
-    show_orderbook_table(b, a, "Bybit", e)
-
-with tab3:
-    b, a, e = st.session_state.okx
-    show_orderbook_table(b, a, "OKX", e)
-
-st.caption("Data diambil langsung dari public API exchange. Tabel bisa di-scroll.")
+st.caption("Data diambil langsung dari OKX public API. Binance & Bybit diblokir oleh lokasi server Streamlit Cloud.")
 
 st.markdown("---")
 
@@ -392,64 +313,6 @@ info_html = f"""
 </div>
 """
 st.markdown(info_html, unsafe_allow_html=True)
-
-st.markdown("---")
-
-# ==========================================
-# PAPAN PROMPT
-# ==========================================
-st.subheader("📋 Papan Prompt 1 — Full Analysis")
-
-prompt_full = f"""Kamu adalah Senior Quantitative Trader + Macro Analyst + Financial Astrologer spesialis XAUUSD.
-
-Gunakan data Astrodox di bawah ini + pengetahuan teknikal, makro, dan geopolitik terbaru kamu untuk menghasilkan analisis lengkap.
-
-=== DATA ASTRODOX TRANSIT ===
-Waktu: {event_datetime.strftime('%d %B %Y %H:%M WIB')}
-
-POSISI PLANET:
-{pos_text}
-
-REKAP GARIS ASPEK GEOMETRI:
-{aspek_text}
-
-=== INSTRUKSI OUTPUT (WAJIB LENGKAP) ===
-
-1. **Rekap Data News & Indikator Pendukung**
-2. **Analisis Makro**
-3. **Update Geopolitik Terbaru**
-4. **Kesimpulan AI untuk Entry** (Bias + Range)
-5. **3 Setup Entry Lengkap** (Macro + Astrodox + Orderflow/SMC)
-
-Format jawaban harus rapi dan siap dibaca trader.
-"""
-
-st.code(prompt_full, language="text")
-
-st.markdown("---")
-
-st.subheader("📋 Papan Prompt 2 — Simple Astrodox Only")
-
-prompt_simple = f"""Kamu adalah Senior Quantitative Trader + Financial Astrologer spesialis XAUUSD.
-
-=== DATA ASTRODOX TRANSIT ===
-Waktu: {event_datetime.strftime('%d %B %Y %H:%M WIB')}
-
-POSISI PLANET:
-{pos_text}
-
-REKAP GARIS ASPEK GEOMETRI:
-{aspek_text}
-
-=== INSTRUKSI OUTPUT ===
-1. **Bias Utama** : BULLISH / BEARISH / WHIPSAW / NEUTRAL
-2. **Peringatan Whipsaw**
-3. **Sweep Range**
-4. **Trend Range**
-5. **Reversal Range**
-"""
-
-st.code(prompt_simple, language="text")
 
 st.markdown("---")
 st.caption("ABEL FX Astrodox Wheel")
