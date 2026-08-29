@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import io
 from datetime import datetime, timedelta
+import requests
 
 # ==========================================
 # KONFIGURASI HALAMAN
@@ -172,6 +173,78 @@ def generate_astrodox_wheel_only(target_date: datetime):
 
 
 # ==========================================
+# ORDERBOOK XAUT
+# ==========================================
+
+def get_binance_orderbook(limit=15):
+    try:
+        url = f"https://api.binance.com/api/v3/depth?symbol=XAUTUSDT&limit={limit}"
+        r = requests.get(url, timeout=5)
+        data = r.json()
+        bids = [[float(p), float(q)] for p, q in data["bids"]]
+        asks = [[float(p), float(q)] for p, q in data["asks"]]
+        return bids, asks, None
+    except Exception as e:
+        return [], [], str(e)
+
+def get_bybit_orderbook(limit=15):
+    try:
+        url = f"https://api.bybit.com/v5/market/orderbook?category=spot&symbol=XAUTUSDT&limit={limit}"
+        r = requests.get(url, timeout=5)
+        data = r.json()
+        if data.get("retCode") != 0:
+            return [], [], data.get("retMsg", "Error")
+        result = data["result"]
+        bids = [[float(p), float(q)] for p, q in result["b"]]
+        asks = [[float(p), float(q)] for p, q in result["a"]]
+        return bids, asks, None
+    except Exception as e:
+        return [], [], str(e)
+
+def get_okx_orderbook(limit=15):
+    try:
+        url = f"https://www.okx.com/api/v5/market/books?instId=XAUT-USDT&sz={limit}"
+        r = requests.get(url, timeout=5)
+        data = r.json()
+        if data.get("code") != "0":
+            return [], [], data.get("msg", "Error")
+        book = data["data"][0]
+        bids = [[float(p), float(q)] for p, q, *_ in book["bids"]]
+        asks = [[float(p), float(q)] for p, q, *_ in book["asks"]]
+        return bids, asks, None
+    except Exception as e:
+        return [], [], str(e)
+
+def display_orderbook(bids, asks, exchange_name, error=None):
+    if error:
+        st.error(f"{exchange_name}: {error}")
+        return
+
+    if not bids or not asks:
+        st.warning(f"{exchange_name}: Data kosong")
+        return
+
+    best_bid = bids[0][0]
+    best_ask = asks[0][0]
+    spread = best_ask - best_bid
+    mid = (best_bid + best_ask) / 2
+
+    st.markdown(f"**{exchange_name}** | Mid: `{mid:.2f}` | Spread: `{spread:.2f}`")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("**Bids (Buy)**")
+        for price, qty in bids[:12]:
+            st.write(f"`{price:.2f}` — {qty:.4f}")
+
+    with col2:
+        st.markdown("**Asks (Sell)**")
+        for price, qty in asks[:12]:
+            st.write(f"`{price:.2f}` — {qty:.4f}")
+
+
+# ==========================================
 # BERANDA UTAMA
 # ==========================================
 st.title("🔮 ABEL FX — Astrodox Wheel")
@@ -230,6 +303,37 @@ with col_dl1:
         mime="image/png",
         use_container_width=True
     )
+
+st.markdown("---")
+
+# ----- ORDERBOOK XAUT -----
+st.subheader("📊 Orderbook XAUT/USDT (Realtime)")
+
+refresh = st.button("🔄 Refresh Orderbook")
+
+if refresh or "orderbook_loaded" not in st.session_state:
+    with st.spinner("Mengambil data orderbook..."):
+        binance_bids, binance_asks, binance_err = get_binance_orderbook()
+        bybit_bids, bybit_asks, bybit_err = get_bybit_orderbook()
+        okx_bids, okx_asks, okx_err = get_okx_orderbook()
+        
+        st.session_state.binance = (binance_bids, binance_asks, binance_err)
+        st.session_state.bybit = (bybit_bids, bybit_asks, bybit_err)
+        st.session_state.okx = (okx_bids, okx_asks, okx_err)
+        st.session_state.orderbook_loaded = True
+
+col_a, col_b, col_c = st.columns(3)
+
+with col_a:
+    display_orderbook(*st.session_state.binance, "Binance")
+
+with col_b:
+    display_orderbook(*st.session_state.bybit, "Bybit")
+
+with col_c:
+    display_orderbook(*st.session_state.okx, "OKX")
+
+st.caption("Data diambil langsung dari public API exchange (Binance, Bybit, OKX). Klik Refresh untuk update.")
 
 st.markdown("---")
 
