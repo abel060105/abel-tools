@@ -118,8 +118,10 @@ def generate_astrodox_wheel_only(target_date: datetime):
             d1 = deg_list[i]
             d2 = deg_list[j]
             diff = abs(d1 - d2) % 360
-            if diff > 180: diff = 360 - diff
-            rad1, rad2 = np.radians(d1), np.radians(d2)
+            if diff > 180:
+                diff = 360 - diff
+            rad1 = np.radians(d1)
+            rad2 = np.radians(d2)
 
             if abs(diff - 90) <= 7 or abs(diff - 180) <= 7:
                 ax.plot([rad1, rad2], [0.70, 0.70], color='#ff3333', alpha=0.85, linewidth=1.6)
@@ -136,6 +138,7 @@ def generate_astrodox_wheel_only(target_date: datetime):
 
     ax.set_title(f"{target_date.strftime('%d.%m.%Y %H:%M WIB')}", color='white', fontsize=16, pad=18, fontweight='bold')
     plt.tight_layout()
+
     img_buf = io.BytesIO()
     plt.savefig(img_buf, format='png', dpi=220, bbox_inches='tight', facecolor='#0e1117')
     img_buf.seek(0)
@@ -225,14 +228,19 @@ st.markdown("---")
 # Tanggal
 st.subheader("📅 Atur Waktu Transit")
 c1, c2, c3, c4, c5 = st.columns(5)
-with c1: tanggal = st.number_input("Tanggal", 1, 31, 12)
+with c1:
+    tanggal = st.number_input("Tanggal", 1, 31, 12)
 with c2:
-    bulan_list = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"]
+    bulan_list = ["Januari", "Februari", "Maret", "April", "Mei", "Juni",
+                  "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
     bulan_nama = st.selectbox("Bulan", bulan_list, index=7)
     bulan = bulan_list.index(bulan_nama) + 1
-with c3: tahun = st.number_input("Tahun", 2000, 2100, 2026)
-with c4: jam = st.number_input("Jam", 0, 23, 19)
-with c5: menit = st.number_input("Menit", 0, 59, 30)
+with c3:
+    tahun = st.number_input("Tahun", 2000, 2100, 2026)
+with c4:
+    jam = st.number_input("Jam", 0, 23, 19)
+with c5:
+    menit = st.number_input("Menit", 0, 59, 30)
 
 try:
     event_datetime = datetime(int(tahun), int(bulan), int(tanggal), int(jam), int(menit))
@@ -258,7 +266,8 @@ col_set1, col_set2, col_set3 = st.columns(3)
 with col_set1:
     limit = st.selectbox("Jumlah Level", [15, 20, 30, 50], index=1)
 with col_set2:
-    min_size = st.number_input("Min Quantity (XAUT)", min_value=0.0, value=0.0, step=0.1, help="Hanya tampilkan order yang jumlahnya ≥ nilai ini")
+    min_size = st.number_input("Min Quantity (XAUT)", min_value=0.0, value=0.0, step=0.1,
+                               help="Hanya tampilkan order yang jumlahnya ≥ nilai ini")
 with col_set3:
     auto_refresh = st.checkbox("Auto Refresh (3 detik)", value=False)
 
@@ -273,8 +282,7 @@ if auto_refresh:
     time.sleep(3)
     st.rerun()
 
-st.caption("• Binance & Bybit diblokir oleh lokasi server Streamlit Cloud → pakai OKX  
-• Centang Auto Refresh agar data update otomatis setiap 3 detik")
+st.caption("Data dari OKX public API. Binance & Bybit diblokir oleh lokasi server Streamlit Cloud. Centang Auto Refresh untuk update otomatis setiap 3 detik.")
 
 st.markdown("---")
 
@@ -284,8 +292,8 @@ pos_lines = []
 pos_items = list(planet_positions.items())
 for i in range(0, len(pos_items), 2):
     p1, v1 = pos_items[i]
-    if i+1 < len(pos_items):
-        p2, v2 = pos_items[i+1]
+    if i + 1 < len(pos_items):
+        p2, v2 = pos_items[i + 1]
         pos_lines.append(f"• {p1:<12}: {v1:<16}  |  • {p2:<12}: {v2}")
     else:
         pos_lines.append(f"• {p1:<12}: {v1}")
