@@ -206,14 +206,14 @@ def show_orderbook_visual(bids, asks, min_cum=0.0, sort_order="Default (Harga)")
         st.warning(f"Tidak ada level dengan cumulative ≥ {min_cum}")
         return
 
-    # Sorting
+    # Sorting berdasarkan Cumulative
     if sort_order == "Size Kecil → Besar":
-        bids_data = sorted(bids_data, key=lambda x: x["size"])
-        asks_data = sorted(asks_data, key=lambda x: x["size"])
+        bids_data = sorted(bids_data, key=lambda x: x["cumulative"])
+        asks_data = sorted(asks_data, key=lambda x: x["cumulative"])
     elif sort_order == "Size Besar → Kecil":
-        bids_data = sorted(bids_data, key=lambda x: x["size"], reverse=True)
-        asks_data = sorted(asks_data, key=lambda x: x["size"], reverse=True)
-    # Default = urutan harga (sudah dari API)
+        bids_data = sorted(bids_data, key=lambda x: x["cumulative"], reverse=True)
+        asks_data = sorted(asks_data, key=lambda x: x["cumulative"], reverse=True)
+    # Default = urutan harga (dari API)
 
     best_bid = bids[0][0]
     best_ask = asks[0][0]
@@ -377,4 +377,4 @@ elif menu == "📊 Orderbook":
         time.sleep(3)
         st.rerun()
 
-    st.caption("Pilih urutan tampilan di atas untuk mengurutkan berdasarkan ukuran order.")
+    st.caption("Pilih urutan tampilan di atas. Sorting sekarang berdasarkan Cumulative.")
