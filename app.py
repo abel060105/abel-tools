@@ -27,9 +27,6 @@ st.markdown("""
         color: #e0e0e0;
         line-height: 1.55;
     }
-    div[data-testid="stMetricValue"] {
-        font-size: 1.3rem;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -179,54 +176,82 @@ def get_okx_orderbook(symbol="XAUT-USDT", limit=50):
         return None, None, str(e)
 
 
-def add_cumulative_and_total(orders):
+def add_cumulative(orders):
     result = []
     cumulative = 0.0
     for price, size in orders:
         cumulative += size
-        total = price * size
-        result.append([price, size, cumulative, total])
+        result.append({
+            "price": price,
+            "size": size,
+            "cumulative": cumulative
+        })
     return result
 
 
-def create_depth_chart(bids, asks):
-    fig, ax = plt.subplots(figsize=(12, 3.5), facecolor='#0e1117')
-    ax.set_facecolor('#0e1117')
+def show_orderbook_visual(bids, asks, min_cum=0.0):
+    if not bids or not asks:
+        st.warning("Data kosong")
+        return
 
-    # Bids (hijau) - reverse supaya dari kanan ke kiri
-    bid_prices = [x[0] for x in bids[:40]]
-    bid_cum = []
-    c = 0
-    for _, size in bids[:40]:
-        c += size
-        bid_cum.append(c)
+    bids_data = add_cumulative(bids)
+    asks_data = add_cumulative(asks)
 
-    # Asks (merah)
-    ask_prices = [x[0] for x in asks[:40]]
-    ask_cum = []
-    c = 0
-    for _, size in asks[:40]:
-        c += size
-        ask_cum.append(c)
+    # Filter cumulative
+    if min_cum > 0:
+        bids_data = [x for x in bids_data if x["cumulative"] >= min_cum]
+        asks_data = [x for x in asks_data if x["cumulative"] >= min_cum]
 
-    ax.fill_between(bid_prices, bid_cum, color='#00c853', alpha=0.6, label='Bids')
-    ax.plot(bid_prices, bid_cum, color='#00c853', linewidth=1.5)
+    if not bids_data or not asks_data:
+        st.warning(f"Tidak ada level dengan cumulative ≥ {min_cum}")
+        return
 
-    ax.fill_between(ask_prices, ask_cum, color='#ff1744', alpha=0.6, label='Asks')
-    ax.plot(ask_prices, ask_cum, color='#ff1744', linewidth=1.5)
+    best_bid = bids[0][0]
+    best_ask = asks[0][0]
+    mid = (best_bid + best_ask) / 2
+    spread = best_ask - best_bid
 
-    ax.set_xlabel("Price", color='white')
-    ax.set_ylabel("Cumulative Size", color='white')
-    ax.tick_params(colors='white')
-    ax.spines['bottom'].set_color('#333')
-    ax.spines['top'].set_color('#333')
-    ax.spines['left'].set_color('#333')
-    ax.spines['right'].set_color('#333')
-    ax.legend(facecolor='#161b22', labelcolor='white')
-    ax.grid(True, alpha=0.15)
+    # Metrics
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Best Bid", f"{best_bid:,.2f}")
+    c2.metric("Best Ask", f"{best_ask:,.2f}")
+    c3.metric("Mid", f"{mid:,.2f}")
+    c4.metric("Spread", f"{spread:.2f}")
 
-    plt.tight_layout()
-    return fig
+    st.markdown("---")
+
+    # Ambil max cumulative untuk scaling bar
+    max_cum = max(
+        max([x["cumulative"] for x in bids_data[:25]], default=1),
+        max([x["cumulative"] for x in asks_data[:25]], default=1)
+    )
+
+    col_bid, col_ask = st.columns(2)
+
+    with col_bid:
+        st.markdown("### 🟢 Beli (Bids)")
+        for item in bids_data[:25]:
+            pct = min(item["cumulative"] / max_cum, 1.0)
+            bar = "█" * int(pct * 20)
+            st.markdown(
+                f"<div style='display:flex; justify-content:space-between; background:linear-gradient(90deg, #0d3b2e {pct*100}%, transparent 0%); padding:4px 8px; margin:2px 0; border-radius:4px;'>"
+                f"<span style='color:#00ff9d'>{item['cumulative']:,.0f}</span>"
+                f"<span style='color:white'>{item['price']:,.2f}</span>"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+
+    with col_ask:
+        st.markdown("### 🔴 Jual (Asks)")
+        for item in asks_data[:25]:
+            pct = min(item["cumulative"] / max_cum, 1.0)
+            st.markdown(
+                f"<div style='display:flex; justify-content:space-between; background:linear-gradient(270deg, #3b0d0d {pct*100}%, transparent 0%); padding:4px 8px; margin:2px 0; border-radius:4px;'>"
+                f"<span style='color:white'>{item['price']:,.2f}</span>"
+                f"<span style='color:#ff4d4d'>{item['cumulative']:,.0f}</span>"
+                f"</div>",
+                unsafe_allow_html=True
+            )
 
 
 # ==========================================
@@ -302,73 +327,32 @@ if menu == "🔮 Astrodox":
 # ==========================================
 elif menu == "📊 Orderbook":
     st.title("📊 Orderbook")
-    
-    col_sym, col_refresh = st.columns([3, 1])
-    with col_sym:
-        symbol = st.selectbox("Pilih Pair", ["XAUT-USDT", "BTC-USDT"], index=0)
-    with col_refresh:
+
+    col1, col2, col3 = st.columns([2, 2, 1])
+    with col1:
+        symbol = st.selectbox("Pair", ["XAUT-USDT", "BTC-USDT"], index=0)
+    with col2:
+        min_cum = st.number_input("Min Cumulative (XAUT/BTC)", min_value=0.0, value=0.0, step=1.0)
+    with col3:
         st.write("")
         st.write("")
-        auto_refresh = st.checkbox("Auto Refresh 3s", value=False)
+        auto_refresh = st.checkbox("Auto Refresh", value=False)
 
-    st.markdown("---")
+    limit = st.selectbox("Jumlah Level", [20, 30, 50, 100], index=2)
 
-    limit = st.selectbox("Depth Level", [20, 30, 50, 100], index=2)
-
-    if st.button("🔄 Refresh", type="primary") or auto_refresh or "ob_data" not in st.session_state:
+    if st.button("🔄 Refresh Sekarang", type="primary") or auto_refresh or "ob_data" not in st.session_state:
         with st.spinner(f"Mengambil data {symbol}..."):
             st.session_state.ob_data = get_okx_orderbook(symbol, limit)
-            st.session_state.current_symbol = symbol
 
     bids, asks, err = st.session_state.ob_data
 
     if err:
-        st.error(f"Error: {err}")
-    elif bids and asks:
-        best_bid = bids[0][0]
-        best_ask = asks[0][0]
-        mid = (best_bid + best_ask) / 2
-        spread = best_ask - best_bid
-
-        # Header metrics
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Best Bid", f"{best_bid:,.2f}")
-        m2.metric("Best Ask", f"{best_ask:,.2f}")
-        m3.metric("Mid Price", f"{mid:,.2f}")
-        m4.metric("Spread", f"{spread:.2f}")
-
-        st.markdown(f"**{st.session_state.get('current_symbol', symbol)}** • Live")
-
-        # Tables
-        bids_full = add_cumulative_and_total(bids)
-        asks_full = add_cumulative_and_total(asks)
-
-        bid_df = pd.DataFrame(bids_full[:30], columns=["Price", "Amount", "Cumulative", "Total"])
-        ask_df = pd.DataFrame(asks_full[:30], columns=["Price", "Amount", "Cumulative", "Total"])
-
-        for df in [bid_df, ask_df]:
-            df["Price"] = df["Price"].map("{:,.2f}".format)
-            df["Amount"] = df["Amount"].map("{:.4f}".format)
-            df["Cumulative"] = df["Cumulative"].map("{:,.2f}".format)
-            df["Total"] = df["Total"].map("{:,.2f}".format)
-
-        c1, c2 = st.columns(2)
-
-        with c1:
-            st.markdown("### 🔴 ASKS (Sells)")
-            st.dataframe(ask_df[["Price", "Amount", "Total"]], use_container_width=True, height=420, hide_index=True)
-
-        with c2:
-            st.markdown("### 🟢 BIDS (Buys)")
-            st.dataframe(bid_df[["Price", "Amount", "Total"]], use_container_width=True, height=420, hide_index=True)
-
-        # Depth Chart
-        st.markdown("### Market Depth Chart")
-        depth_fig = create_depth_chart(bids, asks)
-        st.pyplot(depth_fig, use_container_width=True)
+        st.error(err)
+    else:
+        show_orderbook_visual(bids, asks, min_cum)
 
     if auto_refresh:
         time.sleep(3)
         st.rerun()
 
-    st.caption("Data dari OKX Public API")
+    st.caption("Semakin panjang bar = semakin besar cumulative volume. Mirip tampilan di aplikasi exchange.")
