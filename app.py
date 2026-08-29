@@ -158,7 +158,7 @@ def generate_astrodox_wheel_only(target_date: datetime):
 
 
 # ==========================================
-# ORDERBOOK FUNCTIONS
+# ORDERBOOK + TICKER + TRADES FUNCTIONS
 # ==========================================
 
 def get_okx_orderbook(symbol="XAUT-USDT", limit=50):
@@ -174,6 +174,54 @@ def get_okx_orderbook(symbol="XAUT-USDT", limit=50):
         return bids, asks, None
     except Exception as e:
         return None, None, str(e)
+
+
+def get_okx_ticker(symbol="XAUT-USDT"):
+    try:
+        url = f"https://www.okx.com/api/v5/market/ticker?instId={symbol}"
+        r = requests.get(url, timeout=8)
+        data = r.json()
+        if data.get("code") != "0":
+            return None
+        t = data["data"][0]
+        last = float(t["last"])
+        open24h = float(t["open24h"])
+        high24h = float(t["high24h"])
+        low24h = float(t["low24h"])
+        vol24h = float(t["vol24h"])
+        change = last - open24h
+        change_pct = (change / open24h) * 100 if open24h != 0 else 0
+        return {
+            "last": last,
+            "open24h": open24h,
+            "high24h": high24h,
+            "low24h": low24h,
+            "vol24h": vol24h,
+            "change": change,
+            "change_pct": change_pct
+        }
+    except:
+        return None
+
+
+def get_okx_trades(symbol="XAUT-USDT", limit=30):
+    try:
+        url = f"https://www.okx.com/api/v5/market/trades?instId={symbol}&limit={limit}"
+        r = requests.get(url, timeout=8)
+        data = r.json()
+        if data.get("code") != "0":
+            return []
+        trades = []
+        for t in data["data"]:
+            trades.append({
+                "time": datetime.fromtimestamp(int(t["ts"]) / 1000).strftime("%H:%M:%S"),
+                "price": float(t["px"]),
+                "size": float(t["sz"]),
+                "side": t["side"]  # buy / sell
+            })
+        return trades
+    except:
+        return []
 
 
 def add_cumulative(orders):
@@ -197,7 +245,6 @@ def show_orderbook_visual(bids, asks, min_cum=0.0, sort_order="Default (Harga)")
     bids_data = add_cumulative(bids)
     asks_data = add_cumulative(asks)
 
-    # Filter cumulative
     if min_cum > 0:
         bids_data = [x for x in bids_data if x["cumulative"] >= min_cum]
         asks_data = [x for x in asks_data if x["cumulative"] >= min_cum]
@@ -206,30 +253,13 @@ def show_orderbook_visual(bids, asks, min_cum=0.0, sort_order="Default (Harga)")
         st.warning(f"Tidak ada level dengan cumulative ≥ {min_cum}")
         return
 
-    # Sorting berdasarkan Cumulative
     if sort_order == "Size Kecil → Besar":
         bids_data = sorted(bids_data, key=lambda x: x["cumulative"])
         asks_data = sorted(asks_data, key=lambda x: x["cumulative"])
     elif sort_order == "Size Besar → Kecil":
         bids_data = sorted(bids_data, key=lambda x: x["cumulative"], reverse=True)
         asks_data = sorted(asks_data, key=lambda x: x["cumulative"], reverse=True)
-    # Default = urutan harga (dari API)
 
-    best_bid = bids[0][0]
-    best_ask = asks[0][0]
-    mid = (best_bid + best_ask) / 2
-    spread = best_ask - best_bid
-
-    # Metrics
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Best Bid", f"{best_bid:,.2f}")
-    c2.metric("Best Ask", f"{best_ask:,.2f}")
-    c3.metric("Mid", f"{mid:,.2f}")
-    c4.metric("Spread", f"{spread:.2f}")
-
-    st.markdown("---")
-
-    # Max untuk scaling bar
     max_cum = max(
         max([x["cumulative"] for x in bids_data[:30]], default=1),
         max([x["cumulative"] for x in asks_data[:30]], default=1)
@@ -239,7 +269,7 @@ def show_orderbook_visual(bids, asks, min_cum=0.0, sort_order="Default (Harga)")
 
     with col_bid:
         st.markdown("### 🟢 Beli (Bids)")
-        for item in bids_data[:30]:
+        for item in bids_data[:25]:
             pct = min(item["cumulative"] / max_cum, 1.0)
             st.markdown(
                 f"""
@@ -255,7 +285,7 @@ def show_orderbook_visual(bids, asks, min_cum=0.0, sort_order="Default (Harga)")
 
     with col_ask:
         st.markdown("### 🔴 Jual (Asks)")
-        for item in asks_data[:30]:
+        for item in asks_data[:25]:
             pct = min(item["cumulative"] / max_cum, 1.0)
             st.markdown(
                 f"""
@@ -342,7 +372,7 @@ if menu == "🔮 Astrodox":
 # HALAMAN ORDERBOOK
 # ==========================================
 elif menu == "📊 Orderbook":
-    st.title("📊 Orderbook")
+    st.title("📊 Orderbook & Market Data")
 
     col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
     with col1:
@@ -360,21 +390,86 @@ elif menu == "📊 Orderbook":
         st.write("")
         auto_refresh = st.checkbox("Auto Refresh", value=False)
 
-    limit = st.selectbox("Jumlah Level", [20, 30, 50, 100], index=2)
+    limit = st.selectbox("Jumlah Level Orderbook", [20, 30, 50, 100], index=2)
 
-    if st.button("🔄 Refresh Sekarang", type="primary") or auto_refresh or "ob_data" not in st.session_state:
+    # Ambil data
+    if st.button("🔄 Refresh Sekarang", type="primary") or auto_refresh or "market_data" not in st.session_state:
         with st.spinner(f"Mengambil data {symbol}..."):
-            st.session_state.ob_data = get_okx_orderbook(symbol, limit)
+            bids, asks, err = get_okx_orderbook(symbol, limit)
+            ticker = get_okx_ticker(symbol)
+            trades = get_okx_trades(symbol, 40)
+            st.session_state.market_data = {
+                "bids": bids,
+                "asks": asks,
+                "err": err,
+                "ticker": ticker,
+                "trades": trades,
+                "symbol": symbol
+            }
 
-    bids, asks, err = st.session_state.ob_data
+    data = st.session_state.market_data
+    ticker = data.get("ticker")
+    trades = data.get("trades", [])
+    bids = data.get("bids")
+    asks = data.get("asks")
+    err = data.get("err")
 
+    # ========== TICKER SECTION ==========
+    if ticker:
+        change_color = "green" if ticker["change_pct"] >= 0 else "red"
+        change_sign = "+" if ticker["change_pct"] >= 0 else ""
+
+        st.markdown(f"### {data.get('symbol', symbol)}")
+        
+        m1, m2, m3, m4, m5 = st.columns(5)
+        m1.metric("Harga Terakhir", f"{ticker['last']:,.2f}")
+        m2.metric("Perubahan 24jam", f"{change_sign}{ticker['change_pct']:.2f}%")
+        m3.metric("High 24jam", f"{ticker['high24h']:,.2f}")
+        m4.metric("Low 24jam", f"{ticker['low24h']:,.2f}")
+        m5.metric("Volume 24jam", f"{ticker['vol24h']:,.2f}")
+
+        # Dominasi Buyer vs Seller dari Recent Trades
+        if trades:
+            buy_vol = sum(t["size"] for t in trades if t["side"] == "buy")
+            sell_vol = sum(t["size"] for t in trades if t["side"] == "sell")
+            total_vol = buy_vol + sell_vol
+            if total_vol > 0:
+                buy_pct = (buy_vol / total_vol) * 100
+                sell_pct = (sell_vol / total_vol) * 100
+            else:
+                buy_pct = sell_pct = 50
+
+            st.markdown("#### Dominasi Buyer vs Seller (Recent Trades)")
+            st.progress(buy_pct / 100)
+            st.caption(f"🟢 Buyer: {buy_pct:.1f}%  ({buy_vol:,.2f})   |   🔴 Seller: {sell_pct:.1f}%  ({sell_vol:,.2f})")
+
+    st.markdown("---")
+
+    # ========== ORDERBOOK ==========
     if err:
         st.error(err)
     else:
         show_orderbook_visual(bids, asks, min_cum, sort_order)
 
+    st.markdown("---")
+
+    # ========== RECENT TRADES ==========
+    st.subheader("Recent Trades")
+    if trades:
+        trade_df = pd.DataFrame(trades)
+        trade_df["side"] = trade_df["side"].map({"buy": "🟢 Buy", "sell": "🔴 Sell"})
+        trade_df = trade_df.rename(columns={
+            "time": "Waktu",
+            "price": "Harga",
+            "size": "Jumlah",
+            "side": "Arah"
+        })
+        st.dataframe(trade_df, use_container_width=True, height=350, hide_index=True)
+    else:
+        st.info("Belum ada data trades")
+
     if auto_refresh:
         time.sleep(3)
         st.rerun()
 
-    st.caption("Pilih urutan tampilan di atas. Sorting sekarang berdasarkan Cumulative.")
+    st.caption("Data dari OKX Public API • Auto Refresh setiap 3 detik jika diaktifkan")
