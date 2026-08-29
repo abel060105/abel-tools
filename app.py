@@ -158,7 +158,7 @@ def generate_astrodox_wheel_only(target_date: datetime):
 
 
 # ==========================================
-# ORDERBOOK + TICKER + TRADES FUNCTIONS
+# ORDERBOOK + TICKER + TRADES
 # ==========================================
 
 def get_okx_orderbook(symbol="XAUT-USDT", limit=50):
@@ -204,7 +204,7 @@ def get_okx_ticker(symbol="XAUT-USDT"):
         return None
 
 
-def get_okx_trades(symbol="XAUT-USDT", limit=30):
+def get_okx_trades(symbol="XAUT-USDT", limit=40):
     try:
         url = f"https://www.okx.com/api/v5/market/trades?instId={symbol}&limit={limit}"
         r = requests.get(url, timeout=8)
@@ -217,7 +217,7 @@ def get_okx_trades(symbol="XAUT-USDT", limit=30):
                 "time": datetime.fromtimestamp(int(t["ts"]) / 1000).strftime("%H:%M:%S"),
                 "price": float(t["px"]),
                 "size": float(t["sz"]),
-                "side": t["side"]  # buy / sell
+                "side": t["side"]
             })
         return trades
     except:
@@ -239,7 +239,7 @@ def add_cumulative(orders):
 
 def show_orderbook_visual(bids, asks, min_cum=0.0, sort_order="Default (Harga)"):
     if not bids or not asks:
-        st.warning("Data kosong")
+        st.warning("Data orderbook kosong")
         return
 
     bids_data = add_cumulative(bids)
@@ -250,7 +250,7 @@ def show_orderbook_visual(bids, asks, min_cum=0.0, sort_order="Default (Harga)")
         asks_data = [x for x in asks_data if x["cumulative"] >= min_cum]
 
     if not bids_data or not asks_data:
-        st.warning(f"Tidak ada level dengan cumulative ≥ {min_cum}")
+        st.warning(f"Tidak ada level dengan cumulative ≥ {min_cum}. Coba turunkan Min Cumulative.")
         return
 
     if sort_order == "Size Kecil → Besar":
@@ -276,7 +276,7 @@ def show_orderbook_visual(bids, asks, min_cum=0.0, sort_order="Default (Harga)")
                 <div style="display:flex; justify-content:space-between; align-items:center;
                             background:linear-gradient(90deg, #0d3b2e {pct*100}%, transparent 0%);
                             padding:6px 10px; margin:3px 0; border-radius:6px;">
-                    <span style="color:#00ff9d; font-weight:bold;">{item['cumulative']:,.0f}</span>
+                    <span style="color:#00ff9d; font-weight:bold;">{item['cumulative']:,.1f}</span>
                     <span style="color:white;">{item['price']:,.2f}</span>
                 </div>
                 """,
@@ -293,7 +293,7 @@ def show_orderbook_visual(bids, asks, min_cum=0.0, sort_order="Default (Harga)")
                             background:linear-gradient(270deg, #3b0d0d {pct*100}%, transparent 0%);
                             padding:6px 10px; margin:3px 0; border-radius:6px;">
                     <span style="color:white;">{item['price']:,.2f}</span>
-                    <span style="color:#ff4d4d; font-weight:bold;">{item['cumulative']:,.0f}</span>
+                    <span style="color:#ff4d4d; font-weight:bold;">{item['cumulative']:,.1f}</span>
                 </div>
                 """,
                 unsafe_allow_html=True
@@ -392,7 +392,6 @@ elif menu == "📊 Orderbook":
 
     limit = st.selectbox("Jumlah Level Orderbook", [20, 30, 50, 100], index=2)
 
-    # Ambil data
     if st.button("🔄 Refresh Sekarang", type="primary") or auto_refresh or "market_data" not in st.session_state:
         with st.spinner(f"Mengambil data {symbol}..."):
             bids, asks, err = get_okx_orderbook(symbol, limit)
@@ -414,9 +413,8 @@ elif menu == "📊 Orderbook":
     asks = data.get("asks")
     err = data.get("err")
 
-    # ========== TICKER SECTION ==========
+    # ========== TICKER ==========
     if ticker:
-        change_color = "green" if ticker["change_pct"] >= 0 else "red"
         change_sign = "+" if ticker["change_pct"] >= 0 else ""
 
         st.markdown(f"### {data.get('symbol', symbol)}")
@@ -428,24 +426,42 @@ elif menu == "📊 Orderbook":
         m4.metric("Low 24jam", f"{ticker['low24h']:,.2f}")
         m5.metric("Volume 24jam", f"{ticker['vol24h']:,.2f}")
 
-        # Dominasi Buyer vs Seller dari Recent Trades
+        # Dominasi Buyer vs Seller (hijau - merah)
         if trades:
             buy_vol = sum(t["size"] for t in trades if t["side"] == "buy")
             sell_vol = sum(t["size"] for t in trades if t["side"] == "sell")
             total_vol = buy_vol + sell_vol
             if total_vol > 0:
                 buy_pct = (buy_vol / total_vol) * 100
-                sell_pct = (sell_vol / total_vol) * 100
+                sell_pct = 100 - buy_pct
             else:
                 buy_pct = sell_pct = 50
 
             st.markdown("#### Dominasi Buyer vs Seller (Recent Trades)")
-            st.progress(buy_pct / 100)
-            st.caption(f"🟢 Buyer: {buy_pct:.1f}%  ({buy_vol:,.2f})   |   🔴 Seller: {sell_pct:.1f}%  ({sell_vol:,.2f})")
+            
+            # Custom bar hijau - merah
+            st.markdown(
+                f"""
+                <div style="display:flex; height:28px; border-radius:8px; overflow:hidden; margin-bottom:6px;">
+                    <div style="width:{buy_pct}%; background:#00c853; display:flex; align-items:center; justify-content:center; color:white; font-weight:bold; font-size:13px;">
+                        {buy_pct:.1f}%
+                    </div>
+                    <div style="width:{sell_pct}%; background:#ff1744; display:flex; align-items:center; justify-content:center; color:white; font-weight:bold; font-size:13px;">
+                        {sell_pct:.1f}%
+                    </div>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:13px;">
+                    <span style="color:#00c853;">🟢 Buyer: {buy_vol:,.2f}</span>
+                    <span style="color:#ff1744;">🔴 Seller: {sell_vol:,.2f}</span>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
     st.markdown("---")
 
     # ========== ORDERBOOK ==========
+    st.subheader("Orderbook")
     if err:
         st.error(err)
     else:
@@ -472,4 +488,4 @@ elif menu == "📊 Orderbook":
         time.sleep(3)
         st.rerun()
 
-    st.caption("Data dari OKX Public API • Auto Refresh setiap 3 detik jika diaktifkan")
+    st.caption("Data dari OKX Public API • Pastikan Min Cumulative = 0 agar orderbook muncul")
