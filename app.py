@@ -293,9 +293,9 @@ def generate_astrodox_wheel_only(target_date: datetime):
     return fig, img_buf, aspect_counts, planet_positions
 
 # ==========================================
-# ORDERBOOK FUNCTIONS
+# ORDERBOOK FUNCTIONS (DIOPTIMALKAN SEPERTI OKX)
 # ==========================================
-def get_okx_orderbook(symbol="XAUT-USDT", limit=50):
+def get_okx_orderbook(symbol="XAUT-USDT", limit=100):
     try:
         url = f"https://www.okx.com/api/v5/market/books?instId={symbol}&sz={limit}"
         r = requests.get(url, timeout=8)
@@ -366,17 +366,20 @@ def show_orderbook_visual(bids, asks, min_cum=0.0, sort_order="Default (Harga)")
     elif sort_order == "Size Besar → Kecil":
         bids_data = sorted(bids_data, key=lambda x: x["cumulative"], reverse=True)
         asks_data = sorted(asks_data, key=lambda x: x["cumulative"], reverse=True)
+    
     max_cum = max(max([x["cumulative"] for x in bids_data[:30]], default=1),
                   max([x["cumulative"] for x in asks_data[:30]], default=1))
+    
     c1, c2 = st.columns(2)
     with c1:
         st.markdown("### 🟢 Beli (Bids)")
         for item in bids_data[:25]:
             pct = min(item["cumulative"] / max_cum, 1.0)
+            # Format angka menggunakan pemisah ribuan (contoh: 89,350) menyerupai OKX
             st.markdown(f"""<div style="display:flex;justify-content:space-between;align-items:center;
                 background:linear-gradient(90deg,#0d3b2e {pct*100}%,transparent 0%);
                 padding:6px 10px;margin:3px 0;border-radius:6px;">
-                <span style="color:#00ff9d;font-weight:bold;">{item['cumulative']:,.1f}</span>
+                <span style="color:#00ff9d;font-weight:bold;">{item['cumulative']:,.0f}</span>
                 <span style="color:inherit;">{item['price']:,.2f}</span></div>""", unsafe_allow_html=True)
     with c2:
         st.markdown("### 🔴 Jual (Asks)")
@@ -386,7 +389,7 @@ def show_orderbook_visual(bids, asks, min_cum=0.0, sort_order="Default (Harga)")
                 background:linear-gradient(270deg,#3b0d0d {pct*100}%,transparent 0%);
                 padding:6px 10px;margin:3px 0;border-radius:6px;">
                 <span style="color:inherit;">{item['price']:,.2f}</span>
-                <span style="color:#ff4d4d;font-weight:bold;">{item['cumulative']:,.1f}</span></div>""", unsafe_allow_html=True)
+                <span style="color:#ff4d4d;font-weight:bold;">{item['cumulative']:,.0f}</span></div>""", unsafe_allow_html=True)
 
 # ==========================================
 # HALAMAN UTAMA (CLEAN MINIMALIST)
@@ -591,15 +594,20 @@ elif menu == "📊 Orderbook":
     with c4:
         st.write(""); st.write("")
         auto_refresh = st.checkbox("Auto Refresh")
-    limit = st.selectbox("Jumlah Level", [20,30,50,100], index=2)
+    
+    # Default limit dinaikkan ke 100 agar kedalaman data menandingi aplikasi OKX
+    limit = st.selectbox("Jumlah Level", [20,30,50,100], index=3)
+    
     if st.button("🔄 Refresh Sekarang", type="primary") or auto_refresh or "market_data" not in st.session_state:
         with st.spinner(f"Mengambil data {symbol}..."):
             bids, asks, err = get_okx_orderbook(symbol, limit)
             ticker = get_okx_ticker(symbol)
             trades = get_okx_trades(symbol, 40)
             st.session_state.market_data = {"bids":bids,"asks":asks,"err":err,"ticker":ticker,"trades":trades,"symbol":symbol}
+    
     data = st.session_state.market_data
     ticker, trades, bids, asks, err = data.get("ticker"), data.get("trades",[]), data.get("bids"), data.get("asks"), data.get("err")
+    
     if ticker:
         sign = "+" if ticker["change_pct"] >= 0 else ""
         st.markdown(f"### {data.get('symbol')}")
@@ -609,6 +617,7 @@ elif menu == "📊 Orderbook":
         m3.metric("High 24jam", f"{ticker['high24h']:,.2f}")
         m4.metric("Low 24jam", f"{ticker['low24h']:,.2f}")
         m5.metric("Volume 24jam", f"{ticker['vol24h']:,.2f}")
+        
         if trades:
             buy_vol = sum(t["size"] for t in trades if t["side"]=="buy")
             sell_vol = sum(t["size"] for t in trades if t["side"]=="sell")
@@ -624,10 +633,12 @@ elif menu == "📊 Orderbook":
                 <span style="color:#00c853;">🟢 Buyer: {buy_vol:,.2f}</span>
                 <span style="color:#ff1744;">🔴 Seller: {sell_vol:,.2f}</span>
             </div>""", unsafe_allow_html=True)
+            
     st.markdown("---")
     st.subheader("Orderbook")
     if err: st.error(err)
     else: show_orderbook_visual(bids, asks, min_cum, sort_order)
+    
     st.markdown("---")
     st.subheader("Recent Trades")
     if trades:
@@ -637,6 +648,7 @@ elif menu == "📊 Orderbook":
         st.dataframe(df, use_container_width=True, height=350, hide_index=True)
     else:
         st.info("Belum ada data trades")
+        
     if auto_refresh:
         time.sleep(3)
         st.rerun()
