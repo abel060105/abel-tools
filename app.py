@@ -8,7 +8,7 @@ import pandas as pd
 import time
 
 st.set_page_config(
-    page_title="ABEL FX - Astrodox Wheel",
+    page_title="ABEL FX - Tools",
     page_icon="🔮",
     layout="wide"
 )
@@ -27,6 +27,14 @@ st.markdown("""
         color: #e0e0e0;
         line-height: 1.55;
     }
+    .welcome-box {
+        background: linear-gradient(135deg, #0d1b2a, #1b263b);
+        border: 1px solid #415a77;
+        border-radius: 16px;
+        padding: 40px 30px;
+        text-align: center;
+        margin-top: 40px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -38,7 +46,7 @@ st.sidebar.markdown("---")
 
 menu = st.sidebar.radio(
     "Pilih Halaman",
-    ["🔮 Astrodox", "📊 Orderbook"],
+    ["🏠 Menu Utama", "🔮 Astrodox", "📊 Orderbook"],
     index=0
 )
 
@@ -301,9 +309,37 @@ def show_orderbook_visual(bids, asks, min_cum=0.0, sort_order="Default (Harga)")
 
 
 # ==========================================
+# HALAMAN UTAMA
+# ==========================================
+if menu == "🏠 Menu Utama":
+    st.markdown("""
+    <div class="welcome-box">
+        <h1 style="color:#00d4ff; margin-bottom:10px;">Welcome to ABEL Tools</h1>
+        <p style="color:#adb5bd; font-size:18px; margin-bottom:25px;">
+            Tools trading berbasis Astrodox & Market Data
+        </p>
+        <p style="color:#778da9; font-size:15px;">
+            Pilih menu di sidebar kiri untuk mulai menggunakan tools.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.info("**🔮 Astrodox**\n\nRoda transit planet + rekap aspek geometri untuk analisa XAUUSD.")
+    with col2:
+        st.info("**📊 Orderbook**\n\nOrderbook realtime XAUT & BTC, ticker, volume, recent trades, dan dominasi buyer/seller.")
+
+    st.markdown("---")
+    st.caption("ABEL FX Tools • Powered by OKX Public API")
+
+
+# ==========================================
 # HALAMAN ASTRODOX
 # ==========================================
-if menu == "🔮 Astrodox":
+elif menu == "🔮 Astrodox":
     st.title("🔮 ABEL FX — Astrodox Wheel")
     st.caption("Roda Transit Planet + Rekap Aspek Geometri")
 
@@ -413,7 +449,6 @@ elif menu == "📊 Orderbook":
     asks = data.get("asks")
     err = data.get("err")
 
-    # ========== TICKER ==========
     if ticker:
         change_sign = "+" if ticker["change_pct"] >= 0 else ""
 
@@ -426,7 +461,6 @@ elif menu == "📊 Orderbook":
         m4.metric("Low 24jam", f"{ticker['low24h']:,.2f}")
         m5.metric("Volume 24jam", f"{ticker['vol24h']:,.2f}")
 
-        # Dominasi Buyer vs Seller (hijau - merah)
         if trades:
             buy_vol = sum(t["size"] for t in trades if t["side"] == "buy")
             sell_vol = sum(t["size"] for t in trades if t["side"] == "sell")
@@ -438,8 +472,6 @@ elif menu == "📊 Orderbook":
                 buy_pct = sell_pct = 50
 
             st.markdown("#### Dominasi Buyer vs Seller (Recent Trades)")
-            
-            # Custom bar hijau - merah
             st.markdown(
                 f"""
                 <div style="display:flex; height:28px; border-radius:8px; overflow:hidden; margin-bottom:6px;">
@@ -459,8 +491,6 @@ elif menu == "📊 Orderbook":
             )
 
     st.markdown("---")
-
-    # ========== ORDERBOOK ==========
     st.subheader("Orderbook")
     if err:
         st.error(err)
@@ -468,8 +498,6 @@ elif menu == "📊 Orderbook":
         show_orderbook_visual(bids, asks, min_cum, sort_order)
 
     st.markdown("---")
-
-    # ========== RECENT TRADES ==========
     st.subheader("Recent Trades")
     if trades:
         trade_df = pd.DataFrame(trades)
@@ -488,4 +516,4 @@ elif menu == "📊 Orderbook":
         time.sleep(3)
         st.rerun()
 
-    st.caption("Data dari OKX Public API • Pastikan Min Cumulative = 0 agar orderbook muncul")
+    st.caption("Data dari OKX Public API")
