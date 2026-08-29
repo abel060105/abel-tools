@@ -13,49 +13,79 @@ st.set_page_config(
     layout="wide"
 )
 
+# ================= CSS =================
 st.markdown("""
 <style>
-    /* Sidebar Styling */
+    /* ========== SIDEBAR ========== */
     section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0b132b 0%, #1c2541 100%);
-        border-right: 1px solid #3a506b;
+        background: linear-gradient(180deg, #0a0f1c 0%, #111827 50%, #0f172a 100%) !important;
+        border-right: 1px solid #1e293b !important;
     }
-    section[data-testid="stSidebar"] .stRadio label {
-        font-size: 16px;
-        padding: 8px 12px;
-        border-radius: 8px;
-        margin-bottom: 4px;
+    
+    section[data-testid="stSidebar"] > div {
+        background: transparent !important;
     }
-    section[data-testid="stSidebar"] .stRadio label:hover {
-        background-color: #3a506b;
+    
+    /* Radio button styling */
+    section[data-testid="stSidebar"] .stRadio > div {
+        gap: 6px;
     }
-    .sidebar-title {
-        font-size: 22px;
-        font-weight: 700;
-        color: #00d4ff;
+    
+    section[data-testid="stSidebar"] label {
+        background: #1e293b !important;
+        border-radius: 10px !important;
+        padding: 12px 16px !important;
+        margin-bottom: 6px !important;
+        border: 1px solid #334155 !important;
+        transition: all 0.2s ease;
+    }
+    
+    section[data-testid="stSidebar"] label:hover {
+        background: #334155 !important;
+        border-color: #00d4ff !important;
+    }
+    
+    /* Selected radio */
+    section[data-testid="stSidebar"] label[data-baseweb="radio"] {
+        background: #0ea5e9 !important;
+    }
+
+    /* Title di sidebar */
+    .sidebar-brand {
         text-align: center;
-        padding: 10px 0;
-        letter-spacing: 1px;
+        font-size: 24px;
+        font-weight: 800;
+        color: #00d4ff;
+        padding: 18px 0 8px 0;
+        letter-spacing: 1.5px;
     }
-    .info-box {
-        background-color: #161b22;
-        border: 1px solid #30363d;
-        border-radius: 10px;
-        padding: 18px 22px;
-        margin-top: 10px;
+    
+    .sidebar-sub {
+        text-align: center;
+        color: #64748b;
+        font-size: 12px;
         margin-bottom: 20px;
+    }
+
+    /* ========== LAINNYA ========== */
+    .welcome-box {
+        background: linear-gradient(135deg, #0f172a, #1e293b);
+        border: 1px solid #334155;
+        border-radius: 18px;
+        padding: 55px 30px;
+        text-align: center;
+        margin-top: 40px;
+    }
+    
+    .info-box {
+        background-color: #0f172a;
+        border: 1px solid #334155;
+        border-radius: 12px;
+        padding: 20px;
         font-family: 'Courier New', monospace;
         font-size: 14px;
-        color: #e0e0e0;
-        line-height: 1.55;
-    }
-    .welcome-box {
-        background: linear-gradient(135deg, #0d1b2a, #1b263b);
-        border: 1px solid #415a77;
-        border-radius: 16px;
-        padding: 50px 30px;
-        text-align: center;
-        margin-top: 50px;
+        color: #e2e8f0;
+        line-height: 1.6;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -63,26 +93,26 @@ st.markdown("""
 # ==========================================
 # SIDEBAR
 # ==========================================
-st.sidebar.markdown('<div class="sidebar-title">⚡ ABEL FX</div>', unsafe_allow_html=True)
-st.sidebar.markdown("---")
+st.sidebar.markdown('<div class="sidebar-brand">⚡ ABEL FX</div>', unsafe_allow_html=True)
+st.sidebar.markdown('<div class="sidebar-sub">Trading Tools</div>', unsafe_allow_html=True)
 
 menu = st.sidebar.radio(
-    "Navigasi",
-    ["🏠 Menu Utama", "🔮 Astrodox", "📊 Orderbook"],
+    "menu",
+    ["🏠  Menu Utama", "🔮  Astrodox", "📊  Orderbook"],
     index=0,
     label_visibility="collapsed"
 )
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("""
-<div style="text-align:center; color:#778da9; font-size:13px; padding:10px 0;">
+<div style="text-align:center; color:#475569; font-size:12px; padding-top:10px;">
     ABEL FX Tools<br>
-    <span style="font-size:11px;">Market Data + Astrodox</span>
+    <span style="color:#334155;">v1.0</span>
 </div>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# ASTRODOX ENGINE
+# ASTRODOX ENGINE (sama seperti sebelumnya)
 # ==========================================
 ZODIAC_SYMBOLS = ["♈", "♉", "♊", "♋", "♌", "♍", "♎", "♏", "♐", "♑", "♒", "♓"]
 ZODIAC_NAMES = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
@@ -129,7 +159,6 @@ def compute_planetary_positions(dt_utc):
         z_deg = int(deg % 30)
         z_min = int(((deg % 30) - z_deg) * 60)
         formatted_pos[name] = f"{ZODIAC_NAMES[z_idx]} {z_deg}°{z_min:02d}'"
-
     return raw_degs, formatted_pos
 
 
@@ -149,36 +178,34 @@ def generate_astrodox_wheel_only(target_date: datetime):
     for i in range(12):
         theta_start = np.radians(i * 30)
         theta_end = np.radians((i + 1) * 30)
-        ax.bar(x=(theta_start + theta_end) / 2, height=0.25, width=np.radians(30),
+        ax.bar(x=(theta_start + theta_end)/2, height=0.25, width=np.radians(30),
                bottom=0.75, color=colors[i], alpha=0.6, edgecolor='#555555')
-        ax.text((theta_start + theta_end) / 2, 0.88, ZODIAC_SYMBOLS[i],
+        ax.text((theta_start + theta_end)/2, 0.88, ZODIAC_SYMBOLS[i],
                 color='white', fontsize=16, ha='center', va='center', fontweight='bold')
 
     for name, deg in planet_degrees.items():
         rad = np.radians(deg)
         ax.plot(rad, 0.70, marker='o', color='#00ffff', markersize=7)
-        short_symbol = name.split()[-1]
-        ax.text(rad, 0.60, short_symbol, color='white', fontsize=13, ha='center', va='center', fontweight='bold')
+        ax.text(rad, 0.60, name.split()[-1], color='white', fontsize=13, ha='center', va='center', fontweight='bold')
 
     aspect_counts = {"merah": 0, "hijau": 0, "biru": 0, "kuning": 0}
     planets_keys = list(planet_degrees.keys())
     deg_list = list(planet_degrees.values())
 
     for i in range(len(planets_keys)):
-        for j in range(i + 1, len(planets_keys)):
-            d1 = deg_list[i]
-            d2 = deg_list[j]
+        for j in range(i+1, len(planets_keys)):
+            d1, d2 = deg_list[i], deg_list[j]
             diff = abs(d1 - d2) % 360
             if diff > 180: diff = 360 - diff
             rad1, rad2 = np.radians(d1), np.radians(d2)
 
-            if abs(diff - 90) <= 7 or abs(diff - 180) <= 7:
+            if abs(diff-90) <= 7 or abs(diff-180) <= 7:
                 ax.plot([rad1, rad2], [0.70, 0.70], color='#ff3333', alpha=0.85, linewidth=1.6)
                 aspect_counts["merah"] += 1
-            elif abs(diff - 120) <= 7:
+            elif abs(diff-120) <= 7:
                 ax.plot([rad1, rad2], [0.70, 0.70], color='#00ff66', alpha=0.85, linewidth=1.6)
                 aspect_counts["hijau"] += 1
-            elif abs(diff - 60) <= 6:
+            elif abs(diff-60) <= 6:
                 ax.plot([rad1, rad2], [0.70, 0.70], color='#3399ff', alpha=0.75, linewidth=1.3)
                 aspect_counts["biru"] += 1
             elif diff <= 7:
@@ -196,7 +223,6 @@ def generate_astrodox_wheel_only(target_date: datetime):
 # ==========================================
 # ORDERBOOK FUNCTIONS
 # ==========================================
-
 def get_okx_orderbook(symbol="XAUT-USDT", limit=50):
     try:
         url = f"https://www.okx.com/api/v5/market/books?instId={symbol}&sz={limit}"
@@ -211,78 +237,57 @@ def get_okx_orderbook(symbol="XAUT-USDT", limit=50):
     except Exception as e:
         return None, None, str(e)
 
-
 def get_okx_ticker(symbol="XAUT-USDT"):
     try:
         url = f"https://www.okx.com/api/v5/market/ticker?instId={symbol}"
         r = requests.get(url, timeout=8)
         data = r.json()
-        if data.get("code") != "0":
-            return None
+        if data.get("code") != "0": return None
         t = data["data"][0]
         last = float(t["last"])
         open24h = float(t["open24h"])
-        high24h = float(t["high24h"])
-        low24h = float(t["low24h"])
-        vol24h = float(t["vol24h"])
-        change = last - open24h
-        change_pct = (change / open24h) * 100 if open24h != 0 else 0
         return {
             "last": last,
-            "high24h": high24h,
-            "low24h": low24h,
-            "vol24h": vol24h,
-            "change_pct": change_pct
+            "high24h": float(t["high24h"]),
+            "low24h": float(t["low24h"]),
+            "vol24h": float(t["vol24h"]),
+            "change_pct": ((last - open24h) / open24h * 100) if open24h else 0
         }
-    except:
-        return None
-
+    except: return None
 
 def get_okx_trades(symbol="XAUT-USDT", limit=40):
     try:
         url = f"https://www.okx.com/api/v5/market/trades?instId={symbol}&limit={limit}"
         r = requests.get(url, timeout=8)
         data = r.json()
-        if data.get("code") != "0":
-            return []
-        trades = []
-        for t in data["data"]:
-            trades.append({
-                "time": datetime.fromtimestamp(int(t["ts"]) / 1000).strftime("%H:%M:%S"),
-                "price": float(t["px"]),
-                "size": float(t["sz"]),
-                "side": t["side"]
-            })
-        return trades
-    except:
-        return []
-
+        if data.get("code") != "0": return []
+        return [{
+            "time": datetime.fromtimestamp(int(t["ts"])/1000).strftime("%H:%M:%S"),
+            "price": float(t["px"]),
+            "size": float(t["sz"]),
+            "side": t["side"]
+        } for t in data["data"]]
+    except: return []
 
 def add_cumulative(orders):
-    result = []
-    cumulative = 0.0
+    result, cumulative = [], 0.0
     for price, size in orders:
         cumulative += size
         result.append({"price": price, "size": size, "cumulative": cumulative})
     return result
 
-
 def show_orderbook_visual(bids, asks, min_cum=0.0, sort_order="Default (Harga)"):
     if not bids or not asks:
         st.warning("Data orderbook kosong")
         return
-
     bids_data = add_cumulative(bids)
     asks_data = add_cumulative(asks)
-
     if min_cum > 0:
         bids_data = [x for x in bids_data if x["cumulative"] >= min_cum]
         asks_data = [x for x in asks_data if x["cumulative"] >= min_cum]
-
     if not bids_data or not asks_data:
         st.warning(f"Tidak ada level dengan cumulative ≥ {min_cum}")
         return
-
     if sort_order == "Size Kecil → Besar":
         bids_data = sorted(bids_data, key=lambda x: x["cumulative"])
         asks_data = sorted(asks_data, key=lambda x: x["cumulative"])
@@ -290,86 +295,64 @@ def show_orderbook_visual(bids, asks, min_cum=0.0, sort_order="Default (Harga)")
         bids_data = sorted(bids_data, key=lambda x: x["cumulative"], reverse=True)
         asks_data = sorted(asks_data, key=lambda x: x["cumulative"], reverse=True)
 
-    max_cum = max(
-        max([x["cumulative"] for x in bids_data[:30]], default=1),
-        max([x["cumulative"] for x in asks_data[:30]], default=1)
-    )
+    max_cum = max(max([x["cumulative"] for x in bids_data[:30]], default=1),
+                  max([x["cumulative"] for x in asks_data[:30]], default=1))
 
-    col_bid, col_ask = st.columns(2)
-    with col_bid:
+    c1, c2 = st.columns(2)
+    with c1:
         st.markdown("### 🟢 Beli (Bids)")
         for item in bids_data[:25]:
             pct = min(item["cumulative"] / max_cum, 1.0)
-            st.markdown(
-                f"""<div style="display:flex; justify-content:space-between; align-items:center;
-                background:linear-gradient(90deg, #0d3b2e {pct*100}%, transparent 0%);
-                padding:6px 10px; margin:3px 0; border-radius:6px;">
-                <span style="color:#00ff9d; font-weight:bold;">{item['cumulative']:,.1f}</span>
-                <span style="color:white;">{item['price']:,.2f}</span></div>""",
-                unsafe_allow_html=True
-            )
-    with col_ask:
+            st.markdown(f"""<div style="display:flex;justify-content:space-between;align-items:center;
+                background:linear-gradient(90deg,#0d3b2e {pct*100}%,transparent 0%);
+                padding:6px 10px;margin:3px 0;border-radius:6px;">
+                <span style="color:#00ff9d;font-weight:bold;">{item['cumulative']:,.1f}</span>
+                <span style="color:white;">{item['price']:,.2f}</span></div>""", unsafe_allow_html=True)
+    with c2:
         st.markdown("### 🔴 Jual (Asks)")
         for item in asks_data[:25]:
             pct = min(item["cumulative"] / max_cum, 1.0)
-            st.markdown(
-                f"""<div style="display:flex; justify-content:space-between; align-items:center;
-                background:linear-gradient(270deg, #3b0d0d {pct*100}%, transparent 0%);
-                padding:6px 10px; margin:3px 0; border-radius:6px;">
+            st.markdown(f"""<div style="display:flex;justify-content:space-between;align-items:center;
+                background:linear-gradient(270deg,#3b0d0d {pct*100}%,transparent 0%);
+                padding:6px 10px;margin:3px 0;border-radius:6px;">
                 <span style="color:white;">{item['price']:,.2f}</span>
-                <span style="color:#ff4d4d; font-weight:bold;">{item['cumulative']:,.1f}</span></div>""",
-                unsafe_allow_html=True
-            )
+                <span style="color:#ff4d4d;font-weight:bold;">{item['cumulative']:,.1f}</span></div>""", unsafe_allow_html=True)
 
 
 # ==========================================
-# HALAMAN UTAMA
+# HALAMAN
 # ==========================================
-if menu == "🏠 Menu Utama":
+if menu == "🏠  Menu Utama":
     st.markdown("""
     <div class="welcome-box">
-        <h1 style="color:#00d4ff; margin-bottom:12px; font-size:42px;">Welcome to ABEL Tools</h1>
-        <p style="color:#adb5bd; font-size:18px; margin-bottom:20px;">
-            Tools trading berbasis Astrodox & Market Data
-        </p>
-        <p style="color:#778da9; font-size:15px;">
-            Pilih menu di sidebar kiri untuk mulai
-        </p>
+        <h1 style="color:#00d4ff;font-size:42px;margin-bottom:12px;">Welcome to ABEL Tools</h1>
+        <p style="color:#94a3b8;font-size:18px;">Tools trading berbasis Astrodox & Market Data</p>
+        <p style="color:#64748b;font-size:15px;margin-top:12px;">Pilih menu di sidebar kiri untuk mulai</p>
     </div>
     """, unsafe_allow_html=True)
-
     st.markdown("---")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.info("**🔮 Astrodox**\n\nRoda transit planet + rekap aspek geometri untuk analisa XAUUSD.")
-    with col2:
-        st.info("**📊 Orderbook**\n\nOrderbook realtime, ticker, volume, recent trades, dan dominasi buyer/seller.")
-
-    st.markdown("---")
+    c1, c2 = st.columns(2)
+    with c1: st.info("**🔮 Astrodox**\n\nRoda transit planet + rekap aspek geometri untuk analisa XAUUSD.")
+    with c2: st.info("**📊 Orderbook**\n\nOrderbook realtime, ticker, volume, recent trades & dominasi buyer/seller.")
     st.caption("ABEL FX Tools • Powered by OKX Public API")
 
-
-# ==========================================
-# HALAMAN ASTRODOX
-# ==========================================
-elif menu == "🔮 Astrodox":
+elif menu == "🔮  Astrodox":
     st.title("🔮 Astrodox Wheel")
     st.caption("Roda Transit Planet + Rekap Aspek Geometri")
-
     st.markdown("---")
     st.subheader("📅 Atur Waktu Transit")
-    c1, c2, c3, c4, c5 = st.columns(5)
-    with c1: tanggal = st.number_input("Tanggal", 1, 31, 12)
+    c1,c2,c3,c4,c5 = st.columns(5)
+    with c1: tanggal = st.number_input("Tanggal",1,31,12)
     with c2:
         bulan_list = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"]
         bulan_nama = st.selectbox("Bulan", bulan_list, index=7)
-        bulan = bulan_list.index(bulan_nama) + 1
-    with c3: tahun = st.number_input("Tahun", 2000, 2100, 2026)
-    with c4: jam = st.number_input("Jam", 0, 23, 19)
-    with c5: menit = st.number_input("Menit", 0, 59, 30)
+        bulan = bulan_list.index(bulan_nama)+1
+    with c3: tahun = st.number_input("Tahun",2000,2100,2026)
+    with c4: jam = st.number_input("Jam",0,23,19)
+    with c5: menit = st.number_input("Menit",0,59,30)
 
     try:
-        event_datetime = datetime(int(tahun), int(bulan), int(tanggal), int(jam), int(menit))
+        event_datetime = datetime(int(tahun),int(bulan),int(tanggal),int(jam),int(menit))
     except:
         st.error("Tanggal tidak valid")
         st.stop()
@@ -383,118 +366,88 @@ elif menu == "🔮 Astrodox":
     st.download_button("📥 Download Roda", img_buf, f"Astrodox_{event_datetime.strftime('%Y%m%d_%H%M')}.png", "image/png")
 
     st.markdown("---")
-    st.subheader("📋 Dashboard Info Astrodox")
+    st.subheader("📋 Dashboard Info")
     pos_lines = []
     pos_items = list(planet_positions.items())
     for i in range(0, len(pos_items), 2):
-        p1, v1 = pos_items[i]
+        p1,v1 = pos_items[i]
         if i+1 < len(pos_items):
-            p2, v2 = pos_items[i+1]
+            p2,v2 = pos_items[i+1]
             pos_lines.append(f"• {p1:<12}: {v1:<16}  |  • {p2:<12}: {v2}")
         else:
             pos_lines.append(f"• {p1:<12}: {v1}")
     pos_text = "\n".join(pos_lines)
-
     aspek_text = f"""• MERAH  (Square/Opp) : {aspect_counts['merah']} → Volatilitas Tinggi
 • HIJAU  (Trine)      : {aspect_counts['hijau']} → Expansion
 • BIRU   (Sextile)    : {aspect_counts['biru']} → Retest
 • KUNING (Conjunction): {aspect_counts['kuning']} → Turning Point"""
 
-    st.markdown(f"""
-    <div class="info-box">
-    <strong>POSISI PLANET ({event_datetime.strftime('%d %b %Y %H:%M WIB')})</strong><br>
-    {"─"*60}<br>
-    {pos_text.replace(chr(10), "<br>")}<br><br>
-    <strong>REKAP ASPEK</strong><br>
-    {"─"*60}<br>
-    {aspek_text.replace(chr(10), "<br>")}
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f"""<div class="info-box">
+    <strong>POSISI PLANET ({event_datetime.strftime('%d %b %Y %H:%M WIB')})</strong><br>{"─"*60}<br>
+    {pos_text.replace(chr(10),"<br>")}<br><br>
+    <strong>REKAP ASPEK</strong><br>{"─"*60}<br>
+    {aspek_text.replace(chr(10),"<br>")}</div>""", unsafe_allow_html=True)
 
-
-# ==========================================
-# HALAMAN ORDERBOOK
-# ==========================================
-elif menu == "📊 Orderbook":
+elif menu == "📊  Orderbook":
     st.title("📊 Orderbook & Market Data")
+    c1,c2,c3,c4 = st.columns([2,2,2,1])
+    with c1: symbol = st.selectbox("Pair", ["XAUT-USDT","BTC-USDT"])
+    with c2: min_cum = st.number_input("Min Cumulative", 0.0, value=0.0, step=1.0)
+    with c3: sort_order = st.selectbox("Urutan", ["Default (Harga)","Size Kecil → Besar","Size Besar → Kecil"])
+    with c4:
+        st.write(""); st.write("")
+        auto_refresh = st.checkbox("Auto Refresh")
 
-    col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
-    with col1:
-        symbol = st.selectbox("Pair", ["XAUT-USDT", "BTC-USDT"], index=0)
-    with col2:
-        min_cum = st.number_input("Min Cumulative", min_value=0.0, value=0.0, step=1.0)
-    with col3:
-        sort_order = st.selectbox("Urutan", ["Default (Harga)", "Size Kecil → Besar", "Size Besar → Kecil"])
-    with col4:
-        st.write("")
-        st.write("")
-        auto_refresh = st.checkbox("Auto Refresh", value=False)
-
-    limit = st.selectbox("Jumlah Level", [20, 30, 50, 100], index=2)
+    limit = st.selectbox("Jumlah Level", [20,30,50,100], index=2)
 
     if st.button("🔄 Refresh Sekarang", type="primary") or auto_refresh or "market_data" not in st.session_state:
         with st.spinner(f"Mengambil data {symbol}..."):
             bids, asks, err = get_okx_orderbook(symbol, limit)
             ticker = get_okx_ticker(symbol)
             trades = get_okx_trades(symbol, 40)
-            st.session_state.market_data = {
-                "bids": bids, "asks": asks, "err": err,
-                "ticker": ticker, "trades": trades, "symbol": symbol
-            }
+            st.session_state.market_data = {"bids":bids,"asks":asks,"err":err,"ticker":ticker,"trades":trades,"symbol":symbol}
 
     data = st.session_state.market_data
-    ticker = data.get("ticker")
-    trades = data.get("trades", [])
-    bids = data.get("bids")
-    asks = data.get("asks")
-    err = data.get("err")
+    ticker, trades, bids, asks, err = data.get("ticker"), data.get("trades",[]), data.get("bids"), data.get("asks"), data.get("err")
 
     if ticker:
-        change_sign = "+" if ticker["change_pct"] >= 0 else ""
-        st.markdown(f"### {data.get('symbol', symbol)}")
-        m1, m2, m3, m4, m5 = st.columns(5)
+        sign = "+" if ticker["change_pct"] >= 0 else ""
+        st.markdown(f"### {data.get('symbol')}")
+        m1,m2,m3,m4,m5 = st.columns(5)
         m1.metric("Harga Terakhir", f"{ticker['last']:,.2f}")
-        m2.metric("Perubahan 24jam", f"{change_sign}{ticker['change_pct']:.2f}%")
+        m2.metric("Perubahan 24jam", f"{sign}{ticker['change_pct']:.2f}%")
         m3.metric("High 24jam", f"{ticker['high24h']:,.2f}")
         m4.metric("Low 24jam", f"{ticker['low24h']:,.2f}")
         m5.metric("Volume 24jam", f"{ticker['vol24h']:,.2f}")
 
         if trades:
-            buy_vol = sum(t["size"] for t in trades if t["side"] == "buy")
-            sell_vol = sum(t["size"] for t in trades if t["side"] == "sell")
-            total = buy_vol + sell_vol
-            buy_pct = (buy_vol / total * 100) if total > 0 else 50
-            sell_pct = 100 - buy_pct
-
+            buy_vol = sum(t["size"] for t in trades if t["side"]=="buy")
+            sell_vol = sum(t["size"] for t in trades if t["side"]=="sell")
+            total = buy_vol + sell_vol or 1
+            buy_pct = buy_vol/total*100
             st.markdown("#### Dominasi Buyer vs Seller")
-            st.markdown(
-                f"""
-                <div style="display:flex; height:28px; border-radius:8px; overflow:hidden; margin-bottom:6px;">
-                    <div style="width:{buy_pct}%; background:#00c853; display:flex; align-items:center; justify-content:center; color:white; font-weight:bold; font-size:13px;">{buy_pct:.1f}%</div>
-                    <div style="width:{sell_pct}%; background:#ff1744; display:flex; align-items:center; justify-content:center; color:white; font-weight:bold; font-size:13px;">{sell_pct:.1f}%</div>
-                </div>
-                <div style="display:flex; justify-content:space-between; font-size:13px;">
-                    <span style="color:#00c853;">🟢 Buyer: {buy_vol:,.2f}</span>
-                    <span style="color:#ff1744;">🔴 Seller: {sell_vol:,.2f}</span>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+            st.markdown(f"""
+            <div style="display:flex;height:28px;border-radius:8px;overflow:hidden;margin-bottom:6px;">
+                <div style="width:{buy_pct}%;background:#00c853;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:13px;">{buy_pct:.1f}%</div>
+                <div style="width:{100-buy_pct}%;background:#ff1744;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:13px;">{100-buy_pct:.1f}%</div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:13px;">
+                <span style="color:#00c853;">🟢 Buyer: {buy_vol:,.2f}</span>
+                <span style="color:#ff1744;">🔴 Seller: {sell_vol:,.2f}</span>
+            </div>""", unsafe_allow_html=True)
 
     st.markdown("---")
     st.subheader("Orderbook")
-    if err:
-        st.error(err)
-    else:
-        show_orderbook_visual(bids, asks, min_cum, sort_order)
+    if err: st.error(err)
+    else: show_orderbook_visual(bids, asks, min_cum, sort_order)
 
     st.markdown("---")
     st.subheader("Recent Trades")
     if trades:
-        trade_df = pd.DataFrame(trades)
-        trade_df["side"] = trade_df["side"].map({"buy": "🟢 Buy", "sell": "🔴 Sell"})
-        trade_df = trade_df.rename(columns={"time": "Waktu", "price": "Harga", "size": "Jumlah", "side": "Arah"})
-        st.dataframe(trade_df, use_container_width=True, height=350, hide_index=True)
+        df = pd.DataFrame(trades)
+        df["side"] = df["side"].map({"buy":"🟢 Buy","sell":"🔴 Sell"})
+        df = df.rename(columns={"time":"Waktu","price":"Harga","size":"Jumlah","side":"Arah"})
+        st.dataframe(df, use_container_width=True, height=350, hide_index=True)
     else:
         st.info("Belum ada data trades")
 
