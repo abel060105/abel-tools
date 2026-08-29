@@ -98,7 +98,6 @@ def compute_planetary_positions(dt_utc):
 
 
 def generate_astrodox_wheel_only(target_date: datetime):
-    """Generate hanya roda polar Astrodox (tanpa panel teks)."""
     dt_utc = target_date - timedelta(hours=7)
     planet_degrees, planet_positions = compute_planetary_positions(dt_utc)
 
@@ -179,8 +178,10 @@ def generate_astrodox_wheel_only(target_date: datetime):
 def get_binance_orderbook(limit=15):
     try:
         url = f"https://api.binance.com/api/v3/depth?symbol=XAUTUSDT&limit={limit}"
-        r = requests.get(url, timeout=5)
+        r = requests.get(url, timeout=8)
         data = r.json()
+        if "bids" not in data:
+            return [], [], data.get("msg", "Binance error")
         bids = [[float(p), float(q)] for p, q in data["bids"]]
         asks = [[float(p), float(q)] for p, q in data["asks"]]
         return bids, asks, None
@@ -190,13 +191,13 @@ def get_binance_orderbook(limit=15):
 def get_bybit_orderbook(limit=15):
     try:
         url = f"https://api.bybit.com/v5/market/orderbook?category=spot&symbol=XAUTUSDT&limit={limit}"
-        r = requests.get(url, timeout=5)
+        r = requests.get(url, timeout=8)
         data = r.json()
         if data.get("retCode") != 0:
-            return [], [], data.get("retMsg", "Error")
+            return [], [], data.get("retMsg", "Bybit error")
         result = data["result"]
-        bids = [[float(p), float(q)] for p, q in result["b"]]
-        asks = [[float(p), float(q)] for p, q in result["a"]]
+        bids = [[float(p), float(q)] for p, q in result.get("b", [])]
+        asks = [[float(p), float(q)] for p, q in result.get("a", [])]
         return bids, asks, None
     except Exception as e:
         return [], [], str(e)
@@ -204,10 +205,10 @@ def get_bybit_orderbook(limit=15):
 def get_okx_orderbook(limit=15):
     try:
         url = f"https://www.okx.com/api/v5/market/books?instId=XAUT-USDT&sz={limit}"
-        r = requests.get(url, timeout=5)
+        r = requests.get(url, timeout=8)
         data = r.json()
         if data.get("code") != "0":
-            return [], [], data.get("msg", "Error")
+            return [], [], data.get("msg", "OKX error")
         book = data["data"][0]
         bids = [[float(p), float(q)] for p, q, *_ in book["bids"]]
         asks = [[float(p), float(q)] for p, q, *_ in book["asks"]]
@@ -217,11 +218,11 @@ def get_okx_orderbook(limit=15):
 
 def display_orderbook(bids, asks, exchange_name, error=None):
     if error:
-        st.error(f"{exchange_name}: {error}")
+        st.error(f"**{exchange_name}**: {error}")
         return
 
     if not bids or not asks:
-        st.warning(f"{exchange_name}: Data kosong")
+        st.warning(f"**{exchange_name}**: Data kosong")
         return
 
     best_bid = bids[0][0]
@@ -235,12 +236,12 @@ def display_orderbook(bids, asks, exchange_name, error=None):
 
     with col1:
         st.markdown("**Bids (Buy)**")
-        for price, qty in bids[:12]:
+        for price, qty in bids[:10]:
             st.write(f"`{price:.2f}` — {qty:.4f}")
 
     with col2:
         st.markdown("**Asks (Sell)**")
-        for price, qty in asks[:12]:
+        for price, qty in asks[:10]:
             st.write(f"`{price:.2f}` — {qty:.4f}")
 
 
@@ -266,7 +267,7 @@ with col2:
         "Juli", "Agustus", "September", "Oktober", "November", "Desember"
     ]
     bulan_dict = {nama: i + 1 for i, nama in enumerate(daftar_bulan)}
-    bulan_nama = st.selectbox("Bulan", daftar_bulan, index=7)  # default Agustus
+    bulan_nama = st.selectbox("Bulan", daftar_bulan, index=7)
     bulan = bulan_dict[bulan_nama]
 
 with col3:
@@ -313,34 +314,32 @@ refresh = st.button("🔄 Refresh Orderbook")
 
 if refresh or "orderbook_loaded" not in st.session_state:
     with st.spinner("Mengambil data orderbook..."):
-        binance_bids, binance_asks, binance_err = get_binance_orderbook()
-        bybit_bids, bybit_asks, bybit_err = get_bybit_orderbook()
-        okx_bids, okx_asks, okx_err = get_okx_orderbook()
-        
-        st.session_state.binance = (binance_bids, binance_asks, binance_err)
-        st.session_state.bybit = (bybit_bids, bybit_asks, bybit_err)
-        st.session_state.okx = (okx_bids, okx_asks, okx_err)
+        st.session_state.binance = get_binance_orderbook()
+        st.session_state.bybit = get_bybit_orderbook()
+        st.session_state.okx = get_okx_orderbook()
         st.session_state.orderbook_loaded = True
 
 col_a, col_b, col_c = st.columns(3)
 
 with col_a:
-    display_orderbook(*st.session_state.binance, "Binance")
+    b, a, e = st.session_state.binance
+    display_orderbook(b, a, "Binance", e)
 
 with col_b:
-    display_orderbook(*st.session_state.bybit, "Bybit")
+    b, a, e = st.session_state.bybit
+    display_orderbook(b, a, "Bybit", e)
 
 with col_c:
-    display_orderbook(*st.session_state.okx, "OKX")
+    b, a, e = st.session_state.okx
+    display_orderbook(b, a, "OKX", e)
 
 st.caption("Data diambil langsung dari public API exchange (Binance, Bybit, OKX). Klik Refresh untuk update.")
 
 st.markdown("---")
 
-# ----- Dashboard Info (di luar gambar) -----
+# ----- Dashboard Info -----
 st.subheader("📋 Dashboard Info Astrodox")
 
-# Posisi Planet
 pos_lines = []
 pos_items = list(planet_positions.items())
 for idx in range(0, len(pos_items), 2):
@@ -353,7 +352,6 @@ for idx in range(0, len(pos_items), 2):
 
 pos_text = "\n".join(pos_lines)
 
-# Rekap Aspek
 aspek_text = f"""• MERAH  (Square 90° / Opp 180°) : {aspect_counts['merah']} Garis  → Volatilitas Tinggi
 • HIJAU  (Trine 120°)            : {aspect_counts['hijau']} Garis  → Expansion Trend
 • BIRU   (Sextile 60°)           : {aspect_counts['biru']} Garis  → Retest Zone
@@ -374,7 +372,7 @@ st.markdown(info_html, unsafe_allow_html=True)
 st.markdown("---")
 
 # ==========================================
-# PAPAN PROMPT 1 — FULL (Lengkap seperti fitur lama)
+# PAPAN PROMPT 1
 # ==========================================
 st.subheader("📋 Papan Prompt 1 — Full Analysis (Makro + Geopolitik + 3 Setup)")
 
@@ -442,7 +440,7 @@ st.caption("Klik ikon copy di pojok kanan atas blok kode di atas untuk menyalin 
 st.markdown("---")
 
 # ==========================================
-# PAPAN PROMPT 2 — SIMPLE (Hanya Astrodox)
+# PAPAN PROMPT 2
 # ==========================================
 st.subheader("📋 Papan Prompt 2 — Simple Astrodox Only")
 
