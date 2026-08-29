@@ -341,18 +341,27 @@ def get_okx_trades(symbol="XAUT-USDT", limit=40):
         } for t in data["data"]]
     except: return []
 
-def add_cumulative_okx_style(orders, is_bid=True):
+def add_cumulative_okx_style(orders, is_bid=True, group_size=1.0):
     """
-    Akumulasi ala OKX: Dari luar (harga terjauh) menuju ke dalam (spread).
-    Membuat baris harga terdekat dengan spread memiliki akumulasi angka terbesar (puluhan ribu).
+    Mengelompokkan harga berdasarkan group_size (misal per $1.0) 
+    lalu mengakumulasikannya dari luar (harga terjauh) ke dalam (spread).
     """
     if not orders:
         return []
     
+    # 1. Agregasi / grouping harga
+    grouped = {}
+    for price, size in orders:
+        g_price = round(round(price / group_size) * group_size, 2)
+        grouped[g_price] = grouped.get(g_price, 0.0) + size
+        
+    aggregated_orders = [[p, s] for p, s in grouped.items()]
+    
+    # 2. Urutkan untuk akumulasi
     if is_bid:
-        sorted_orders = sorted(orders, key=lambda x: x[0]) # dari terendah
+        sorted_orders = sorted(aggregated_orders, key=lambda x: x[0]) # dari terendah
     else:
-        sorted_orders = sorted(orders, key=lambda x: x[0], reverse=True) # dari tertinggi
+        sorted_orders = sorted(aggregated_orders, key=lambda x: x[0], reverse=True) # dari tertinggi
         
     result = []
     cumulative = 0.0
@@ -360,6 +369,7 @@ def add_cumulative_okx_style(orders, is_bid=True):
         cumulative += size
         result.append({"price": price, "size": size, "cumulative": cumulative})
         
+    # 3. Urutkan kembali untuk tampilan layar
     if is_bid:
         return sorted(result, key=lambda x: x["price"], reverse=True)
     else:
@@ -370,8 +380,9 @@ def show_orderbook_visual(bids, asks, min_cum=0.0, sort_order="Default (Harga)")
         st.warning("Data orderbook kosong")
         return
     
-    bids_data = add_cumulative_okx_style(bids, is_bid=True)
-    asks_data = add_cumulative_okx_style(asks, is_bid=False)
+    # Gunakan group_size=1.0 (bisa diubah ke 0.5 atau 5.0 sesuai selera kerapatan baris)
+    bids_data = add_cumulative_okx_style(bids, is_bid=True, group_size=1.0)
+    asks_data = add_cumulative_okx_style(asks, is_bid=False, group_size=1.0)
     
     if min_cum > 0:
         bids_data = [x for x in bids_data if x["cumulative"] >= min_cum]
