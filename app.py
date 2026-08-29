@@ -22,12 +22,12 @@ def set_video_background(video_file):
         encoded = base64.b64encode(data).decode()
         css = f"""
         <style>
-            /* Reset margin & padding utama agar full layar */
+            /* Reset margin & padding utama */
             .stApp {{
                 background: transparent !important;
             }}
             
-            /* Memastikan video menutupi layar secara penuh tanpa celah */
+            /* Background Video Full Layar & Responsif untuk HP & PC */
             #bg-video {{
                 position: fixed;
                 top: 0;
@@ -35,12 +35,21 @@ def set_video_background(video_file):
                 width: 100vw;
                 height: 100vh;
                 z-index: -999;
-                object-fit: cover;
+                object-fit: cover; /* Default untuk PC/Laptop */
             }}
 
-            /* ========== SIDEBAR DENGAN EFEK TRANSPARAN BLUR ========== */
+            /* Khusus Tampilan HP / Layar Portrait agar video tidak kepotong */
+            @media only screen and (max-width: 768px) {{
+                #bg-video {{
+                    width: 100vw;
+                    height: 100vh;
+                    object-fit: fill; /* Menyesuaikan layar HP */
+                }}
+            }}
+
+            /* ========== SIDEBAR TRANSPARAN BLUR ========== */
             section[data-testid="stSidebar"] {{
-                background: rgba(10, 15, 28, 0.8) !important;
+                background: rgba(10, 15, 28, 0.85) !important;
                 backdrop-filter: blur(12px);
                 border-right: 1px solid #1e293b !important;
             }}
@@ -54,7 +63,7 @@ def set_video_background(video_file):
             }}
             
             section[data-testid="stSidebar"] label {{
-                background: rgba(30, 41, 59, 0.85) !important;
+                background: rgba(30, 41, 59, 0.9) !important;
                 border-radius: 10px !important;
                 padding: 12px 16px !important;
                 margin-bottom: 6px !important;
@@ -83,33 +92,32 @@ def set_video_background(video_file):
                 margin-bottom: 20px;
             }}
 
-            /* ========== KOTAK UTAMA & KOLOM DENGAN EFEK KACA (GLASSMORPHISM) ========== */
+            /* ========== KOTAK UTAMA & CARD DIBAWAH (DILEBIHKAN GELAPNYA AGAR JELAS) ========== */
             .welcome-box {{
-                background: rgba(15, 23, 42, 0.82);
-                backdrop-filter: blur(10px);
-                border: 1px solid rgba(51, 65, 85, 0.9);
+                background: rgba(11, 16, 30, 0.92);
+                backdrop-filter: blur(12px);
+                border: 1px solid rgba(0, 212, 255, 0.3);
                 border-radius: 18px;
                 padding: 55px 30px;
                 text-align: center;
                 margin-top: 20px;
-                box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+                box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
             }}
             
-            /* Kotak khusus untuk menyamakan tampilan card di bawah agar jelas */
             .custom-card {{
-                background: rgba(15, 23, 42, 0.82);
-                backdrop-filter: blur(10px);
-                border: 1px solid rgba(51, 65, 85, 0.9);
+                background: rgba(11, 16, 30, 0.92);
+                backdrop-filter: blur(12px);
+                border: 1px solid rgba(0, 212, 255, 0.3);
                 border-radius: 14px;
-                padding: 22px;
+                padding: 24px;
                 margin-top: 15px;
-                box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+                box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
             }}
 
             .info-box {{
-                background-color: rgba(15, 23, 42, 0.85);
-                backdrop-filter: blur(10px);
-                border: 1px solid rgba(51, 65, 85, 0.9);
+                background-color: rgba(11, 16, 30, 0.92);
+                backdrop-filter: blur(12px);
+                border: 1px solid rgba(0, 212, 255, 0.3);
                 border-radius: 12px;
                 padding: 20px;
                 font-family: 'Courier New', monospace;
@@ -346,8 +354,8 @@ if menu == "🏠  Menu Utama":
     st.markdown("""
     <div class="welcome-box">
         <h1 style="color:#00d4ff;font-size:42px;margin-bottom:12px;">Welcome to ABEL Tools</h1>
-        <p style="color:#94a3b8;font-size:18px;">Tools trading berbasis Astrodox & Market Data</p>
-        <p style="color:#64748b;font-size:15px;margin-top:12px;">Pilih menu di sidebar kiri untuk mulai</p>
+        <p style="color:#cbd5e1;font-size:18px;">Tools trading berbasis Astrodox & Market Data</p>
+        <p style="color:#94a3b8;font-size:15px;margin-top:12px;">Pilih menu di sidebar kiri untuk mulai</p>
     </div>
     """, unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
