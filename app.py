@@ -27,18 +27,21 @@ st.markdown("""
         color: #e0e0e0;
         line-height: 1.55;
     }
+    div[data-testid="stMetricValue"] {
+        font-size: 1.3rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# SIDEBAR NAVIGASI
+# SIDEBAR
 # ==========================================
 st.sidebar.title("ABEL FX")
 st.sidebar.markdown("---")
 
 menu = st.sidebar.radio(
     "Pilih Halaman",
-    ["🔮 Astrodox", "📊 Orderbook XAUT"],
+    ["🔮 Astrodox", "📊 Orderbook"],
     index=0
 )
 
@@ -133,10 +136,8 @@ def generate_astrodox_wheel_only(target_date: datetime):
             d1 = deg_list[i]
             d2 = deg_list[j]
             diff = abs(d1 - d2) % 360
-            if diff > 180:
-                diff = 360 - diff
-            rad1 = np.radians(d1)
-            rad2 = np.radians(d2)
+            if diff > 180: diff = 360 - diff
+            rad1, rad2 = np.radians(d1), np.radians(d2)
 
             if abs(diff - 90) <= 7 or abs(diff - 180) <= 7:
                 ax.plot([rad1, rad2], [0.70, 0.70], color='#ff3333', alpha=0.85, linewidth=1.6)
@@ -153,7 +154,6 @@ def generate_astrodox_wheel_only(target_date: datetime):
 
     ax.set_title(f"{target_date.strftime('%d.%m.%Y %H:%M WIB')}", color='white', fontsize=16, pad=18, fontweight='bold')
     plt.tight_layout()
-
     img_buf = io.BytesIO()
     plt.savefig(img_buf, format='png', dpi=220, bbox_inches='tight', facecolor='#0e1117')
     img_buf.seek(0)
@@ -164,9 +164,9 @@ def generate_astrodox_wheel_only(target_date: datetime):
 # ORDERBOOK FUNCTIONS
 # ==========================================
 
-def get_okx_orderbook(limit=50):
+def get_okx_orderbook(symbol="XAUT-USDT", limit=50):
     try:
-        url = f"https://www.okx.com/api/v5/market/books?instId=XAUT-USDT&sz={limit}"
+        url = f"https://www.okx.com/api/v5/market/books?instId={symbol}&sz={limit}"
         r = requests.get(url, timeout=8)
         data = r.json()
         if data.get("code") != "0":
@@ -179,64 +179,54 @@ def get_okx_orderbook(limit=50):
         return None, None, str(e)
 
 
-def add_cumulative(orders):
+def add_cumulative_and_total(orders):
     result = []
     cumulative = 0.0
     for price, size in orders:
         cumulative += size
-        result.append([price, size, cumulative])
+        total = price * size
+        result.append([price, size, cumulative, total])
     return result
 
 
-def show_orderbook(bids, asks, error=None, min_cum=0.0):
-    if error:
-        st.error(f"Gagal: {error}")
-        return
+def create_depth_chart(bids, asks):
+    fig, ax = plt.subplots(figsize=(12, 3.5), facecolor='#0e1117')
+    ax.set_facecolor('#0e1117')
 
-    if not bids or not asks:
-        st.warning("Data kosong")
-        return
+    # Bids (hijau) - reverse supaya dari kanan ke kiri
+    bid_prices = [x[0] for x in bids[:40]]
+    bid_cum = []
+    c = 0
+    for _, size in bids[:40]:
+        c += size
+        bid_cum.append(c)
 
-    bids_cum = add_cumulative(bids)
-    asks_cum = add_cumulative(asks)
+    # Asks (merah)
+    ask_prices = [x[0] for x in asks[:40]]
+    ask_cum = []
+    c = 0
+    for _, size in asks[:40]:
+        c += size
+        ask_cum.append(c)
 
-    if min_cum > 0:
-        bids_cum = [x for x in bids_cum if x[2] >= min_cum]
-        asks_cum = [x for x in asks_cum if x[2] >= min_cum]
+    ax.fill_between(bid_prices, bid_cum, color='#00c853', alpha=0.6, label='Bids')
+    ax.plot(bid_prices, bid_cum, color='#00c853', linewidth=1.5)
 
-    if not bids_cum or not asks_cum:
-        st.warning(f"Tidak ada level dengan cumulative ≥ {min_cum} XAUT")
-        return
+    ax.fill_between(ask_prices, ask_cum, color='#ff1744', alpha=0.6, label='Asks')
+    ax.plot(ask_prices, ask_cum, color='#ff1744', linewidth=1.5)
 
-    best_bid = bids[0][0]
-    best_ask = asks[0][0]
-    spread = best_ask - best_bid
-    mid = (best_bid + best_ask) / 2
+    ax.set_xlabel("Price", color='white')
+    ax.set_ylabel("Cumulative Size", color='white')
+    ax.tick_params(colors='white')
+    ax.spines['bottom'].set_color('#333')
+    ax.spines['top'].set_color('#333')
+    ax.spines['left'].set_color('#333')
+    ax.spines['right'].set_color('#333')
+    ax.legend(facecolor='#161b22', labelcolor='white')
+    ax.grid(True, alpha=0.15)
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Best Bid", f"{best_bid:,.2f}")
-    col2.metric("Best Ask", f"{best_ask:,.2f}")
-    col3.metric("Spread", f"{spread:.2f}")
-
-    st.markdown(f"**Mid Price:** `{mid:,.2f}` USDT")
-
-    bid_df = pd.DataFrame(bids_cum[:40], columns=["Harga", "Size", "Cumulative"])
-    ask_df = pd.DataFrame(asks_cum[:40], columns=["Harga", "Size", "Cumulative"])
-
-    bid_df["Harga"] = bid_df["Harga"].map("{:,.2f}".format)
-    ask_df["Harga"] = ask_df["Harga"].map("{:,.2f}".format)
-    bid_df["Size"] = bid_df["Size"].map("{:.4f}".format)
-    ask_df["Size"] = ask_df["Size"].map("{:.4f}".format)
-    bid_df["Cumulative"] = bid_df["Cumulative"].map("{:,.2f}".format)
-    ask_df["Cumulative"] = ask_df["Cumulative"].map("{:,.2f}".format)
-
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown("### 🟢 Pembeli (Bids)")
-        st.dataframe(bid_df, use_container_width=True, height=520, hide_index=True)
-    with c2:
-        st.markdown("### 🔴 Penjual (Asks)")
-        st.dataframe(ask_df, use_container_width=True, height=520, hide_index=True)
+    plt.tight_layout()
+    return fig
 
 
 # ==========================================
@@ -247,22 +237,17 @@ if menu == "🔮 Astrodox":
     st.caption("Roda Transit Planet + Rekap Aspek Geometri")
 
     st.markdown("---")
-
     st.subheader("📅 Atur Waktu Transit")
+
     c1, c2, c3, c4, c5 = st.columns(5)
-    with c1:
-        tanggal = st.number_input("Tanggal", 1, 31, 12)
+    with c1: tanggal = st.number_input("Tanggal", 1, 31, 12)
     with c2:
-        bulan_list = ["Januari", "Februari", "Maret", "April", "Mei", "Juni",
-                      "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
+        bulan_list = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"]
         bulan_nama = st.selectbox("Bulan", bulan_list, index=7)
         bulan = bulan_list.index(bulan_nama) + 1
-    with c3:
-        tahun = st.number_input("Tahun", 2000, 2100, 2026)
-    with c4:
-        jam = st.number_input("Jam", 0, 23, 19)
-    with c5:
-        menit = st.number_input("Menit", 0, 59, 30)
+    with c3: tahun = st.number_input("Tahun", 2000, 2100, 2026)
+    with c4: jam = st.number_input("Jam", 0, 23, 19)
+    with c5: menit = st.number_input("Menit", 0, 59, 30)
 
     try:
         event_datetime = datetime(int(tahun), int(bulan), int(tanggal), int(jam), int(menit))
@@ -279,15 +264,14 @@ if menu == "🔮 Astrodox":
     st.download_button("📥 Download Roda", img_buf, f"Astrodox_{event_datetime.strftime('%Y%m%d_%H%M')}.png", "image/png")
 
     st.markdown("---")
-
-    # Dashboard Info
     st.subheader("📋 Dashboard Info Astrodox")
+
     pos_lines = []
     pos_items = list(planet_positions.items())
     for i in range(0, len(pos_items), 2):
         p1, v1 = pos_items[i]
-        if i + 1 < len(pos_items):
-            p2, v2 = pos_items[i + 1]
+        if i+1 < len(pos_items):
+            p2, v2 = pos_items[i+1]
             pos_lines.append(f"• {p1:<12}: {v1:<16}  |  • {p2:<12}: {v2}")
         else:
             pos_lines.append(f"• {p1:<12}: {v1}")
@@ -316,30 +300,75 @@ if menu == "🔮 Astrodox":
 # ==========================================
 # HALAMAN ORDERBOOK
 # ==========================================
-elif menu == "📊 Orderbook XAUT":
-    st.title("📊 Orderbook XAUT/USDT")
-    st.caption("Data realtime dari OKX • dengan Cumulative Quantity")
+elif menu == "📊 Orderbook":
+    st.title("📊 Orderbook")
+    
+    col_sym, col_refresh = st.columns([3, 1])
+    with col_sym:
+        symbol = st.selectbox("Pilih Pair", ["XAUT-USDT", "BTC-USDT"], index=0)
+    with col_refresh:
+        st.write("")
+        st.write("")
+        auto_refresh = st.checkbox("Auto Refresh 3s", value=False)
 
     st.markdown("---")
 
-    col_set1, col_set2, col_set3 = st.columns(3)
-    with col_set1:
-        limit = st.selectbox("Jumlah Level", [20, 30, 50, 100], index=2)
-    with col_set2:
-        min_cum = st.number_input("Min Cumulative (XAUT)", min_value=0.0, value=0.0, step=1.0,
-                                  help="Hanya tampilkan level yang cumulative-nya ≥ nilai ini")
-    with col_set3:
-        auto_refresh = st.checkbox("Auto Refresh (3 detik)", value=False)
+    limit = st.selectbox("Depth Level", [20, 30, 50, 100], index=2)
 
-    if st.button("🔄 Refresh Sekarang", type="primary") or auto_refresh or "ob_data" not in st.session_state:
-        with st.spinner("Mengambil data OKX..."):
-            st.session_state.ob_data = get_okx_orderbook(limit)
+    if st.button("🔄 Refresh", type="primary") or auto_refresh or "ob_data" not in st.session_state:
+        with st.spinner(f"Mengambil data {symbol}..."):
+            st.session_state.ob_data = get_okx_orderbook(symbol, limit)
+            st.session_state.current_symbol = symbol
 
     bids, asks, err = st.session_state.ob_data
-    show_orderbook(bids, asks, err, min_cum)
+
+    if err:
+        st.error(f"Error: {err}")
+    elif bids and asks:
+        best_bid = bids[0][0]
+        best_ask = asks[0][0]
+        mid = (best_bid + best_ask) / 2
+        spread = best_ask - best_bid
+
+        # Header metrics
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Best Bid", f"{best_bid:,.2f}")
+        m2.metric("Best Ask", f"{best_ask:,.2f}")
+        m3.metric("Mid Price", f"{mid:,.2f}")
+        m4.metric("Spread", f"{spread:.2f}")
+
+        st.markdown(f"**{st.session_state.get('current_symbol', symbol)}** • Live")
+
+        # Tables
+        bids_full = add_cumulative_and_total(bids)
+        asks_full = add_cumulative_and_total(asks)
+
+        bid_df = pd.DataFrame(bids_full[:30], columns=["Price", "Amount", "Cumulative", "Total"])
+        ask_df = pd.DataFrame(asks_full[:30], columns=["Price", "Amount", "Cumulative", "Total"])
+
+        for df in [bid_df, ask_df]:
+            df["Price"] = df["Price"].map("{:,.2f}".format)
+            df["Amount"] = df["Amount"].map("{:.4f}".format)
+            df["Cumulative"] = df["Cumulative"].map("{:,.2f}".format)
+            df["Total"] = df["Total"].map("{:,.2f}".format)
+
+        c1, c2 = st.columns(2)
+
+        with c1:
+            st.markdown("### 🔴 ASKS (Sells)")
+            st.dataframe(ask_df[["Price", "Amount", "Total"]], use_container_width=True, height=420, hide_index=True)
+
+        with c2:
+            st.markdown("### 🟢 BIDS (Buys)")
+            st.dataframe(bid_df[["Price", "Amount", "Total"]], use_container_width=True, height=420, hide_index=True)
+
+        # Depth Chart
+        st.markdown("### Market Depth Chart")
+        depth_fig = create_depth_chart(bids, asks)
+        st.pyplot(depth_fig, use_container_width=True)
 
     if auto_refresh:
         time.sleep(3)
         st.rerun()
 
-    st.caption("Cumulative = total volume dari harga terbaik sampai level tersebut.")
+    st.caption("Data dari OKX Public API")
