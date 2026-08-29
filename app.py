@@ -22,25 +22,25 @@ def set_video_background(video_file):
         encoded = base64.b64encode(data).decode()
         css = f"""
         <style>
-            /* Sembunyikan background bawaan Streamlit */
+            /* Reset margin & padding utama agar full layar */
             .stApp {{
                 background: transparent !important;
             }}
             
-            /* Buat video jadi background yang menutupi seluruh layar & bergerak */
+            /* Memastikan video menutupi layar secara penuh tanpa celah */
             #bg-video {{
                 position: fixed;
-                right: 0;
-                bottom: 0;
-                min-width: 100%;
-                min-height: 100%;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
                 z-index: -999;
                 object-fit: cover;
             }}
 
             /* ========== SIDEBAR DENGAN EFEK TRANSPARAN BLUR ========== */
             section[data-testid="stSidebar"] {{
-                background: rgba(10, 15, 28, 0.75) !important;
+                background: rgba(10, 15, 28, 0.8) !important;
                 backdrop-filter: blur(12px);
                 border-right: 1px solid #1e293b !important;
             }}
@@ -54,7 +54,7 @@ def set_video_background(video_file):
             }}
             
             section[data-testid="stSidebar"] label {{
-                background: rgba(30, 41, 59, 0.8) !important;
+                background: rgba(30, 41, 59, 0.85) !important;
                 border-radius: 10px !important;
                 padding: 12px 16px !important;
                 margin-bottom: 6px !important;
@@ -63,7 +63,7 @@ def set_video_background(video_file):
             }}
             
             section[data-testid="stSidebar"] label:hover {{
-                background: rgba(51, 65, 85, 0.9) !important;
+                background: rgba(51, 65, 85, 0.95) !important;
                 border-color: #00d4ff !important;
             }}
             
@@ -83,21 +83,33 @@ def set_video_background(video_file):
                 margin-bottom: 20px;
             }}
 
-            /* ========== KOTAK UTAMA DENGAN EFEK KACA (GLASSMORPHISM) ========== */
+            /* ========== KOTAK UTAMA & KOLOM DENGAN EFEK KACA (GLASSMORPHISM) ========== */
             .welcome-box {{
-                background: rgba(15, 23, 42, 0.75);
+                background: rgba(15, 23, 42, 0.82);
                 backdrop-filter: blur(10px);
-                border: 1px solid rgba(51, 65, 85, 0.8);
+                border: 1px solid rgba(51, 65, 85, 0.9);
                 border-radius: 18px;
                 padding: 55px 30px;
                 text-align: center;
-                margin-top: 40px;
+                margin-top: 20px;
+                box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
             }}
             
-            .info-box {{
-                background-color: rgba(15, 23, 42, 0.8);
+            /* Kotak khusus untuk menyamakan tampilan card di bawah agar jelas */
+            .custom-card {{
+                background: rgba(15, 23, 42, 0.82);
                 backdrop-filter: blur(10px);
-                border: 1px solid rgba(51, 65, 85, 0.8);
+                border: 1px solid rgba(51, 65, 85, 0.9);
+                border-radius: 14px;
+                padding: 22px;
+                margin-top: 15px;
+                box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            }}
+
+            .info-box {{
+                background-color: rgba(15, 23, 42, 0.85);
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(51, 65, 85, 0.9);
                 border-radius: 12px;
                 padding: 20px;
                 font-family: 'Courier New', monospace;
@@ -112,10 +124,9 @@ def set_video_background(video_file):
         """
         st.markdown(css, unsafe_allow_html=True)
     except Exception as e:
-        # Cadangan jika file video tidak ditemukan, web tetap aman tidak error
         pass
 
-# Panggil fungsi background video (menggunakan file bg.mp4)
+# Panggil fungsi background video
 set_video_background("bg.mp4")
 
 # ==========================================
@@ -339,11 +350,23 @@ if menu == "🏠  Menu Utama":
         <p style="color:#64748b;font-size:15px;margin-top:12px;">Pilih menu di sidebar kiri untuk mulai</p>
     </div>
     """, unsafe_allow_html=True)
-    st.markdown("---")
+    st.markdown("<br>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
-    with c1: st.info("**🔮 Astrodox**\n\nRoda transit planet + rekap aspek geometri untuk analisa XAUUSD.")
-    with c2: st.info("**📊 Orderbook**\n\nOrderbook realtime, ticker, volume, recent trades & dominasi buyer/seller.")
-    st.caption("ABEL FX Tools • Powered by OKX Public API")
+    with c1:
+        st.markdown("""
+        <div class="custom-card">
+            <h3 style="color:#00d4ff;margin-bottom:8px;">🔮 Astrodox</h3>
+            <p style="color:#cbd5e1;font-size:15px;">Roda transit planet + rekap aspek geometri untuk analisa XAUUSD.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with c2:
+        st.markdown("""
+        <div class="custom-card">
+            <h3 style="color:#00d4ff;margin-bottom:8px;">📊 Orderbook</h3>
+            <p style="color:#cbd5e1;font-size:15px;">Orderbook realtime, ticker, volume, recent trades & dominasi buyer/seller.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    st.markdown("<br><div style='text-align:center; color:#94a3b8;'>ABEL FX Tools • Powered by OKX Public API</div>", unsafe_allow_html=True)
 
 elif menu == "🔮  Astrodox":
     st.title("🔮 Astrodox Wheel")
