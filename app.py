@@ -41,7 +41,7 @@ def apply_theme_and_background(theme_mode, video_file):
         }
         .welcome-box {
             border-radius: 18px;
-            padding: 75px 30px;
+            padding: 85px 30px;
             text-align: center;
             margin-top: 40px;
         }
@@ -156,16 +156,13 @@ apply_theme_and_background(selected_theme, "bg.mp4")
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📌 Navigasi Menu")
 
-# Inisialisasi state halaman aktif
 if "active_menu" not in st.session_state:
     st.session_state.active_menu = "🏠 Menu Utama"
 
-# Desain Tombol Menu Kustom di Sidebar Menggunakan Native Streamlit Button styling via CSS
 def sidebar_menu_button(label, icon, target_key):
     is_active = st.session_state.active_menu == target_key
     button_label = f"{icon}  {label}"
     
-    # CSS kustom untuk merubah tampilan tombol sidebar agar terlihat seperti card/pill modern
     active_border = "border-left: 4px solid #00d4ff !important;" if is_active else "border-left: 4px solid transparent !important;"
     active_bg = "background-color: rgba(0, 212, 255, 0.15) !important; color: #00d4ff !important;" if is_active else ""
     
@@ -196,7 +193,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="text-align:center; color:#94a3b8; font-size:12px; padding-top:5px;">
     ABEL FX Tools<br>
-    <span style="color:#64748b;">v1.4 (Clean & Custom Nav)</span>
+    <span style="color:#64748b;">v1.5 (Clean Landing)</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -392,17 +389,14 @@ def show_orderbook_visual(bids, asks, min_cum=0.0, sort_order="Default (Harga)")
                 <span style="color:#ff4d4d;font-weight:bold;">{item['cumulative']:,.1f}</span></div>""", unsafe_allow_html=True)
 
 # ==========================================
-# HALAMAN UTAMA (CLEAN)
+# HALAMAN UTAMA (CLEAN MINIMALIST)
 # ==========================================
 if menu == "🏠 Menu Utama":
     st.markdown("""
     <div class="welcome-box">
-        <h1 style="color:#00d4ff;font-size:46px;margin-bottom:12px;">Welcome to ABEL Tools</h1>
-        <p style="font-size:18px;opacity:0.9;">Tools trading profesional berbasis Astrodox & Market Data</p>
-        <p style="font-size:15px;margin-top:16px;opacity:0.7;">Silakan pilih menu di sidebar kiri untuk mulai menggunakan tools.</p>
+        <h1 style="color:#00d4ff;font-size:52px;margin:0;">Welcome to ABEL Tools</h1>
     </div>
     """, unsafe_allow_html=True)
-    st.markdown("<br><br><div style='text-align:center; opacity:0.6;'>ABEL FX Tools • Powered by OKX Public API</div>", unsafe_allow_html=True)
 
 elif menu == "🔮 Astrodox":
     st.title("🔮 Astrodox Wheel")
