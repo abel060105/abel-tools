@@ -293,7 +293,7 @@ def generate_astrodox_wheel_only(target_date: datetime):
     return fig, img_buf, aspect_counts, planet_positions
 
 # ==========================================
-# ORDERBOOK FUNCTIONS (DIOPTIMALKAN SEPERTI OKX)
+# ORDERBOOK FUNCTIONS (OKX CUMULATIVE STYLE)
 # ==========================================
 def get_okx_orderbook(symbol="XAUT-USDT", limit=100):
     try:
@@ -341,25 +341,45 @@ def get_okx_trades(symbol="XAUT-USDT", limit=40):
         } for t in data["data"]]
     except: return []
 
-def add_cumulative(orders):
-    result, cumulative = [], 0.0
-    for price, size in orders:
+def add_cumulative_okx_style(orders, is_bid=True):
+    """
+    Akumulasi ala OKX: Dari luar (harga terjauh) menuju ke dalam (spread).
+    Membuat baris harga terdekat dengan spread memiliki akumulasi angka terbesar (puluhan ribu).
+    """
+    if not orders:
+        return []
+    
+    if is_bid:
+        sorted_orders = sorted(orders, key=lambda x: x[0]) # dari terendah
+    else:
+        sorted_orders = sorted(orders, key=lambda x: x[0], reverse=True) # dari tertinggi
+        
+    result = []
+    cumulative = 0.0
+    for price, size in sorted_orders:
         cumulative += size
         result.append({"price": price, "size": size, "cumulative": cumulative})
-    return result
+        
+    if is_bid:
+        return sorted(result, key=lambda x: x["price"], reverse=True)
+    else:
+        return sorted(result, key=lambda x: x["price"])
 
 def show_orderbook_visual(bids, asks, min_cum=0.0, sort_order="Default (Harga)"):
     if not bids or not asks:
         st.warning("Data orderbook kosong")
         return
-    bids_data = add_cumulative(bids)
-    asks_data = add_cumulative(asks)
+    
+    bids_data = add_cumulative_okx_style(bids, is_bid=True)
+    asks_data = add_cumulative_okx_style(asks, is_bid=False)
+    
     if min_cum > 0:
         bids_data = [x for x in bids_data if x["cumulative"] >= min_cum]
         asks_data = [x for x in asks_data if x["cumulative"] >= min_cum]
     if not bids_data or not asks_data:
         st.warning(f"Tidak ada level dengan cumulative ≥ {min_cum}")
         return
+        
     if sort_order == "Size Kecil → Besar":
         bids_data = sorted(bids_data, key=lambda x: x["cumulative"])
         asks_data = sorted(asks_data, key=lambda x: x["cumulative"])
@@ -375,7 +395,6 @@ def show_orderbook_visual(bids, asks, min_cum=0.0, sort_order="Default (Harga)")
         st.markdown("### 🟢 Beli (Bids)")
         for item in bids_data[:25]:
             pct = min(item["cumulative"] / max_cum, 1.0)
-            # Format angka menggunakan pemisah ribuan (contoh: 89,350) menyerupai OKX
             st.markdown(f"""<div style="display:flex;justify-content:space-between;align-items:center;
                 background:linear-gradient(90deg,#0d3b2e {pct*100}%,transparent 0%);
                 padding:6px 10px;margin:3px 0;border-radius:6px;">
@@ -475,7 +494,7 @@ elif menu == "🔮 Astrodox":
     st.markdown("---")
 
     # ==========================================
-    # PAPAN PROMPT 1 — FULL (Lengkap + Cek Harga XAU Realtime)
+    # PAPAN PROMPT 1 — FULL
     # ==========================================
     st.subheader("📋 Papan Prompt 1 — Full Analysis (Makro + Geopolitik + 3 Setup)")
 
@@ -548,7 +567,7 @@ Fokus pada confluence Astro + Makro + Orderflow.
     st.markdown("---")
 
     # ==========================================
-    # PAPAN PROMPT 2 — SIMPLE (Hanya Astrodox)
+    # PAPAN PROMPT 2 — SIMPLE
     # ==========================================
     st.subheader("📋 Papan Prompt 2 — Simple Astrodox Only")
 
@@ -595,7 +614,6 @@ elif menu == "📊 Orderbook":
         st.write(""); st.write("")
         auto_refresh = st.checkbox("Auto Refresh")
     
-    # Default limit dinaikkan ke 100 agar kedalaman data menandingi aplikasi OKX
     limit = st.selectbox("Jumlah Level", [20,30,50,100], index=3)
     
     if st.button("🔄 Refresh Sekarang", type="primary") or auto_refresh or "market_data" not in st.session_state:
