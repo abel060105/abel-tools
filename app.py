@@ -512,10 +512,10 @@ REKAP GARIS ASPEK GEOMETRI:
 5. **Kesimpulan AI untuk Entry**
    - Bias utama: BULLISH / BEARISH / WHIPSAW / NEUTRAL
    - Peringatan Whipsaw (jika ada)
-   - Proyeksi Range:
-     • Sweep Range
-     • Trend Range
-     • Reversal Range
+   - Proyeksi Besaran Range (hanya tampilkan ukuran besaran jaraknya saja dalam bentuk Pips / Dollar, BUKAN harga dari sekian sampai sekian):
+     • Sweep Range (contoh: 80-150 Pips / $8.0-$15.0)
+     • Trend Range (contoh: 200-350 Pips / $20.0-$35.0)
+     • Reversal Range (contoh: 80-130 Pips / $8.0-$13.0)
 
 6. **3 Setup Entry Lengkap**
    A. Setup dari AI Macro Engine
@@ -567,9 +567,9 @@ Berikan jawaban dalam format ringkas dan jelas:
 
 1. **Bias Utama** : BULLISH / BEARISH / WHIPSAW / NEUTRAL
 2. **Peringatan Whipsaw** : (hanya jika ada risiko whipsaw yang signifikan, jika tidak ada cukup tulis "Tidak signifikan")
-3. **Sweep Range** : contoh 80-150 Pips ($8.0-$15.0)
-4. **Trend Range** : contoh 200-350 Pips ($20.0-$35.0)
-5. **Reversal Range** : contoh 80-130 Pips ($8.0-$13.0)
+3. **Sweep Range** : (hanya tampilkan ukuran besaran jaraknya saja, contoh: 80-150 Pips / $8.0-$15.0)
+4. **Trend Range** : (hanya tampilkan ukuran besaran jaraknya saja, contoh: 200-350 Pips / $20.0-$35.0)
+5. **Reversal Range** : (hanya tampilkan ukuran besaran jaraknya saja, contoh: 80-130 Pips / $8.0-$13.0)
 
 Catatan:
 - Fokus hanya pada confluence Astro + Price Action / SMC structure.
