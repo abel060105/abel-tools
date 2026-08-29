@@ -14,134 +14,151 @@ st.set_page_config(
     layout="wide"
 )
 
-# ================= VIDEO BACKGROUND & CSS =================
-def set_video_background(video_file):
-    try:
-        with open(video_file, "rb") as f:
-            data = f.read()
-        encoded = base64.b64encode(data).decode()
-        css = f"""
-        <style>
-            /* Reset margin & padding utama */
-            .stApp {{
-                background: transparent !important;
-            }}
-            
-            /* Background Video Full Layar & Responsif untuk HP & PC */
-            #bg-video {{
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100vw;
-                height: 100vh;
-                z-index: -999;
-                object-fit: cover; /* Default untuk PC/Laptop */
-            }}
+# ================= THEME & VIDEO BACKGROUND CONFIG =================
+def apply_theme_and_background(theme_mode, video_file):
+    # Inisialisasi CSS dasar
+    css = """
+    <style>
+        /* Styling Sidebar Default */
+        section[data-testid="stSidebar"] {
+            backdrop-filter: blur(12px);
+            border-right: 1px solid #1e293b !important;
+        }
+        section[data-testid="stSidebar"] > div {
+            background: transparent !important;
+        }
+        .sidebar-brand {
+            text-align: center;
+            font-size: 24px;
+            font-weight: 800;
+            color: #00d4ff;
+            padding: 18px 0 8px 0;
+            letter-spacing: 1.5px;
+        }
+        .sidebar-sub {
+            text-align: center;
+            color: #94a3b8;
+            font-size: 12px;
+            margin-bottom: 20px;
+        }
+    """
 
-            /* Khusus Tampilan HP / Layar Portrait agar video tidak kepotong */
-            @media only screen and (max-width: 768px) {{
-                #bg-video {{
+    if theme_mode == "🖼️ Wallpaper Mode":
+        try:
+            with open(video_file, "rb") as f:
+                data = f.read()
+            encoded = base64.b64encode(data).decode()
+            
+            css += f"""
+                .stApp {
+                    background: transparent !important;
+                }
+                #bg-video {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
                     width: 100vw;
                     height: 100vh;
-                    object-fit: fill; /* Menyesuaikan layar HP */
-                }}
-            }}
+                    z-index: -999;
+                    object-fit: cover; /* Responsif untuk Laptop */
+                }
+                @media only screen and (max-width: 768px) {
+                    #bg-video {
+                        object-fit: fill; /* Menyesuaikan layar HP Portrait */
+                    }
+                }
+                section[data-testid="stSidebar"] {
+                    background: rgba(10, 15, 28, 0.85) !important;
+                }
+                .welcome-box, .custom-card, .info-box {
+                    background: rgba(11, 16, 30, 0.92) !important;
+                    backdrop-filter: blur(12px);
+                    border: 1px solid rgba(0, 212, 255, 0.3) !important;
+                    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+                }
+            </style>
+            <video autoplay muted loop id="bg-video">
+                <source src="data:video/mp4;base64,{encoded}" type="video/mp4">
+            </video>
+            """
+        except:
+            pass
+    elif theme_mode == "🌙 Dark Clean":
+        css += """
+            .stApp {
+                background-color: #0e1117 !important;
+            }
+            section[data-testid="stSidebar"] {
+                background-color: #161b22 !important;
+            }
+            .welcome-box, .custom-card, .info-box {
+                background: #161b22 !important;
+                border: 1px solid #30363d !important;
+            }
+        </style>
+        """
+    else: # Light Clean
+        css += """
+            .stApp {
+                background-color: #ffffff !important;
+                color: #000000 !important;
+            }
+            section[data-testid="stSidebar"] {
+                background-color: #f0f2f6 !important;
+            }
+            .welcome-box, .custom-card, .info-box {
+                background: #f8f9fa !important;
+                border: 1px solid #d1d5db !important;
+                color: #111827 !important;
+            }
+        </style>
+        """
 
-            /* ========== SIDEBAR TRANSPARAN BLUR ========== */
-            section[data-testid="stSidebar"] {{
-                background: rgba(10, 15, 28, 0.85) !important;
-                backdrop-filter: blur(12px);
-                border-right: 1px solid #1e293b !important;
-            }}
-            
-            section[data-testid="stSidebar"] > div {{
-                background: transparent !important;
-            }}
-            
-            section[data-testid="stSidebar"] .stRadio > div {{
-                gap: 6px;
-            }}
-            
-            section[data-testid="stSidebar"] label {{
-                background: rgba(30, 41, 59, 0.9) !important;
-                border-radius: 10px !important;
-                padding: 12px 16px !important;
-                margin-bottom: 6px !important;
-                border: 1px solid #334155 !important;
-                transition: all 0.2s ease;
-            }}
-            
-            section[data-testid="stSidebar"] label:hover {{
-                background: rgba(51, 65, 85, 0.95) !important;
-                border-color: #00d4ff !important;
-            }}
-            
-            .sidebar-brand {{
-                text-align: center;
-                font-size: 24px;
-                font-weight: 800;
-                color: #00d4ff;
-                padding: 18px 0 8px 0;
-                letter-spacing: 1.5px;
-            }}
-            
-            .sidebar-sub {{
-                text-align: center;
-                color: #94a3b8;
-                font-size: 12px;
-                margin-bottom: 20px;
-            }}
-
-            /* ========== KOTAK UTAMA & CARD DIBAWAH (DILEBIHKAN GELAPNYA AGAR JELAS) ========== */
-            .welcome-box {{
-                background: rgba(11, 16, 30, 0.92);
-                backdrop-filter: blur(12px);
-                border: 1px solid rgba(0, 212, 255, 0.3);
+    # Tambahan komponen card umum
+    css += """
+        <style>
+            .welcome-box {
                 border-radius: 18px;
                 padding: 55px 30px;
                 text-align: center;
                 margin-top: 20px;
-                box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
-            }}
-            
-            .custom-card {{
-                background: rgba(11, 16, 30, 0.92);
-                backdrop-filter: blur(12px);
-                border: 1px solid rgba(0, 212, 255, 0.3);
+            }
+            .custom-card {
                 border-radius: 14px;
                 padding: 24px;
                 margin-top: 15px;
-                box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
-            }}
-
-            .info-box {{
-                background-color: rgba(11, 16, 30, 0.92);
-                backdrop-filter: blur(12px);
-                border: 1px solid rgba(0, 212, 255, 0.3);
+            }
+            .info-box {
                 border-radius: 12px;
                 padding: 20px;
                 font-family: 'Courier New', monospace;
                 font-size: 14px;
-                color: #e2e8f0;
                 line-height: 1.6;
-            }}
+            }
         </style>
-        <video autoplay muted loop id="bg-video">
-            <source src="data:video/mp4;base64,{encoded}" type="video/mp4">
-        </video>
-        """
-        st.markdown(css, unsafe_allow_html=True)
-    except Exception as e:
-        pass
-
-# Panggil fungsi background video
-set_video_background("bg.mp4")
+    """
+    st.markdown(css, unsafe_allow_html=True)
 
 # ==========================================
-# SIDEBAR
+# SIDEBAR & THEME SWITCHER
 # ==========================================
 st.sidebar.markdown('<div class="sidebar-brand">⚡ ABEL FX</div>', unsafe_allow_html=True)
 st.sidebar.markdown('<div class="sidebar-sub">Trading Tools</div>', unsafe_allow_html=True)
+
+# Pilihan Menu Tema Wallpaper / Tampilan Standar
+st.sidebar.markdown("### 🎨 Tema Tampilan")
+selected_theme = st.sidebar.selectbox(
+    "Pilih Tema",
+    ["🖼️ Wallpaper Mode", "🌙 Dark Clean", "☀️ Light Clean"],
+    index=0,
+    label_visibility="collapsed"
+)
+
+# Eksekusi Tema & Background
+apply_theme_and_background(selected_theme, "bg.mp4")
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📌 Navigasi Menu")
 menu = st.sidebar.radio(
     "menu",
     ["🏠  Menu Utama", "🔮  Astrodox", "📊  Orderbook"],
@@ -150,9 +167,9 @@ menu = st.sidebar.radio(
 )
 st.sidebar.markdown("---")
 st.sidebar.markdown("""
-<div style="text-align:center; color:#94a3b8; font-size:12px; padding-top:10px;">
+<div style="text-align:center; color:#94a3b8; font-size:12px; padding-top:5px;">
     ABEL FX Tools<br>
-    <span style="color:#64748b;">v1.0 (Live BG)</span>
+    <span style="color:#64748b;">v1.1 (Theme Switcher)</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -336,7 +353,7 @@ def show_orderbook_visual(bids, asks, min_cum=0.0, sort_order="Default (Harga)")
                 background:linear-gradient(90deg,#0d3b2e {pct*100}%,transparent 0%);
                 padding:6px 10px;margin:3px 0;border-radius:6px;">
                 <span style="color:#00ff9d;font-weight:bold;">{item['cumulative']:,.1f}</span>
-                <span style="color:white;">{item['price']:,.2f}</span></div>""", unsafe_allow_html=True)
+                <span style="color:inherit;">{item['price']:,.2f}</span></div>""", unsafe_allow_html=True)
     with c2:
         st.markdown("### 🔴 Jual (Asks)")
         for item in asks_data[:25]:
@@ -344,18 +361,18 @@ def show_orderbook_visual(bids, asks, min_cum=0.0, sort_order="Default (Harga)")
             st.markdown(f"""<div style="display:flex;justify-content:space-between;align-items:center;
                 background:linear-gradient(270deg,#3b0d0d {pct*100}%,transparent 0%);
                 padding:6px 10px;margin:3px 0;border-radius:6px;">
-                <span style="color:white;">{item['price']:,.2f}</span>
+                <span style="color:inherit;">{item['price']:,.2f}</span>
                 <span style="color:#ff4d4d;font-weight:bold;">{item['cumulative']:,.1f}</span></div>""", unsafe_allow_html=True)
 
 # ==========================================
-# HALAMAN
+# HALAMAN UTAMA
 # ==========================================
 if menu == "🏠  Menu Utama":
     st.markdown("""
     <div class="welcome-box">
         <h1 style="color:#00d4ff;font-size:42px;margin-bottom:12px;">Welcome to ABEL Tools</h1>
-        <p style="color:#cbd5e1;font-size:18px;">Tools trading berbasis Astrodox & Market Data</p>
-        <p style="color:#94a3b8;font-size:15px;margin-top:12px;">Pilih menu di sidebar kiri untuk mulai</p>
+        <p style="font-size:18px;">Tools trading berbasis Astrodox & Market Data</p>
+        <p style="font-size:15px;margin-top:12px;opacity:0.8;">Pilih menu di sidebar kiri untuk mulai</p>
     </div>
     """, unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
@@ -364,17 +381,17 @@ if menu == "🏠  Menu Utama":
         st.markdown("""
         <div class="custom-card">
             <h3 style="color:#00d4ff;margin-bottom:8px;">🔮 Astrodox</h3>
-            <p style="color:#cbd5e1;font-size:15px;">Roda transit planet + rekap aspek geometri untuk analisa XAUUSD.</p>
+            <p style="font-size:15px;">Roda transit planet + rekap aspek geometri untuk analisa XAUUSD.</p>
         </div>
         """, unsafe_allow_html=True)
     with c2:
         st.markdown("""
         <div class="custom-card">
             <h3 style="color:#00d4ff;margin-bottom:8px;">📊 Orderbook</h3>
-            <p style="color:#cbd5e1;font-size:15px;">Orderbook realtime, ticker, volume, recent trades & dominasi buyer/seller.</p>
+            <p style="font-size:15px;">Orderbook realtime, ticker, volume, recent trades & dominasi buyer/seller.</p>
         </div>
         """, unsafe_allow_html=True)
-    st.markdown("<br><div style='text-align:center; color:#94a3b8;'>ABEL FX Tools • Powered by OKX Public API</div>", unsafe_allow_html=True)
+    st.markdown("<br><div style='text-align:center; opacity:0.7;'>ABEL FX Tools • Powered by OKX Public API</div>", unsafe_allow_html=True)
 
 elif menu == "🔮  Astrodox":
     st.title("🔮 Astrodox Wheel")
