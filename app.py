@@ -52,10 +52,6 @@ def apply_theme_and_background(theme_mode, video_file):
             font-size: 14px;
             line-height: 1.6;
         }
-        /* Sembunyikan radio button bawaan streamlit untuk navigasi */
-        div.row-widget.stRadio > div {
-            display: none;
-        }
     </style>
     """
     
@@ -164,36 +160,32 @@ st.sidebar.markdown("### 📌 Navigasi Menu")
 if "active_menu" not in st.session_state:
     st.session_state.active_menu = "🏠 Menu Utama"
 
-# Desain Tombol Menu Kustom di Sidebar
+# Desain Tombol Menu Kustom di Sidebar Menggunakan Native Streamlit Button styling via CSS
 def sidebar_menu_button(label, icon, target_key):
     is_active = st.session_state.active_menu == target_key
-    bg_color = "rgba(0, 212, 255, 0.15)" if is_active else "transparent"
-    border_color = "#00d4ff" if is_active else "transparent"
-    text_color = "#00d4ff" if is_active else "inherit"
-    font_weight = "bold" if is_active else "normal"
+    button_label = f"{icon}  {label}"
     
-    button_html = f"""
-    <div style="
-        background-color: {bg_color};
-        border-left: 4px solid {border_color};
-        padding: 10px 14px;
-        margin: 6px 0;
-        border-radius: 6px;
-        color: {text_color};
-        font-weight: {font_weight};
-        font-size: 14px;
-        cursor: pointer;
-        transition: all 0.2s ease-in-out;
-    ">
-        {icon} &nbsp; {label}
-    </div>
-    """
-    if st.sidebar.button(f"nav_{target_key}", use_container_width=True, label_visibility="collapsed"):
+    # CSS kustom untuk merubah tampilan tombol sidebar agar terlihat seperti card/pill modern
+    active_border = "border-left: 4px solid #00d4ff !important;" if is_active else "border-left: 4px solid transparent !important;"
+    active_bg = "background-color: rgba(0, 212, 255, 0.15) !important; color: #00d4ff !important;" if is_active else ""
+    
+    st.markdown(f"""
+    <style>
+    div.stButton > button[kind="secondary"][data-baseweb="button"]:has-text("{label}") {{
+        text-align: left !important;
+        width: 100% !important;
+        border-radius: 6px !important;
+        margin-bottom: 4px !important;
+        {active_border}
+        {active_bg}
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+    
+    if st.sidebar.button(button_label, use_container_width=True, key=f"btn_{target_key}"):
         st.session_state.active_menu = target_key
         st.rerun()
-    st.sidebar.markdown(button_html, unsafe_allow_html=True)
 
-# Render Tombol Navigasi Kustom
 sidebar_menu_button("Menu Utama", "🏠", "🏠 Menu Utama")
 sidebar_menu_button("Astrodox", "🔮", "🔮 Astrodox")
 sidebar_menu_button("Orderbook", "📊", "📊 Orderbook")
@@ -204,7 +196,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="text-align:center; color:#94a3b8; font-size:12px; padding-top:5px;">
     ABEL FX Tools<br>
-    <span style="color:#64748b;">v1.3 (Clean & Custom Nav)</span>
+    <span style="color:#64748b;">v1.4 (Clean & Custom Nav)</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -400,14 +392,14 @@ def show_orderbook_visual(bids, asks, min_cum=0.0, sort_order="Default (Harga)")
                 <span style="color:#ff4d4d;font-weight:bold;">{item['cumulative']:,.1f}</span></div>""", unsafe_allow_html=True)
 
 # ==========================================
-# HALAMAN UTAMA
+# HALAMAN UTAMA (CLEAN)
 # ==========================================
 if menu == "🏠 Menu Utama":
     st.markdown("""
     <div class="welcome-box">
         <h1 style="color:#00d4ff;font-size:46px;margin-bottom:12px;">Welcome to ABEL Tools</h1>
         <p style="font-size:18px;opacity:0.9;">Tools trading profesional berbasis Astrodox & Market Data</p>
-        <p style="font-size:15px;margin-top:16px;opacity:0.7;">Silakan pilih menu di sidebar kiri untuk mulai menganalisa</p>
+        <p style="font-size:15px;margin-top:16px;opacity:0.7;">Silakan pilih menu di sidebar kiri untuk mulai menggunakan tools.</p>
     </div>
     """, unsafe_allow_html=True)
     st.markdown("<br><br><div style='text-align:center; opacity:0.6;'>ABEL FX Tools • Powered by OKX Public API</div>", unsafe_allow_html=True)
