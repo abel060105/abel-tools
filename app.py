@@ -16,7 +16,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# ================= THEME =================
+# ================= THEME & BACKGROUND =================
 def apply_theme_and_background(theme_mode, video_file):
     css_base = """
     <style>
@@ -63,16 +63,25 @@ def apply_theme_and_background(theme_mode, video_file):
             with open(video_file, "rb") as f:
                 data = f.read()
             encoded = base64.b64encode(data).decode()
+            
             css_wallpaper = """
             <style>
-                .stApp { background: transparent !important; }
+                .stApp {
+                    background: transparent !important;
+                }
                 #bg-video {
-                    position: fixed; top: 0; left: 0;
-                    width: 100vw; height: 100vh;
-                    z-index: -999; object-fit: cover;
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100vw;
+                    height: 100vh;
+                    z-index: -999;
+                    object-fit: cover;
                 }
                 @media only screen and (max-width: 768px) {
-                    #bg-video { object-fit: fill; }
+                    #bg-video {
+                        object-fit: cover;
+                    }
                 }
                 section[data-testid="stSidebar"] {
                     background: rgba(10, 15, 28, 0.85) !important;
@@ -84,13 +93,35 @@ def apply_theme_and_background(theme_mode, video_file):
                     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
                 }
             </style>
-            <video autoplay muted loop id="bg-video">
+
+            <video autoplay muted loop playsinline webkit-playsinline id="bg-video">
                 <source src="data:video/mp4;base64,REPLACE_BASE64" type="video/mp4">
             </video>
+
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    var video = document.getElementById('bg-video');
+                    if (video) {
+                        var playPromise = video.play();
+                        if (playPromise !== undefined) {
+                            playPromise.catch(function(error) {
+                                document.body.addEventListener('touchstart', function() {
+                                    video.play();
+                                }, { once: true });
+                                document.body.addEventListener('click', function() {
+                                    video.play();
+                                }, { once: true });
+                            });
+                        }
+                    }
+                });
+            </script>
             """.replace("REPLACE_BASE64", encoded)
+            
             st.markdown(css_wallpaper, unsafe_allow_html=True)
-        except:
-            pass
+        except Exception as e:
+            st.warning(f"Gagal load video background: {e}")
+            
     elif theme_mode == "🌙 Dark Clean":
         st.markdown("""
         <style>
@@ -169,7 +200,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="text-align:center; color:#94a3b8; font-size:12px; padding-top:5px;">
     ABEL FX Tools<br>
-    <span style="color:#64748b;">v2.3 (Full + Prompt Boards)</span>
+    <span style="color:#64748b;">v2.5 (Clean Main Menu)</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -423,11 +454,8 @@ def show_orderbook_visual(bids, asks, aggregation=0.1, sort_order="Default (Harg
 # HALAMAN
 # ==========================================
 if menu == "🏠 Menu Utama":
-    st.markdown("""
-    <div class="welcome-box">
-        <h1 style="color:#00d4ff;font-size:52px;margin:0;">Welcome to ABEL Tools</h1>
-    </div>
-    """, unsafe_allow_html=True)
+    # Kosongkan saja, biar background kelihatan penuh
+    pass
 
 elif menu == "🔮 Astrodox":
     st.title("🔮 Astrodox Wheel")
