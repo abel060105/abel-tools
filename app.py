@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import requests
 import pandas as pd
 import time
+from collections import defaultdict
 
 st.set_page_config(
     page_title="ABEL FX Tools",
@@ -193,7 +194,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="text-align:center; color:#94a3b8; font-size:12px; padding-top:5px;">
     ABEL FX Tools<br>
-    <span style="color:#64748b;">v1.5 (Clean Landing)</span>
+    <span style="color:#64748b;">v1.6 (OKX-like Orderbook)</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -341,6 +342,33 @@ def get_okx_trades(symbol="XAUT-USDT", limit=40):
         } for t in data["data"]]
     except: return []
 
+def aggregate_orders(orders, aggregation: float, side: str = "bid"):
+    """
+    Aggregate orderbook levels by price group.
+    aggregation = 0.1 → almost raw
+    aggregation = 1 / 10 / 100 → group by that step
+    """
+    if aggregation <= 0.1:
+        # keep original (just round lightly)
+        return [[round(p, 1), s] for p, s in orders]
+
+    grouped = defaultdict(float)
+    for price, size in orders:
+        if side == "bid":
+            # floor to nearest aggregation
+            key = (price // aggregation) * aggregation
+        else:
+            # ceil for asks so price level moves upward
+            key = ((price + aggregation - 1e-9) // aggregation) * aggregation
+        grouped[key] += size
+
+    result = [[price, size] for price, size in grouped.items()]
+    if side == "bid":
+        result.sort(key=lambda x: x[0], reverse=True)
+    else:
+        result.sort(key=lambda x: x[0])
+    return result
+
 def add_cumulative(orders):
     result, cumulative = [], 0.0
     for price, size in orders:
@@ -348,45 +376,65 @@ def add_cumulative(orders):
         result.append({"price": price, "size": size, "cumulative": cumulative})
     return result
 
-def show_orderbook_visual(bids, asks, min_cum=0.0, sort_order="Default (Harga)"):
+def show_orderbook_visual(bids, asks, aggregation=0.1, display_mode="Size per level", sort_order="Default (Harga)"):
     if not bids or not asks:
         st.warning("Data orderbook kosong")
         return
+
+    # Apply aggregation
+    bids = aggregate_orders(bids, aggregation, side="bid")
+    asks = aggregate_orders(asks, aggregation, side="ask")
+
     bids_data = add_cumulative(bids)
     asks_data = add_cumulative(asks)
-    if min_cum > 0:
-        bids_data = [x for x in bids_data if x["cumulative"] >= min_cum]
-        asks_data = [x for x in asks_data if x["cumulative"] >= min_cum]
+
     if not bids_data or not asks_data:
-        st.warning(f"Tidak ada level dengan cumulative ≥ {min_cum}")
+        st.warning("Tidak ada data setelah aggregation")
         return
+
     if sort_order == "Size Kecil → Besar":
-        bids_data = sorted(bids_data, key=lambda x: x["cumulative"])
-        asks_data = sorted(asks_data, key=lambda x: x["cumulative"])
+        key = "size" if display_mode == "Size per level" else "cumulative"
+        bids_data = sorted(bids_data, key=lambda x: x[key])
+        asks_data = sorted(asks_data, key=lambda x: x[key])
     elif sort_order == "Size Besar → Kecil":
-        bids_data = sorted(bids_data, key=lambda x: x["cumulative"], reverse=True)
-        asks_data = sorted(asks_data, key=lambda x: x["cumulative"], reverse=True)
-    max_cum = max(max([x["cumulative"] for x in bids_data[:30]], default=1),
-                  max([x["cumulative"] for x in asks_data[:30]], default=1))
+        key = "size" if display_mode == "Size per level" else "cumulative"
+        bids_data = sorted(bids_data, key=lambda x: x[key], reverse=True)
+        asks_data = sorted(asks_data, key=lambda x: x[key], reverse=True)
+
+    # Max value for bar width
+    if display_mode == "Size per level":
+        max_val = max(
+            max([x["size"] for x in bids_data[:30]], default=1),
+            max([x["size"] for x in asks_data[:30]], default=1)
+        )
+    else:
+        max_val = max(
+            max([x["cumulative"] for x in bids_data[:30]], default=1),
+            max([x["cumulative"] for x in asks_data[:30]], default=1)
+        )
+
     c1, c2 = st.columns(2)
     with c1:
         st.markdown("### 🟢 Beli (Bids)")
         for item in bids_data[:25]:
-            pct = min(item["cumulative"] / max_cum, 1.0)
+            value = item["size"] if display_mode == "Size per level" else item["cumulative"]
+            pct = min(value / max_val, 1.0)
             st.markdown(f"""<div style="display:flex;justify-content:space-between;align-items:center;
                 background:linear-gradient(90deg,#0d3b2e {pct*100}%,transparent 0%);
                 padding:6px 10px;margin:3px 0;border-radius:6px;">
-                <span style="color:#00ff9d;font-weight:bold;">{item['cumulative']:,.1f}</span>
-                <span style="color:inherit;">{item['price']:,.2f}</span></div>""", unsafe_allow_html=True)
+                <span style="color:#00ff9d;font-weight:bold;">{value:,.2f}</span>
+                <span style="color:inherit;">{item['price']:,.1f}</span></div>""", unsafe_allow_html=True)
+
     with c2:
         st.markdown("### 🔴 Jual (Asks)")
         for item in asks_data[:25]:
-            pct = min(item["cumulative"] / max_cum, 1.0)
+            value = item["size"] if display_mode == "Size per level" else item["cumulative"]
+            pct = min(value / max_val, 1.0)
             st.markdown(f"""<div style="display:flex;justify-content:space-between;align-items:center;
                 background:linear-gradient(270deg,#3b0d0d {pct*100}%,transparent 0%);
                 padding:6px 10px;margin:3px 0;border-radius:6px;">
-                <span style="color:inherit;">{item['price']:,.2f}</span>
-                <span style="color:#ff4d4d;font-weight:bold;">{item['cumulative']:,.1f}</span></div>""", unsafe_allow_html=True)
+                <span style="color:inherit;">{item['price']:,.1f}</span>
+                <span style="color:#ff4d4d;font-weight:bold;">{value:,.2f}</span></div>""", unsafe_allow_html=True)
 
 # ==========================================
 # HALAMAN UTAMA (CLEAN MINIMALIST)
@@ -472,7 +520,7 @@ elif menu == "🔮 Astrodox":
     st.markdown("---")
 
     # ==========================================
-    # PAPAN PROMPT 1 — FULL (Lengkap + Cek Harga XAU Realtime)
+    # PAPAN PROMPT 1 — FULL
     # ==========================================
     st.subheader("📋 Papan Prompt 1 — Full Analysis (Makro + Geopolitik + 3 Setup)")
 
@@ -545,7 +593,7 @@ Fokus pada confluence Astro + Makro + Orderflow.
     st.markdown("---")
 
     # ==========================================
-    # PAPAN PROMPT 2 — SIMPLE (Hanya Astrodox)
+    # PAPAN PROMPT 2 — SIMPLE
     # ==========================================
     st.subheader("📋 Papan Prompt 2 — Simple Astrodox Only")
 
@@ -584,36 +632,73 @@ Catatan:
 
 elif menu == "📊 Orderbook":
     st.title("📊 Orderbook & Market Data")
-    c1,c2,c3,c4 = st.columns([2,2,2,1])
-    with c1: symbol = st.selectbox("Pair", ["XAUT-USDT","BTC-USDT"])
-    with c2: min_cum = st.number_input("Min Cumulative", 0.0, value=0.0, step=1.0)
-    with c3: sort_order = st.selectbox("Urutan", ["Default (Harga)","Size Kecil → Besar","Size Besar → Kecil"])
+    
+    c1, c2, c3, c4 = st.columns([2, 2, 2, 1.2])
+    with c1:
+        symbol = st.selectbox("Pair", ["XAUT-USDT", "BTC-USDT"])
+    with c2:
+        aggregation = st.selectbox(
+            "Aggregation (mirip OKX)",
+            [0.1, 1, 10, 100],
+            index=0,
+            format_func=lambda x: f"{x}"
+        )
+    with c3:
+        display_mode = st.selectbox(
+            "Tampilan Size",
+            ["Size per level", "Cumulative"],
+            index=0   # default = Size per level (mirip OKX)
+        )
     with c4:
-        st.write(""); st.write("")
+        st.write("")
+        st.write("")
         auto_refresh = st.checkbox("Auto Refresh")
-    limit = st.selectbox("Jumlah Level", [20,30,50,100], index=2)
+
+    c5, c6 = st.columns([2, 2])
+    with c5:
+        sort_order = st.selectbox(
+            "Urutan",
+            ["Default (Harga)", "Size Kecil → Besar", "Size Besar → Kecil"]
+        )
+    with c6:
+        limit = st.selectbox("Jumlah Level (Depth)", [20, 30, 50, 100, 200], index=2)
+
     if st.button("🔄 Refresh Sekarang", type="primary") or auto_refresh or "market_data" not in st.session_state:
         with st.spinner(f"Mengambil data {symbol}..."):
             bids, asks, err = get_okx_orderbook(symbol, limit)
             ticker = get_okx_ticker(symbol)
             trades = get_okx_trades(symbol, 40)
-            st.session_state.market_data = {"bids":bids,"asks":asks,"err":err,"ticker":ticker,"trades":trades,"symbol":symbol}
+            st.session_state.market_data = {
+                "bids": bids,
+                "asks": asks,
+                "err": err,
+                "ticker": ticker,
+                "trades": trades,
+                "symbol": symbol
+            }
+
     data = st.session_state.market_data
-    ticker, trades, bids, asks, err = data.get("ticker"), data.get("trades",[]), data.get("bids"), data.get("asks"), data.get("err")
+    ticker = data.get("ticker")
+    trades = data.get("trades", [])
+    bids = data.get("bids")
+    asks = data.get("asks")
+    err = data.get("err")
+
     if ticker:
         sign = "+" if ticker["change_pct"] >= 0 else ""
         st.markdown(f"### {data.get('symbol')}")
-        m1,m2,m3,m4,m5 = st.columns(5)
+        m1, m2, m3, m4, m5 = st.columns(5)
         m1.metric("Harga Terakhir", f"{ticker['last']:,.2f}")
         m2.metric("Perubahan 24jam", f"{sign}{ticker['change_pct']:.2f}%")
         m3.metric("High 24jam", f"{ticker['high24h']:,.2f}")
         m4.metric("Low 24jam", f"{ticker['low24h']:,.2f}")
         m5.metric("Volume 24jam", f"{ticker['vol24h']:,.2f}")
+
         if trades:
-            buy_vol = sum(t["size"] for t in trades if t["side"]=="buy")
-            sell_vol = sum(t["size"] for t in trades if t["side"]=="sell")
+            buy_vol = sum(t["size"] for t in trades if t["side"] == "buy")
+            sell_vol = sum(t["size"] for t in trades if t["side"] == "sell")
             total = buy_vol + sell_vol or 1
-            buy_pct = buy_vol/total*100
+            buy_pct = buy_vol / total * 100
             st.markdown("#### Dominasi Buyer vs Seller")
             st.markdown(f"""
             <div style="display:flex;height:28px;border-radius:8px;overflow:hidden;margin-bottom:6px;">
@@ -624,19 +709,30 @@ elif menu == "📊 Orderbook":
                 <span style="color:#00c853;">🟢 Buyer: {buy_vol:,.2f}</span>
                 <span style="color:#ff1744;">🔴 Seller: {sell_vol:,.2f}</span>
             </div>""", unsafe_allow_html=True)
+
     st.markdown("---")
     st.subheader("Orderbook")
-    if err: st.error(err)
-    else: show_orderbook_visual(bids, asks, min_cum, sort_order)
+    
+    if err:
+        st.error(err)
+    else:
+        show_orderbook_visual(
+            bids, asks,
+            aggregation=aggregation,
+            display_mode=display_mode,
+            sort_order=sort_order
+        )
+
     st.markdown("---")
     st.subheader("Recent Trades")
     if trades:
         df = pd.DataFrame(trades)
-        df["side"] = df["side"].map({"buy":"🟢 Buy","sell":"🔴 Sell"})
-        df = df.rename(columns={"time":"Waktu","price":"Harga","size":"Jumlah","side":"Arah"})
+        df["side"] = df["side"].map({"buy": "🟢 Buy", "sell": "🔴 Sell"})
+        df = df.rename(columns={"time": "Waktu", "price": "Harga", "size": "Jumlah", "side": "Arah"})
         st.dataframe(df, use_container_width=True, height=350, hide_index=True)
     else:
         st.info("Belum ada data trades")
+
     if auto_refresh:
         time.sleep(3)
         st.rerun()
