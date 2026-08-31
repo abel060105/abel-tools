@@ -16,7 +16,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# ================= THEME & VIDEO BACKGROUND =================
+# ================= THEME =================
 def apply_theme_and_background(theme_mode, video_file):
     css_base = """
     <style>
@@ -169,12 +169,12 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="text-align:center; color:#94a3b8; font-size:12px; padding-top:5px;">
     ABEL FX Tools<br>
-    <span style="color:#64748b;">v2.1 (Fixed + Aggregation 1000/10000)</span>
+    <span style="color:#64748b;">v2.2 (Fixed Pair Switching)</span>
 </div>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# ASTRODOX (tetap sama)
+# ASTRODOX
 # ==========================================
 ZODIAC_SYMBOLS = ["♈", "♉", "♊", "♋", "♌", "♍", "♎", "♏", "♐", "♑", "♒", "♓"]
 ZODIAC_NAMES = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
@@ -269,7 +269,7 @@ def generate_astrodox_wheel_only(target_date: datetime):
     return fig, img_buf, aspect_counts, planet_positions
 
 # ==========================================
-# MARKET DATA FUNCTIONS
+# MARKET DATA
 # ==========================================
 def get_okx_orderbook(symbol="XAUT-USDT", limit=80):
     try:
@@ -345,7 +345,6 @@ def get_btcusd_price():
     except:
         pass
     try:
-        # fallback
         r = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT", timeout=6)
         data = r.json()
         if "price" in data:
@@ -471,7 +470,7 @@ elif menu == "📊 Orderbook":
     
     c1, c2, c3 = st.columns([2, 2, 1.5])
     with c1:
-        symbol = st.selectbox("Pair", ["XAUT-USDT", "BTC-USDT"])
+        symbol = st.selectbox("Pair", ["XAUT-USDT", "BTC-USDT"], key="pair_select")
     with c2:
         aggregation = st.selectbox(
             "Aggregation",
@@ -493,18 +492,27 @@ elif menu == "📊 Orderbook":
         depth = 120
     elif aggregation <= 10:
         depth = 250
-    elif aggregation <= 100:
-        depth = 400
     else:
-        depth = 400   # max API
+        depth = 400
 
-    if st.button("🔄 Refresh Sekarang", type="primary") or auto_refresh or "market_data" not in st.session_state:
-        with st.spinner(f"Mengambil data {symbol} (depth={depth})..."):
+    # ===== FIX: Force refresh when pair berubah =====
+    if "last_symbol" not in st.session_state:
+        st.session_state.last_symbol = symbol
+
+    force_refresh = False
+    if st.session_state.last_symbol != symbol:
+        st.session_state.last_symbol = symbol
+        force_refresh = True
+        # Clear old data
+        if "market_data" in st.session_state:
+            del st.session_state.market_data
+
+    if st.button("🔄 Refresh Sekarang", type="primary") or auto_refresh or force_refresh or "market_data" not in st.session_state:
+        with st.spinner(f"Mengambil data {symbol}..."):
             bids, asks, err = get_okx_orderbook(symbol, limit=depth)
             ticker = get_okx_ticker(symbol)
             trades = get_okx_trades(symbol, 40)
             
-            # Ambil harga referensi sesuai pair
             if symbol == "XAUT-USDT":
                 ref_price = get_xauusd_price()
             else:
@@ -520,7 +528,7 @@ elif menu == "📊 Orderbook":
                 "ref_price": ref_price
             }
 
-    data = st.session_state.market_data
+    data = st.session_state.get("market_data", {})
     ticker = data.get("ticker")
     trades = data.get("trades", [])
     bids = data.get("bids")
@@ -554,7 +562,7 @@ elif menu == "📊 Orderbook":
                 <span style="color:#ff1744;">🔴 Seller: {sell_vol:,.2f}</span>
             </div>""", unsafe_allow_html=True)
 
-    # ===================== SPREAD SECTION (hanya sesuai pair) =====================
+    # ===================== SPREAD SECTION =====================
     st.markdown("---")
     
     if symbol == "XAUT-USDT":
@@ -689,15 +697,17 @@ elif menu == "📊 Orderbook":
                 """)
                 st.info("Rumus: Harga OANDA ≈ Harga BTC − Selisih")
             else:
-                st.warning("Data BTCUSD belum tersedia. Coba refresh beberapa detik.")
+                st.warning("Data BTCUSD belum tersedia. Coba refresh.")
 
     st.markdown("---")
     st.subheader("Orderbook")
     
     if err:
         st.error(err)
-    else:
+    elif bids and asks:
         show_orderbook_visual(bids, asks, aggregation=aggregation, sort_order=sort_order)
+    else:
+        st.info("Sedang memuat orderbook...")
 
     st.markdown("---")
     st.subheader("Recent Trades")
