@@ -194,7 +194,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="text-align:center; color:#94a3b8; font-size:12px; padding-top:5px;">
     ABEL FX Tools<br>
-    <span style="color:#64748b;">v1.6 (OKX-like Orderbook)</span>
+    <span style="color:#64748b;">v1.7 (Size + Notional)</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -296,7 +296,7 @@ def generate_astrodox_wheel_only(target_date: datetime):
 # ==========================================
 # ORDERBOOK FUNCTIONS
 # ==========================================
-def get_okx_orderbook(symbol="XAUT-USDT", limit=50):
+def get_okx_orderbook(symbol="XAUT-USDT", limit=80):
     try:
         url = f"https://www.okx.com/api/v5/market/books?instId={symbol}&sz={limit}"
         r = requests.get(url, timeout=8)
@@ -343,22 +343,15 @@ def get_okx_trades(symbol="XAUT-USDT", limit=40):
     except: return []
 
 def aggregate_orders(orders, aggregation: float, side: str = "bid"):
-    """
-    Aggregate orderbook levels by price group.
-    aggregation = 0.1 → almost raw
-    aggregation = 1 / 10 / 100 → group by that step
-    """
+    """Aggregate orderbook levels by price group."""
     if aggregation <= 0.1:
-        # keep original (just round lightly)
         return [[round(p, 1), s] for p, s in orders]
 
     grouped = defaultdict(float)
     for price, size in orders:
         if side == "bid":
-            # floor to nearest aggregation
             key = (price // aggregation) * aggregation
         else:
-            # ceil for asks so price level moves upward
             key = ((price + aggregation - 1e-9) // aggregation) * aggregation
         grouped[key] += size
 
@@ -369,14 +362,7 @@ def aggregate_orders(orders, aggregation: float, side: str = "bid"):
         result.sort(key=lambda x: x[0])
     return result
 
-def add_cumulative(orders):
-    result, cumulative = [], 0.0
-    for price, size in orders:
-        cumulative += size
-        result.append({"price": price, "size": size, "cumulative": cumulative})
-    return result
-
-def show_orderbook_visual(bids, asks, aggregation=0.1, display_mode="Size per level", sort_order="Default (Harga)"):
+def show_orderbook_visual(bids, asks, aggregation=0.1, sort_order="Default (Harga)"):
     if not bids or not asks:
         st.warning("Data orderbook kosong")
         return
@@ -385,59 +371,60 @@ def show_orderbook_visual(bids, asks, aggregation=0.1, display_mode="Size per le
     bids = aggregate_orders(bids, aggregation, side="bid")
     asks = aggregate_orders(asks, aggregation, side="ask")
 
-    bids_data = add_cumulative(bids)
-    asks_data = add_cumulative(asks)
+    # Prepare data with notional
+    bids_data = []
+    for price, size in bids:
+        notional = size * price
+        bids_data.append({"price": price, "size": size, "notional": notional})
 
-    if not bids_data or not asks_data:
-        st.warning("Tidak ada data setelah aggregation")
-        return
+    asks_data = []
+    for price, size in asks:
+        notional = size * price
+        asks_data.append({"price": price, "size": size, "notional": notional})
 
     if sort_order == "Size Kecil → Besar":
-        key = "size" if display_mode == "Size per level" else "cumulative"
-        bids_data = sorted(bids_data, key=lambda x: x[key])
-        asks_data = sorted(asks_data, key=lambda x: x[key])
+        bids_data = sorted(bids_data, key=lambda x: x["size"])
+        asks_data = sorted(asks_data, key=lambda x: x["size"])
     elif sort_order == "Size Besar → Kecil":
-        key = "size" if display_mode == "Size per level" else "cumulative"
-        bids_data = sorted(bids_data, key=lambda x: x[key], reverse=True)
-        asks_data = sorted(asks_data, key=lambda x: x[key], reverse=True)
+        bids_data = sorted(bids_data, key=lambda x: x["size"], reverse=True)
+        asks_data = sorted(asks_data, key=lambda x: x["size"], reverse=True)
 
-    # Max value for bar width
-    if display_mode == "Size per level":
-        max_val = max(
-            max([x["size"] for x in bids_data[:30]], default=1),
-            max([x["size"] for x in asks_data[:30]], default=1)
-        )
-    else:
-        max_val = max(
-            max([x["cumulative"] for x in bids_data[:30]], default=1),
-            max([x["cumulative"] for x in asks_data[:30]], default=1)
-        )
+    # Max size for bar width
+    max_size = max(
+        max([x["size"] for x in bids_data[:30]], default=1),
+        max([x["size"] for x in asks_data[:30]], default=1)
+    )
 
     c1, c2 = st.columns(2)
+    
     with c1:
         st.markdown("### 🟢 Beli (Bids)")
         for item in bids_data[:25]:
-            value = item["size"] if display_mode == "Size per level" else item["cumulative"]
-            pct = min(value / max_val, 1.0)
+            pct = min(item["size"] / max_size, 1.0)
+            size_str = f"{item['size']:,.2f}"
+            notional_str = f"${item['notional']:,.0f}"
             st.markdown(f"""<div style="display:flex;justify-content:space-between;align-items:center;
                 background:linear-gradient(90deg,#0d3b2e {pct*100}%,transparent 0%);
-                padding:6px 10px;margin:3px 0;border-radius:6px;">
-                <span style="color:#00ff9d;font-weight:bold;">{value:,.2f}</span>
-                <span style="color:inherit;">{item['price']:,.1f}</span></div>""", unsafe_allow_html=True)
+                padding:7px 12px;margin:3px 0;border-radius:6px;font-size:14px;">
+                <span style="color:#00ff9d;font-weight:600;">{size_str} <span style="color:#94a3b8;font-size:12px;">({notional_str})</span></span>
+                <span style="color:inherit;font-weight:500;">{item['price']:,.1f}</span>
+            </div>""", unsafe_allow_html=True)
 
     with c2:
         st.markdown("### 🔴 Jual (Asks)")
         for item in asks_data[:25]:
-            value = item["size"] if display_mode == "Size per level" else item["cumulative"]
-            pct = min(value / max_val, 1.0)
+            pct = min(item["size"] / max_size, 1.0)
+            size_str = f"{item['size']:,.2f}"
+            notional_str = f"${item['notional']:,.0f}"
             st.markdown(f"""<div style="display:flex;justify-content:space-between;align-items:center;
                 background:linear-gradient(270deg,#3b0d0d {pct*100}%,transparent 0%);
-                padding:6px 10px;margin:3px 0;border-radius:6px;">
-                <span style="color:inherit;">{item['price']:,.1f}</span>
-                <span style="color:#ff4d4d;font-weight:bold;">{value:,.2f}</span></div>""", unsafe_allow_html=True)
+                padding:7px 12px;margin:3px 0;border-radius:6px;font-size:14px;">
+                <span style="color:inherit;font-weight:500;">{item['price']:,.1f}</span>
+                <span style="color:#ff4d4d;font-weight:600;">{size_str} <span style="color:#94a3b8;font-size:12px;">({notional_str})</span></span>
+            </div>""", unsafe_allow_html=True)
 
 # ==========================================
-# HALAMAN UTAMA (CLEAN MINIMALIST)
+# HALAMAN UTAMA
 # ==========================================
 if menu == "🏠 Menu Utama":
     st.markdown("""
@@ -519,9 +506,6 @@ elif menu == "🔮 Astrodox":
     
     st.markdown("---")
 
-    # ==========================================
-    # PAPAN PROMPT 1 — FULL
-    # ==========================================
     st.subheader("📋 Papan Prompt 1 — Full Analysis (Makro + Geopolitik + 3 Setup)")
 
     prompt_full_1 = f"""Cek dan update harga XAUUSD (Gold) secara realtime saat ini terlebih dahulu melalui pencarian/web.
@@ -592,9 +576,6 @@ Fokus pada confluence Astro + Makro + Orderflow.
 
     st.markdown("---")
 
-    # ==========================================
-    # PAPAN PROMPT 2 — SIMPLE
-    # ==========================================
     st.subheader("📋 Papan Prompt 2 — Simple Astrodox Only")
 
     prompt_simple = f"""Kamu adalah Senior Quantitative Trader + Financial Astrologer spesialis XAUUSD.
@@ -633,39 +614,30 @@ Catatan:
 elif menu == "📊 Orderbook":
     st.title("📊 Orderbook & Market Data")
     
-    c1, c2, c3, c4 = st.columns([2, 2, 2, 1.2])
+    c1, c2, c3 = st.columns([2, 2, 1.5])
     with c1:
         symbol = st.selectbox("Pair", ["XAUT-USDT", "BTC-USDT"])
     with c2:
         aggregation = st.selectbox(
-            "Aggregation (mirip OKX)",
+            "Aggregation",
             [0.1, 1, 10, 100],
             index=0,
             format_func=lambda x: f"{x}"
         )
     with c3:
-        display_mode = st.selectbox(
-            "Tampilan Size",
-            ["Size per level", "Cumulative"],
-            index=0   # default = Size per level (mirip OKX)
-        )
-    with c4:
         st.write("")
         st.write("")
         auto_refresh = st.checkbox("Auto Refresh")
 
-    c5, c6 = st.columns([2, 2])
-    with c5:
-        sort_order = st.selectbox(
-            "Urutan",
-            ["Default (Harga)", "Size Kecil → Besar", "Size Besar → Kecil"]
-        )
-    with c6:
-        limit = st.selectbox("Jumlah Level (Depth)", [20, 30, 50, 100, 200], index=2)
+    sort_order = st.selectbox(
+        "Urutan",
+        ["Default (Harga)", "Size Kecil → Besar", "Size Besar → Kecil"],
+        index=0
+    )
 
     if st.button("🔄 Refresh Sekarang", type="primary") or auto_refresh or "market_data" not in st.session_state:
         with st.spinner(f"Mengambil data {symbol}..."):
-            bids, asks, err = get_okx_orderbook(symbol, limit)
+            bids, asks, err = get_okx_orderbook(symbol, limit=80)
             ticker = get_okx_ticker(symbol)
             trades = get_okx_trades(symbol, 40)
             st.session_state.market_data = {
@@ -719,7 +691,6 @@ elif menu == "📊 Orderbook":
         show_orderbook_visual(
             bids, asks,
             aggregation=aggregation,
-            display_mode=display_mode,
             sort_order=sort_order
         )
 
