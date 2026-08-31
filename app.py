@@ -120,7 +120,7 @@ def apply_theme_and_background(theme_mode, video_file):
         """
         st.markdown(css_dark, unsafe_allow_html=True)
         
-    else: # Light Clean
+    else:
         css_light = """
         <style>
             .stApp {
@@ -140,12 +140,11 @@ def apply_theme_and_background(theme_mode, video_file):
         st.markdown(css_light, unsafe_allow_html=True)
 
 # ==========================================
-# SIDEBAR (Navigasi di atas, Tema di bawah)
+# SIDEBAR
 # ==========================================
 st.sidebar.markdown('<div class="sidebar-brand">⚡ ABEL FX</div>', unsafe_allow_html=True)
 st.sidebar.markdown('<div class="sidebar-sub">Trading Tools</div>', unsafe_allow_html=True)
 
-# ===== NAVIGASI MENU (di atas) =====
 st.sidebar.markdown("### 📌 Navigasi Menu")
 
 if "active_menu" not in st.session_state:
@@ -183,7 +182,6 @@ menu = st.session_state.active_menu
 
 st.sidebar.markdown("---")
 
-# ===== TEMA TAMPILAN (di bawah) =====
 st.sidebar.markdown("### 🎨 Tema Tampilan")
 selected_theme = st.sidebar.selectbox(
     "Pilih Tema",
@@ -198,7 +196,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="text-align:center; color:#94a3b8; font-size:12px; padding-top:5px;">
     ABEL FX Tools<br>
-    <span style="color:#64748b;">v1.9 (XAUUSD Widget)</span>
+    <span style="color:#64748b;">v2.0 (XAU + BTC Spread)</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -298,7 +296,7 @@ def generate_astrodox_wheel_only(target_date: datetime):
     return fig, img_buf, aspect_counts, planet_positions
 
 # ==========================================
-# ORDERBOOK FUNCTIONS
+# ORDERBOOK + PRICE FUNCTIONS
 # ==========================================
 def get_okx_orderbook(symbol="XAUT-USDT", limit=80):
     try:
@@ -347,9 +345,7 @@ def get_okx_trades(symbol="XAUT-USDT", limit=40):
     except: return []
 
 def get_xauusd_price():
-    """Ambil harga XAUUSD dari free source (approximasi OANDA)"""
     try:
-        # Sumber 1: goldprice.dev (gratis, no key)
         r = requests.get("https://api.goldprice.dev/v1/prices?symbol=XAU-USD-SPOT", timeout=6)
         data = r.json()
         if "symbols" in data and len(data["symbols"]) > 0:
@@ -357,11 +353,21 @@ def get_xauusd_price():
     except:
         pass
     try:
-        # Fallback sederhana
         r = requests.get("https://api.gold-api.com/price/XAU", timeout=6)
         data = r.json()
         if "price" in data:
             return float(data["price"])
+    except:
+        pass
+    return None
+
+def get_btcusd_price():
+    """Ambil harga BTCUSD approx (bisa dari CoinGecko / sumber gratis)"""
+    try:
+        r = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd", timeout=6)
+        data = r.json()
+        if "bitcoin" in data:
+            return float(data["bitcoin"]["usd"])
     except:
         pass
     return None
@@ -393,15 +399,8 @@ def show_orderbook_visual(bids, asks, aggregation=0.1, sort_order="Default (Harg
     bids = aggregate_orders(bids, aggregation, side="bid")
     asks = aggregate_orders(asks, aggregation, side="ask")
 
-    bids_data = []
-    for price, size in bids:
-        notional = size * price
-        bids_data.append({"price": price, "size": size, "notional": notional})
-
-    asks_data = []
-    for price, size in asks:
-        notional = size * price
-        asks_data.append({"price": price, "size": size, "notional": notional})
+    bids_data = [{"price": p, "size": s, "notional": s * p} for p, s in bids]
+    asks_data = [{"price": p, "size": s, "notional": s * p} for p, s in asks]
 
     if sort_order == "Size Kecil → Besar":
         bids_data = sorted(bids_data, key=lambda x: x["size"])
@@ -414,7 +413,6 @@ def show_orderbook_visual(bids, asks, aggregation=0.1, sort_order="Default (Harg
         max([x["size"] for x in bids_data[:40]], default=1),
         max([x["size"] for x in asks_data[:40]], default=1)
     )
-
     max_display = 30 if aggregation >= 10 else 25
 
     c1, c2 = st.columns(2)
@@ -423,12 +421,10 @@ def show_orderbook_visual(bids, asks, aggregation=0.1, sort_order="Default (Harg
         st.markdown("### 🟢 Beli (Bids)")
         for item in bids_data[:max_display]:
             pct = min(item["size"] / max_size, 1.0)
-            size_str = f"{item['size']:,.2f}"
-            notional_str = f"${item['notional']:,.0f}"
             st.markdown(f"""<div style="display:flex;justify-content:space-between;align-items:center;
                 background:linear-gradient(90deg,#0d3b2e {pct*100}%,transparent 0%);
                 padding:7px 12px;margin:3px 0;border-radius:6px;font-size:14px;">
-                <span style="color:#00ff9d;font-weight:600;">{size_str} <span style="color:#94a3b8;font-size:12px;">({notional_str})</span></span>
+                <span style="color:#00ff9d;font-weight:600;">{item['size']:,.2f} <span style="color:#94a3b8;font-size:12px;">(${item['notional']:,.0f})</span></span>
                 <span style="color:inherit;font-weight:500;">{item['price']:,.1f}</span>
             </div>""", unsafe_allow_html=True)
 
@@ -436,17 +432,15 @@ def show_orderbook_visual(bids, asks, aggregation=0.1, sort_order="Default (Harg
         st.markdown("### 🔴 Jual (Asks)")
         for item in asks_data[:max_display]:
             pct = min(item["size"] / max_size, 1.0)
-            size_str = f"{item['size']:,.2f}"
-            notional_str = f"${item['notional']:,.0f}"
             st.markdown(f"""<div style="display:flex;justify-content:space-between;align-items:center;
                 background:linear-gradient(270deg,#3b0d0d {pct*100}%,transparent 0%);
                 padding:7px 12px;margin:3px 0;border-radius:6px;font-size:14px;">
                 <span style="color:inherit;font-weight:500;">{item['price']:,.1f}</span>
-                <span style="color:#ff4d4d;font-weight:600;">{size_str} <span style="color:#94a3b8;font-size:12px;">({notional_str})</span></span>
+                <span style="color:#ff4d4d;font-weight:600;">{item['size']:,.2f} <span style="color:#94a3b8;font-size:12px;">(${item['notional']:,.0f})</span></span>
             </div>""", unsafe_allow_html=True)
 
 # ==========================================
-# HALAMAN UTAMA
+# HALAMAN
 # ==========================================
 if menu == "🏠 Menu Utama":
     st.markdown("""
@@ -457,7 +451,7 @@ if menu == "🏠 Menu Utama":
 
 elif menu == "🔮 Astrodox":
     st.title("🔮 Astrodox Wheel")
-    st.caption("Roda Transit Planet + Rekap Aspek Geometri | Siap untuk di-copy ke AI eksternal")
+    st.caption("Roda Transit Planet + Rekap Aspek Geometri")
     st.markdown("---")
     
     st.subheader("📅 Atur Waktu Transit")
@@ -485,153 +479,12 @@ elif menu == "🔮 Astrodox":
     st.subheader("🔮 Roda Astrodox Transit")
     st.pyplot(fig, use_container_width=True)
     
-    col_dl1, col_dl2 = st.columns([1, 3])
-    with col_dl1:
-        st.download_button(
-            label="📥 Download Roda (.png)",
-            data=img_buf,
-            file_name=f"Astrodox_Wheel_{event_datetime.strftime('%Y%m%d_%H%M')}.png",
-            mime="image/png",
-            use_container_width=True
-        )
-        
-    st.markdown("---")
-    
-    st.subheader("📋 Dashboard Info Astrodox")
-    pos_lines = []
-    pos_items = list(planet_positions.items())
-    for i in range(0, len(pos_items), 2):
-        p1, v1 = pos_items[i]
-        if i+1 < len(pos_items):
-            p2, v2 = pos_items[i+1]
-            pos_lines.append(f"• {p1:<12}: {v1:<16}  |  • {p2:<12}: {v2}")
-        else:
-            pos_lines.append(f"• {p1:<12}: {v1}")
-            
-    pos_text = "\n".join(pos_lines)
-    aspek_text = f"""• MERAH  (Square 90° / Opp 180°) : {aspect_counts['merah']} Garis  → Volatilitas Tinggi
-• HIJAU  (Trine 120°)            : {aspect_counts['hijau']} Garis  → Expansion Trend
-• BIRU   (Sextile 60°)           : {aspect_counts['biru']} Garis  → Retest Zone
-• KUNING (Conjunction 0°)        : {aspect_counts['kuning']} Garis  → Turning Point"""
-
-    info_html = f"""
-    <div class="info-box">
-    <strong>POSISI PLANET TRANSIT ({event_datetime.strftime('%d %b %Y %H:%M WIB')}):</strong><br>
-    {"─" * 68}<br>
-    {pos_text.replace(chr(10), "<br>")}<br><br>
-    <strong>REKAP GARIS ASPEK GEOMETRI ASTRODOX:</strong><br>
-    {"─" * 68}<br>
-    {aspek_text.replace(chr(10), "<br>")}
-    </div>
-    """
-    st.markdown(info_html, unsafe_allow_html=True)
-    
-    st.markdown("---")
-
-    st.subheader("📋 Papan Prompt 1 — Full Analysis (Makro + Geopolitik + 3 Setup)")
-
-    prompt_full_1 = f"""Cek dan update harga XAUUSD (Gold) secara realtime saat ini terlebih dahulu melalui pencarian/web.
-
-Kamu adalah Senior Quantitative Trader + Macro Analyst + Financial Astrologer spesialis XAUUSD.
-
-Gunakan data Astrodox di bawah ini + pengetahuan teknikal, makro, dan geopolitik terbaru kamu untuk menghasilkan analisis lengkap.
-
-=== DATA ASTRODOX TRANSIT ===
-Waktu: {event_datetime.strftime('%d %B %Y %H:%M WIB')}
-
-POSISI PLANET:
-{pos_text}
-
-REKAP GARIS ASPEK GEOMETRI:
-{aspek_text}
-
-=== INSTRUKSI OUTPUT (WAJIB LENGKAP) ===
-
-1. **Harga Realtime XAUUSD**
-   - Tampilkan harga market Gold saat ini hasil pengecekan Anda.
-
-2. **Rekap Data News & Indikator Pendukung**
-   - Tentukan sendiri news utama yang relevan (NFP / CPI / FOMC / dll) berdasarkan waktu di atas.
-   - Tampilkan data pendukung yang paling relevan (Actual | Forecast | Previous).
-   - AI yang menentukan indikator mana yang paling penting.
-
-3. **Analisis Makro**
-   - Bias makro saat ini (Bullish USD / Bearish USD / Neutral).
-   - Skor dan alasan singkat berdasarkan data pendukung.
-
-4. **Update Geopolitik Terbaru**
-   - Isu geopolitik krusial terkini yang mempengaruhi XAUUSD & USD.
-   - Dampak gabungan ke USD dan XAUUSD.
-
-5. **Kesimpulan AI untuk Entry**
-   - Bias utama: BULLISH / BEARISH / WHIPSAW / NEUTRAL
-   - Peringatan Whipsaw (jika ada)
-   - Proyeksi Besaran Range (hanya tampilkan ukuran besaran jaraknya saja dalam bentuk Pips / Dollar, BUKAN harga dari sekian sampai sekian):
-     • Sweep Range (contoh: 80-150 Pips / $8.0-$15.0)
-     • Trend Range (contoh: 200-350 Pips / $20.0-$35.0)
-     • Reversal Range (contoh: 80-130 Pips / $8.0-$13.0)
-
-6. **3 Setup Entry Lengkap**
-   A. Setup dari AI Macro Engine
-      - Zona Entry
-      - Stop Loss
-      - Take Profit
-
-   B. Setup dari Astrodox Engine
-      - Zona Entry (berdasarkan aspek dominan)
-      - Stop Loss
-      - Take Profit
-
-   C. Setup dari Orderflow / SMC / Liquidity
-      - BSL / SSL
-      - Supply & Demand / Order Block
-      - FVG
-      - Entry Zone + SL + TP (dua arah jika whipsaw)
-
-Format jawaban harus rapi, jelas, dan siap dibaca trader.
-Fokus pada confluence Astro + Makro + Orderflow.
-"""
-
-    st.markdown("Salin prompt bagian 1 di bawah ini lalu paste ke AI (Grok / Claude / GPT / dll):")
-    st.code(prompt_full_1, language="text")
-    st.caption("Klik ikon copy di pojok kanan atas blok kode di atas untuk menyalin prompt.")
-
-    st.markdown("---")
-
-    st.subheader("📋 Papan Prompt 2 — Simple Astrodox Only")
-
-    prompt_simple = f"""Kamu adalah Senior Quantitative Trader + Financial Astrologer spesialis XAUUSD.
-
-Gunakan data Astrodox di bawah ini + pengetahuan teknikal & makro kamu untuk memberikan proyeksi range pips yang presisi.
-
-=== DATA ASTRODOX TRANSIT ===
-Waktu: {event_datetime.strftime('%d %B %Y %H:%M WIB')}
-
-POSISI PLANET:
-{pos_text}
-
-REKAP GARIS ASPEK GEOMETRI:
-{aspek_text}
-
-=== INSTRUKSI OUTPUT ===
-Berikan jawaban dalam format ringkas dan jelas:
-
-1. **Bias Utama** : BULLISH / BEARISH / WHIPSAW / NEUTRAL
-2. **Peringatan Whipsaw** : (hanya jika ada risiko whipsaw yang signifikan, jika tidak ada cukup tulis "Tidak signifikan")
-3. **Sweep Range** : (hanya tampilkan ukuran besaran jaraknya saja, contoh: 80-150 Pips / $8.0-$15.0)
-4. **Trend Range** : (hanya tampilkan ukuran besaran jaraknya saja, contoh: 200-350 Pips / $20.0-$35.0)
-5. **Reversal Range** : (hanya tampilkan ukuran besaran jaraknya saja, contoh: 80-130 Pips / $8.0-$13.0)
-
-Catatan:
-- Fokus hanya pada confluence Astro + Price Action / SMC structure.
-- Tidak perlu memberikan zona entry, SL, atau TP (sudah di-handle di sistem lain).
-- Jelaskan singkat alasan bias berdasarkan aspek dominan (Merah/Hijau/Biru/Kuning).
-"""
-
-    st.markdown("Salin prompt di bawah ini lalu paste ke AI (Grok / Claude / GPT / dll):")
-    st.code(prompt_simple, language="text")
-    st.caption("Klik ikon copy di pojok kanan atas blok kode di atas untuk menyalin prompt.")
-    st.markdown("---")
+    st.download_button(
+        label="📥 Download Roda (.png)",
+        data=img_buf,
+        file_name=f"Astrodox_Wheel_{event_datetime.strftime('%Y%m%d_%H%M')}.png",
+        mime="image/png"
+    )
 
 elif menu == "📊 Orderbook":
     st.title("📊 Orderbook & Market Data")
@@ -640,47 +493,29 @@ elif menu == "📊 Orderbook":
     with c1:
         symbol = st.selectbox("Pair", ["XAUT-USDT", "BTC-USDT"])
     with c2:
-        aggregation = st.selectbox(
-            "Aggregation",
-            [0.1, 1, 10, 100],
-            index=0,
-            format_func=lambda x: f"{x}"
-        )
+        aggregation = st.selectbox("Aggregation", [0.1, 1, 10, 100], index=0, format_func=lambda x: f"{x}")
     with c3:
-        st.write("")
-        st.write("")
+        st.write(""); st.write("")
         auto_refresh = st.checkbox("Auto Refresh")
 
-    sort_order = st.selectbox(
-        "Urutan",
-        ["Default (Harga)", "Size Kecil → Besar", "Size Besar → Kecil"],
-        index=0
-    )
+    sort_order = st.selectbox("Urutan", ["Default (Harga)", "Size Kecil → Besar", "Size Besar → Kecil"], index=0)
 
-    # Dynamic depth
-    if aggregation == 0.1:
-        depth = 80
-    elif aggregation == 1:
-        depth = 120
-    elif aggregation == 10:
-        depth = 250
-    else:
-        depth = 400
+    if aggregation == 0.1: depth = 80
+    elif aggregation == 1: depth = 120
+    elif aggregation == 10: depth = 250
+    else: depth = 400
 
     if st.button("🔄 Refresh Sekarang", type="primary") or auto_refresh or "market_data" not in st.session_state:
-        with st.spinner(f"Mengambil data {symbol} (depth={depth})..."):
+        with st.spinner(f"Mengambil data {symbol}..."):
             bids, asks, err = get_okx_orderbook(symbol, limit=depth)
             ticker = get_okx_ticker(symbol)
             trades = get_okx_trades(symbol, 40)
             xauusd = get_xauusd_price()
+            btcusd = get_btcusd_price()
             st.session_state.market_data = {
-                "bids": bids,
-                "asks": asks,
-                "err": err,
-                "ticker": ticker,
-                "trades": trades,
-                "symbol": symbol,
-                "xauusd": xauusd
+                "bids": bids, "asks": asks, "err": err,
+                "ticker": ticker, "trades": trades,
+                "symbol": symbol, "xauusd": xauusd, "btcusd": btcusd
             }
 
     data = st.session_state.market_data
@@ -690,6 +525,7 @@ elif menu == "📊 Orderbook":
     asks = data.get("asks")
     err = data.get("err")
     xauusd_price = data.get("xauusd")
+    btcusd_price = data.get("btcusd")
 
     if ticker:
         sign = "+" if ticker["change_pct"] >= 0 else ""
@@ -717,15 +553,14 @@ elif menu == "📊 Orderbook":
                 <span style="color:#ff1744;">🔴 Seller: {sell_vol:,.2f}</span>
             </div>""", unsafe_allow_html=True)
 
-    # ========== XAUUSD WIDGET + SELISIH ==========
+    # ===================== XAUUSD SECTION =====================
     st.markdown("---")
-    st.subheader("📈 XAUUSD (OANDA) vs XAUT Spread")
+    st.subheader("📈 XAUUSD (OANDA) vs XAUT")
 
-    col_w1, col_w2 = st.columns([1.4, 1])
+    col1, col2 = st.columns([1.4, 1])
 
-    with col_w1:
-        # TradingView Widget
-        tv_widget = """
+    with col1:
+        tv_xau = """
         <div class="tradingview-widget-container">
           <div class="tradingview-widget-container__widget"></div>
           <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js" async>
@@ -733,7 +568,7 @@ elif menu == "📊 Orderbook":
           "symbols": [["OANDA:XAUUSD|1D"]],
           "chartOnly": false,
           "width": "100%",
-          "height": 340,
+          "height": 320,
           "locale": "en",
           "colorTheme": "dark",
           "autosize": true,
@@ -750,10 +585,6 @@ elif menu == "📊 Orderbook":
           "valuesTracking": "1",
           "changeMode": "price-and-percent",
           "chartType": "area",
-          "maLineColor": "#2962FF",
-          "maLineWidth": 1,
-          "maLength": 9,
-          "headerFontSize": "medium",
           "lineWidth": 2,
           "lineType": 0,
           "dateRanges": ["1d|1","1m|30","3m|60","12m|1D","60m|1W","all|1M"]
@@ -761,33 +592,107 @@ elif menu == "📊 Orderbook":
           </script>
         </div>
         """
-        components.html(tv_widget, height=360)
+        components.html(tv_xau, height=340)
 
-    with col_w2:
-        st.markdown("#### Perhitungan Selisih Otomatis")
-        
+    with col2:
+        st.markdown("#### Perhitungan Selisih XAUT")
         if ticker and xauusd_price:
-            xaut_price = ticker["last"]
-            selisih = xaut_price - xauusd_price
+            xaut = ticker["last"]
+            selisih = xaut - xauusd_price
             
-            st.metric("XAUT (OKX)", f"{xaut_price:,.2f}")
+            st.metric("XAUT (OKX)", f"{xaut:,.2f}")
             st.metric("XAUUSD (approx)", f"{xauusd_price:,.2f}")
-            
-            color = "normal"
-            if selisih > 0:
-                delta_text = f"+{selisih:.2f} (XAUT Premium)"
-            else:
-                delta_text = f"{selisih:.2f} (XAUT Discount)"
-                
-            st.metric("Selisih (XAUT - XAUUSD)", f"{selisih:+.2f}", delta=delta_text)
+            st.metric("Selisih", f"{selisih:+.2f}", delta=f"{'Premium' if selisih > 0 else 'Discount'}")
             
             st.markdown("---")
-            st.markdown("**Rumus Adjusted Price ke OANDA:**")
-            st.code(f"Harga OANDA ≈ Harga XAUT − ({selisih:+.2f})", language="text")
+            st.markdown("**Contoh Otomatis (pakai harga sekarang):**")
             
-            st.info("Gunakan selisih ini untuk menyesuaikan level Bid/Ask XAUT ke harga XAUUSD di MT5/OANDA.")
+            contoh_harga = 4100  # contoh
+            adjusted = contoh_harga - selisih
+            
+            st.markdown(f"""
+            **Asumsikan kamu lihat level di XAUT = `{contoh_harga}`**
+
+            - **Mau SELL di OANDA** → Entry di **`{adjusted:,.2f}`**  
+              (karena `4100 − ({selisih:+.2f}) = {adjusted:,.2f}`)
+
+            - **Mau BUY di OANDA** → Entry di **`{adjusted:,.2f}`**  
+              (rumus sama)
+            """)
+            
+            st.info("Rumus: Harga OANDA ≈ Harga XAUT − Selisih")
         else:
-            st.warning("Gagal mengambil harga XAUUSD. Coba refresh.")
+            st.warning("Data XAUUSD belum tersedia")
+
+    # ===================== BTC SECTION =====================
+    st.markdown("---")
+    st.subheader("₿ BTCUSD (OANDA) vs BTC-USDT")
+
+    col3, col4 = st.columns([1.4, 1])
+
+    with col3:
+        tv_btc = """
+        <div class="tradingview-widget-container">
+          <div class="tradingview-widget-container__widget"></div>
+          <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js" async>
+          {
+          "symbols": [["OANDA:BTCUSD|1D"]],
+          "chartOnly": false,
+          "width": "100%",
+          "height": 320,
+          "locale": "en",
+          "colorTheme": "dark",
+          "autosize": true,
+          "showVolume": false,
+          "showMA": false,
+          "hideDateRanges": false,
+          "hideMarketStatus": false,
+          "hideSymbolLogo": false,
+          "scalePosition": "right",
+          "scaleMode": "Normal",
+          "fontFamily": "-apple-system, BlinkMacSystemFont, Trebuchet MS, Roboto, Ubuntu, sans-serif",
+          "fontSize": "10",
+          "noTimeScale": false,
+          "valuesTracking": "1",
+          "changeMode": "price-and-percent",
+          "chartType": "area",
+          "lineWidth": 2,
+          "lineType": 0,
+          "dateRanges": ["1d|1","1m|30","3m|60","12m|1D","60m|1W","all|1M"]
+        }
+          </script>
+        </div>
+        """
+        components.html(tv_btc, height=340)
+
+    with col4:
+        st.markdown("#### Perhitungan Selisih BTC")
+        
+        # Ambil ticker BTC jika sedang di pair BTC, atau fetch terpisah
+        btc_ticker = get_okx_ticker("BTC-USDT") if symbol != "BTC-USDT" else ticker
+        
+        if btc_ticker and btcusd_price:
+            btc_okx = btc_ticker["last"]
+            selisih_btc = btc_okx - btcusd_price
+            
+            st.metric("BTC-USDT (OKX)", f"{btc_okx:,.2f}")
+            st.metric("BTCUSD (approx)", f"{btcusd_price:,.2f}")
+            st.metric("Selisih", f"{selisih_btc:+.2f}", delta=f"{'Premium' if selisih_btc > 0 else 'Discount'}")
+            
+            st.markdown("---")
+            st.markdown("**Contoh Otomatis BTC:**")
+            
+            contoh_btc = 95000
+            adjusted_btc = contoh_btc - selisih_btc
+            
+            st.markdown(f"""
+            **Asumsikan level di BTC-USDT = `{contoh_btc:,}`**
+
+            - **Mau SELL di OANDA** → Entry di **`{adjusted_btc:,.2f}`**
+            - **Mau BUY di OANDA** → Entry di **`{adjusted_btc:,.2f}`**
+            """)
+        else:
+            st.warning("Data BTCUSD belum tersedia")
 
     st.markdown("---")
     st.subheader("Orderbook")
@@ -795,11 +700,7 @@ elif menu == "📊 Orderbook":
     if err:
         st.error(err)
     else:
-        show_orderbook_visual(
-            bids, asks,
-            aggregation=aggregation,
-            sort_order=sort_order
-        )
+        show_orderbook_visual(bids, asks, aggregation=aggregation, sort_order=sort_order)
 
     st.markdown("---")
     st.subheader("Recent Trades")
