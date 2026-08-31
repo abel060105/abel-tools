@@ -8,6 +8,7 @@ import requests
 import pandas as pd
 import time
 from collections import defaultdict
+import streamlit.components.v1 as components
 
 st.set_page_config(
     page_title="ABEL FX Tools",
@@ -139,22 +140,12 @@ def apply_theme_and_background(theme_mode, video_file):
         st.markdown(css_light, unsafe_allow_html=True)
 
 # ==========================================
-# SIDEBAR & THEME SWITCHER
+# SIDEBAR (Navigasi di atas, Tema di bawah)
 # ==========================================
 st.sidebar.markdown('<div class="sidebar-brand">⚡ ABEL FX</div>', unsafe_allow_html=True)
 st.sidebar.markdown('<div class="sidebar-sub">Trading Tools</div>', unsafe_allow_html=True)
 
-st.sidebar.markdown("### 🎨 Tema Tampilan")
-selected_theme = st.sidebar.selectbox(
-    "Pilih Tema",
-    ["🖼️ Wallpaper Mode", "🌙 Dark Clean", "☀️ Light Clean"],
-    index=0,
-    label_visibility="collapsed"
-)
-
-apply_theme_and_background(selected_theme, "bg.mp4")
-
-st.sidebar.markdown("---")
+# ===== NAVIGASI MENU (di atas) =====
 st.sidebar.markdown("### 📌 Navigasi Menu")
 
 if "active_menu" not in st.session_state:
@@ -191,10 +182,23 @@ sidebar_menu_button("Orderbook", "📊", "📊 Orderbook")
 menu = st.session_state.active_menu
 
 st.sidebar.markdown("---")
+
+# ===== TEMA TAMPILAN (di bawah) =====
+st.sidebar.markdown("### 🎨 Tema Tampilan")
+selected_theme = st.sidebar.selectbox(
+    "Pilih Tema",
+    ["🖼️ Wallpaper Mode", "🌙 Dark Clean", "☀️ Light Clean"],
+    index=0,
+    label_visibility="collapsed"
+)
+
+apply_theme_and_background(selected_theme, "bg.mp4")
+
+st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="text-align:center; color:#94a3b8; font-size:12px; padding-top:5px;">
     ABEL FX Tools<br>
-    <span style="color:#64748b;">v1.8 (Dynamic Depth)</span>
+    <span style="color:#64748b;">v1.9 (XAUUSD Widget)</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -342,8 +346,27 @@ def get_okx_trades(symbol="XAUT-USDT", limit=40):
         } for t in data["data"]]
     except: return []
 
+def get_xauusd_price():
+    """Ambil harga XAUUSD dari free source (approximasi OANDA)"""
+    try:
+        # Sumber 1: goldprice.dev (gratis, no key)
+        r = requests.get("https://api.goldprice.dev/v1/prices?symbol=XAU-USD-SPOT", timeout=6)
+        data = r.json()
+        if "symbols" in data and len(data["symbols"]) > 0:
+            return float(data["symbols"][0]["price"])
+    except:
+        pass
+    try:
+        # Fallback sederhana
+        r = requests.get("https://api.gold-api.com/price/XAU", timeout=6)
+        data = r.json()
+        if "price" in data:
+            return float(data["price"])
+    except:
+        pass
+    return None
+
 def aggregate_orders(orders, aggregation: float, side: str = "bid"):
-    """Aggregate orderbook levels by price group."""
     if aggregation <= 0.1:
         return [[round(p, 1), s] for p, s in orders]
 
@@ -367,11 +390,9 @@ def show_orderbook_visual(bids, asks, aggregation=0.1, sort_order="Default (Harg
         st.warning("Data orderbook kosong")
         return
 
-    # Apply aggregation
     bids = aggregate_orders(bids, aggregation, side="bid")
     asks = aggregate_orders(asks, aggregation, side="ask")
 
-    # Prepare data with notional
     bids_data = []
     for price, size in bids:
         notional = size * price
@@ -389,13 +410,11 @@ def show_orderbook_visual(bids, asks, aggregation=0.1, sort_order="Default (Harg
         bids_data = sorted(bids_data, key=lambda x: x["size"], reverse=True)
         asks_data = sorted(asks_data, key=lambda x: x["size"], reverse=True)
 
-    # Max size for bar width
     max_size = max(
         max([x["size"] for x in bids_data[:40]], default=1),
         max([x["size"] for x in asks_data[:40]], default=1)
     )
 
-    # Tampilkan lebih banyak bar saat aggregation besar
     max_display = 30 if aggregation >= 10 else 25
 
     c1, c2 = st.columns(2)
@@ -638,14 +657,14 @@ elif menu == "📊 Orderbook":
         index=0
     )
 
-    # ===== DYNAMIC DEPTH BERDASARKAN AGGREGATION =====
+    # Dynamic depth
     if aggregation == 0.1:
         depth = 80
     elif aggregation == 1:
         depth = 120
     elif aggregation == 10:
         depth = 250
-    else:  # 100
+    else:
         depth = 400
 
     if st.button("🔄 Refresh Sekarang", type="primary") or auto_refresh or "market_data" not in st.session_state:
@@ -653,13 +672,15 @@ elif menu == "📊 Orderbook":
             bids, asks, err = get_okx_orderbook(symbol, limit=depth)
             ticker = get_okx_ticker(symbol)
             trades = get_okx_trades(symbol, 40)
+            xauusd = get_xauusd_price()
             st.session_state.market_data = {
                 "bids": bids,
                 "asks": asks,
                 "err": err,
                 "ticker": ticker,
                 "trades": trades,
-                "symbol": symbol
+                "symbol": symbol,
+                "xauusd": xauusd
             }
 
     data = st.session_state.market_data
@@ -668,6 +689,7 @@ elif menu == "📊 Orderbook":
     bids = data.get("bids")
     asks = data.get("asks")
     err = data.get("err")
+    xauusd_price = data.get("xauusd")
 
     if ticker:
         sign = "+" if ticker["change_pct"] >= 0 else ""
@@ -694,6 +716,78 @@ elif menu == "📊 Orderbook":
                 <span style="color:#00c853;">🟢 Buyer: {buy_vol:,.2f}</span>
                 <span style="color:#ff1744;">🔴 Seller: {sell_vol:,.2f}</span>
             </div>""", unsafe_allow_html=True)
+
+    # ========== XAUUSD WIDGET + SELISIH ==========
+    st.markdown("---")
+    st.subheader("📈 XAUUSD (OANDA) vs XAUT Spread")
+
+    col_w1, col_w2 = st.columns([1.4, 1])
+
+    with col_w1:
+        # TradingView Widget
+        tv_widget = """
+        <div class="tradingview-widget-container">
+          <div class="tradingview-widget-container__widget"></div>
+          <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js" async>
+          {
+          "symbols": [["OANDA:XAUUSD|1D"]],
+          "chartOnly": false,
+          "width": "100%",
+          "height": 340,
+          "locale": "en",
+          "colorTheme": "dark",
+          "autosize": true,
+          "showVolume": false,
+          "showMA": false,
+          "hideDateRanges": false,
+          "hideMarketStatus": false,
+          "hideSymbolLogo": false,
+          "scalePosition": "right",
+          "scaleMode": "Normal",
+          "fontFamily": "-apple-system, BlinkMacSystemFont, Trebuchet MS, Roboto, Ubuntu, sans-serif",
+          "fontSize": "10",
+          "noTimeScale": false,
+          "valuesTracking": "1",
+          "changeMode": "price-and-percent",
+          "chartType": "area",
+          "maLineColor": "#2962FF",
+          "maLineWidth": 1,
+          "maLength": 9,
+          "headerFontSize": "medium",
+          "lineWidth": 2,
+          "lineType": 0,
+          "dateRanges": ["1d|1","1m|30","3m|60","12m|1D","60m|1W","all|1M"]
+        }
+          </script>
+        </div>
+        """
+        components.html(tv_widget, height=360)
+
+    with col_w2:
+        st.markdown("#### Perhitungan Selisih Otomatis")
+        
+        if ticker and xauusd_price:
+            xaut_price = ticker["last"]
+            selisih = xaut_price - xauusd_price
+            
+            st.metric("XAUT (OKX)", f"{xaut_price:,.2f}")
+            st.metric("XAUUSD (approx)", f"{xauusd_price:,.2f}")
+            
+            color = "normal"
+            if selisih > 0:
+                delta_text = f"+{selisih:.2f} (XAUT Premium)"
+            else:
+                delta_text = f"{selisih:.2f} (XAUT Discount)"
+                
+            st.metric("Selisih (XAUT - XAUUSD)", f"{selisih:+.2f}", delta=delta_text)
+            
+            st.markdown("---")
+            st.markdown("**Rumus Adjusted Price ke OANDA:**")
+            st.code(f"Harga OANDA ≈ Harga XAUT − ({selisih:+.2f})", language="text")
+            
+            st.info("Gunakan selisih ini untuk menyesuaikan level Bid/Ask XAUT ke harga XAUUSD di MT5/OANDA.")
+        else:
+            st.warning("Gagal mengambil harga XAUUSD. Coba refresh.")
 
     st.markdown("---")
     st.subheader("Orderbook")
