@@ -169,12 +169,12 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="text-align:center; color:#94a3b8; font-size:12px; padding-top:5px;">
     ABEL FX Tools<br>
-    <span style="color:#64748b;">v2.2 (Fixed Pair Switching)</span>
+    <span style="color:#64748b;">v2.3 (Full + Prompt Boards)</span>
 </div>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# ASTRODOX
+# ASTRODOX ENGINE
 # ==========================================
 ZODIAC_SYMBOLS = ["♈", "♉", "♊", "♋", "♌", "♍", "♎", "♏", "♐", "♑", "♒", "♓"]
 ZODIAC_NAMES = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
@@ -431,7 +431,7 @@ if menu == "🏠 Menu Utama":
 
 elif menu == "🔮 Astrodox":
     st.title("🔮 Astrodox Wheel")
-    st.caption("Roda Transit Planet + Rekap Aspek Geometri")
+    st.caption("Roda Transit Planet + Rekap Aspek Geometri | Siap untuk di-copy ke AI eksternal")
     st.markdown("---")
     
     st.subheader("📅 Atur Waktu Transit")
@@ -455,15 +455,159 @@ elif menu == "🔮 Astrodox":
     st.markdown("---")
     
     fig, img_buf, aspect_counts, planet_positions = generate_astrodox_wheel_only(event_datetime)
+    
     st.subheader("🔮 Roda Astrodox Transit")
     st.pyplot(fig, use_container_width=True)
     
-    st.download_button(
-        label="📥 Download Roda (.png)",
-        data=img_buf,
-        file_name=f"Astrodox_Wheel_{event_datetime.strftime('%Y%m%d_%H%M')}.png",
-        mime="image/png"
-    )
+    col_dl1, col_dl2 = st.columns([1, 3])
+    with col_dl1:
+        st.download_button(
+            label="📥 Download Roda (.png)",
+            data=img_buf,
+            file_name=f"Astrodox_Wheel_{event_datetime.strftime('%Y%m%d_%H%M')}.png",
+            mime="image/png",
+            use_container_width=True
+        )
+        
+    st.markdown("---")
+    
+    st.subheader("📋 Dashboard Info Astrodox")
+    pos_lines = []
+    pos_items = list(planet_positions.items())
+    for i in range(0, len(pos_items), 2):
+        p1, v1 = pos_items[i]
+        if i+1 < len(pos_items):
+            p2, v2 = pos_items[i+1]
+            pos_lines.append(f"• {p1:<12}: {v1:<16}  |  • {p2:<12}: {v2}")
+        else:
+            pos_lines.append(f"• {p1:<12}: {v1}")
+            
+    pos_text = "\n".join(pos_lines)
+    aspek_text = f"""• MERAH  (Square 90° / Opp 180°) : {aspect_counts['merah']} Garis  → Volatilitas Tinggi
+• HIJAU  (Trine 120°)            : {aspect_counts['hijau']} Garis  → Expansion Trend
+• BIRU   (Sextile 60°)           : {aspect_counts['biru']} Garis  → Retest Zone
+• KUNING (Conjunction 0°)        : {aspect_counts['kuning']} Garis  → Turning Point"""
+
+    info_html = f"""
+    <div class="info-box">
+    <strong>POSISI PLANET TRANSIT ({event_datetime.strftime('%d %b %Y %H:%M WIB')}):</strong><br>
+    {"─" * 68}<br>
+    {pos_text.replace(chr(10), "<br>")}<br><br>
+    <strong>REKAP GARIS ASPEK GEOMETRI ASTRODOX:</strong><br>
+    {"─" * 68}<br>
+    {aspek_text.replace(chr(10), "<br>")}
+    </div>
+    """
+    st.markdown(info_html, unsafe_allow_html=True)
+    
+    st.markdown("---")
+
+    # ========== PAPAN PROMPT 1 ==========
+    st.subheader("📋 Papan Prompt 1 — Full Analysis (Makro + Geopolitik + 3 Setup)")
+
+    prompt_full_1 = f"""Cek dan update harga XAUUSD (Gold) secara realtime saat ini terlebih dahulu melalui pencarian/web.
+
+Kamu adalah Senior Quantitative Trader + Macro Analyst + Financial Astrologer spesialis XAUUSD.
+
+Gunakan data Astrodox di bawah ini + pengetahuan teknikal, makro, dan geopolitik terbaru kamu untuk menghasilkan analisis lengkap.
+
+=== DATA ASTRODOX TRANSIT ===
+Waktu: {event_datetime.strftime('%d %B %Y %H:%M WIB')}
+
+POSISI PLANET:
+{pos_text}
+
+REKAP GARIS ASPEK GEOMETRI:
+{aspek_text}
+
+=== INSTRUKSI OUTPUT (WAJIB LENGKAP) ===
+
+1. **Harga Realtime XAUUSD**
+   - Tampilkan harga market Gold saat ini hasil pengecekan Anda.
+
+2. **Rekap Data News & Indikator Pendukung**
+   - Tentukan sendiri news utama yang relevan (NFP / CPI / FOMC / dll) berdasarkan waktu di atas.
+   - Tampilkan data pendukung yang paling relevan (Actual | Forecast | Previous).
+   - AI yang menentukan indikator mana yang paling penting.
+
+3. **Analisis Makro**
+   - Bias makro saat ini (Bullish USD / Bearish USD / Neutral).
+   - Skor dan alasan singkat berdasarkan data pendukung.
+
+4. **Update Geopolitik Terbaru**
+   - Isu geopolitik krusial terkini yang mempengaruhi XAUUSD & USD.
+   - Dampak gabungan ke USD dan XAUUSD.
+
+5. **Kesimpulan AI untuk Entry**
+   - Bias utama: BULLISH / BEARISH / WHIPSAW / NEUTRAL
+   - Peringatan Whipsaw (jika ada)
+   - Proyeksi Besaran Range (hanya tampilkan ukuran besaran jaraknya saja dalam bentuk Pips / Dollar, BUKAN harga dari sekian sampai sekian):
+     • Sweep Range (contoh: 80-150 Pips / $8.0-$15.0)
+     • Trend Range (contoh: 200-350 Pips / $20.0-$35.0)
+     • Reversal Range (contoh: 80-130 Pips / $8.0-$13.0)
+
+6. **3 Setup Entry Lengkap**
+   A. Setup dari AI Macro Engine
+      - Zona Entry
+      - Stop Loss
+      - Take Profit
+
+   B. Setup dari Astrodox Engine
+      - Zona Entry (berdasarkan aspek dominan)
+      - Stop Loss
+      - Take Profit
+
+   C. Setup dari Orderflow / SMC / Liquidity
+      - BSL / SSL
+      - Supply & Demand / Order Block
+      - FVG
+      - Entry Zone + SL + TP (dua arah jika whipsaw)
+
+Format jawaban harus rapi, jelas, dan siap dibaca trader.
+Fokus pada confluence Astro + Makro + Orderflow.
+"""
+
+    st.markdown("Salin prompt bagian 1 di bawah ini lalu paste ke AI (Grok / Claude / GPT / dll):")
+    st.code(prompt_full_1, language="text")
+    st.caption("Klik ikon copy di pojok kanan atas blok kode di atas untuk menyalin prompt.")
+
+    st.markdown("---")
+
+    # ========== PAPAN PROMPT 2 ==========
+    st.subheader("📋 Papan Prompt 2 — Simple Astrodox Only")
+
+    prompt_simple = f"""Kamu adalah Senior Quantitative Trader + Financial Astrologer spesialis XAUUSD.
+
+Gunakan data Astrodox di bawah ini + pengetahuan teknikal & makro kamu untuk memberikan proyeksi range pips yang presisi.
+
+=== DATA ASTRODOX TRANSIT ===
+Waktu: {event_datetime.strftime('%d %B %Y %H:%M WIB')}
+
+POSISI PLANET:
+{pos_text}
+
+REKAP GARIS ASPEK GEOMETRI:
+{aspek_text}
+
+=== INSTRUKSI OUTPUT ===
+Berikan jawaban dalam format ringkas dan jelas:
+
+1. **Bias Utama** : BULLISH / BEARISH / WHIPSAW / NEUTRAL
+2. **Peringatan Whipsaw** : (hanya jika ada risiko whipsaw yang signifikan, jika tidak ada cukup tulis "Tidak signifikan")
+3. **Sweep Range** : (hanya tampilkan ukuran besaran jaraknya saja, contoh: 80-150 Pips / $8.0-$15.0)
+4. **Trend Range** : (hanya tampilkan ukuran besaran jaraknya saja, contoh: 200-350 Pips / $20.0-$35.0)
+5. **Reversal Range** : (hanya tampilkan ukuran besaran jaraknya saja, contoh: 80-130 Pips / $8.0-$13.0)
+
+Catatan:
+- Fokus hanya pada confluence Astro + Price Action / SMC structure.
+- Tidak perlu memberikan zona entry, SL, atau TP (sudah di-handle di sistem lain).
+- Jelaskan singkat alasan bias berdasarkan aspek dominan (Merah/Hijau/Biru/Kuning).
+"""
+
+    st.markdown("Salin prompt di bawah ini lalu paste ke AI (Grok / Claude / GPT / dll):")
+    st.code(prompt_simple, language="text")
+    st.caption("Klik ikon copy di pojok kanan atas blok kode di atas untuk menyalin prompt.")
+    st.markdown("---")
 
 elif menu == "📊 Orderbook":
     st.title("📊 Orderbook & Market Data")
@@ -485,7 +629,6 @@ elif menu == "📊 Orderbook":
 
     sort_order = st.selectbox("Urutan", ["Default (Harga)", "Size Kecil → Besar", "Size Besar → Kecil"], index=0)
 
-    # Dynamic depth
     if aggregation <= 0.1:
         depth = 80
     elif aggregation <= 1:
@@ -495,7 +638,7 @@ elif menu == "📊 Orderbook":
     else:
         depth = 400
 
-    # ===== FIX: Force refresh when pair berubah =====
+    # Force refresh when pair berubah
     if "last_symbol" not in st.session_state:
         st.session_state.last_symbol = symbol
 
@@ -503,7 +646,6 @@ elif menu == "📊 Orderbook":
     if st.session_state.last_symbol != symbol:
         st.session_state.last_symbol = symbol
         force_refresh = True
-        # Clear old data
         if "market_data" in st.session_state:
             del st.session_state.market_data
 
@@ -562,7 +704,6 @@ elif menu == "📊 Orderbook":
                 <span style="color:#ff1744;">🔴 Seller: {sell_vol:,.2f}</span>
             </div>""", unsafe_allow_html=True)
 
-    # ===================== SPREAD SECTION =====================
     st.markdown("---")
     
     if symbol == "XAUT-USDT":
@@ -633,7 +774,7 @@ elif menu == "📊 Orderbook":
             else:
                 st.warning("Data XAUUSD belum tersedia. Coba refresh.")
 
-    else:  # BTC-USDT
+    else:
         st.subheader("₿ BTCUSD (OANDA) vs BTC-USDT")
         
         col1, col2 = st.columns([1.4, 1])
