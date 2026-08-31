@@ -194,7 +194,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="text-align:center; color:#94a3b8; font-size:12px; padding-top:5px;">
     ABEL FX Tools<br>
-    <span style="color:#64748b;">v1.7 (Size + Notional)</span>
+    <span style="color:#64748b;">v1.8 (Dynamic Depth)</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -299,7 +299,7 @@ def generate_astrodox_wheel_only(target_date: datetime):
 def get_okx_orderbook(symbol="XAUT-USDT", limit=80):
     try:
         url = f"https://www.okx.com/api/v5/market/books?instId={symbol}&sz={limit}"
-        r = requests.get(url, timeout=8)
+        r = requests.get(url, timeout=10)
         data = r.json()
         if data.get("code") != "0":
             return None, None, data.get("msg", "Error")
@@ -391,15 +391,18 @@ def show_orderbook_visual(bids, asks, aggregation=0.1, sort_order="Default (Harg
 
     # Max size for bar width
     max_size = max(
-        max([x["size"] for x in bids_data[:30]], default=1),
-        max([x["size"] for x in asks_data[:30]], default=1)
+        max([x["size"] for x in bids_data[:40]], default=1),
+        max([x["size"] for x in asks_data[:40]], default=1)
     )
+
+    # Tampilkan lebih banyak bar saat aggregation besar
+    max_display = 30 if aggregation >= 10 else 25
 
     c1, c2 = st.columns(2)
     
     with c1:
         st.markdown("### 🟢 Beli (Bids)")
-        for item in bids_data[:25]:
+        for item in bids_data[:max_display]:
             pct = min(item["size"] / max_size, 1.0)
             size_str = f"{item['size']:,.2f}"
             notional_str = f"${item['notional']:,.0f}"
@@ -412,7 +415,7 @@ def show_orderbook_visual(bids, asks, aggregation=0.1, sort_order="Default (Harg
 
     with c2:
         st.markdown("### 🔴 Jual (Asks)")
-        for item in asks_data[:25]:
+        for item in asks_data[:max_display]:
             pct = min(item["size"] / max_size, 1.0)
             size_str = f"{item['size']:,.2f}"
             notional_str = f"${item['notional']:,.0f}"
@@ -635,9 +638,19 @@ elif menu == "📊 Orderbook":
         index=0
     )
 
+    # ===== DYNAMIC DEPTH BERDASARKAN AGGREGATION =====
+    if aggregation == 0.1:
+        depth = 80
+    elif aggregation == 1:
+        depth = 120
+    elif aggregation == 10:
+        depth = 250
+    else:  # 100
+        depth = 400
+
     if st.button("🔄 Refresh Sekarang", type="primary") or auto_refresh or "market_data" not in st.session_state:
-        with st.spinner(f"Mengambil data {symbol}..."):
-            bids, asks, err = get_okx_orderbook(symbol, limit=80)
+        with st.spinner(f"Mengambil data {symbol} (depth={depth})..."):
+            bids, asks, err = get_okx_orderbook(symbol, limit=depth)
             ticker = get_okx_ticker(symbol)
             trades = get_okx_trades(symbol, 40)
             st.session_state.market_data = {
