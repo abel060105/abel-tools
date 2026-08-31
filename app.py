@@ -16,7 +16,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# ================= THEME & VIDEO BACKGROUND CONFIG =================
+# ================= THEME & VIDEO BACKGROUND =================
 def apply_theme_and_background(theme_mode, video_file):
     css_base = """
     <style>
@@ -56,7 +56,6 @@ def apply_theme_and_background(theme_mode, video_file):
         }
     </style>
     """
-    
     st.markdown(css_base, unsafe_allow_html=True)
 
     if theme_mode == "🖼️ Wallpaper Mode":
@@ -64,25 +63,16 @@ def apply_theme_and_background(theme_mode, video_file):
             with open(video_file, "rb") as f:
                 data = f.read()
             encoded = base64.b64encode(data).decode()
-            
             css_wallpaper = """
             <style>
-                .stApp {
-                    background: transparent !important;
-                }
+                .stApp { background: transparent !important; }
                 #bg-video {
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100vw;
-                    height: 100vh;
-                    z-index: -999;
-                    object-fit: cover;
+                    position: fixed; top: 0; left: 0;
+                    width: 100vw; height: 100vh;
+                    z-index: -999; object-fit: cover;
                 }
                 @media only screen and (max-width: 768px) {
-                    #bg-video {
-                        object-fit: fill;
-                    }
+                    #bg-video { object-fit: fill; }
                 }
                 section[data-testid="stSidebar"] {
                     background: rgba(10, 15, 28, 0.85) !important;
@@ -98,46 +88,32 @@ def apply_theme_and_background(theme_mode, video_file):
                 <source src="data:video/mp4;base64,REPLACE_BASE64" type="video/mp4">
             </video>
             """.replace("REPLACE_BASE64", encoded)
-            
             st.markdown(css_wallpaper, unsafe_allow_html=True)
         except:
             pass
-            
     elif theme_mode == "🌙 Dark Clean":
-        css_dark = """
+        st.markdown("""
         <style>
-            .stApp {
-                background-color: #0e1117 !important;
-            }
-            section[data-testid="stSidebar"] {
-                background-color: #161b22 !important;
-            }
+            .stApp { background-color: #0e1117 !important; }
+            section[data-testid="stSidebar"] { background-color: #161b22 !important; }
             .welcome-box, .info-box {
                 background: #161b22 !important;
                 border: 1px solid #30363d !important;
             }
         </style>
-        """
-        st.markdown(css_dark, unsafe_allow_html=True)
-        
+        """, unsafe_allow_html=True)
     else:
-        css_light = """
+        st.markdown("""
         <style>
-            .stApp {
-                background-color: #ffffff !important;
-                color: #000000 !important;
-            }
-            section[data-testid="stSidebar"] {
-                background-color: #f0f2f6 !important;
-            }
+            .stApp { background-color: #ffffff !important; color: #000000 !important; }
+            section[data-testid="stSidebar"] { background-color: #f0f2f6 !important; }
             .welcome-box, .info-box {
                 background: #f8f9fa !important;
                 border: 1px solid #d1d5db !important;
                 color: #111827 !important;
             }
         </style>
-        """
-        st.markdown(css_light, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
 # ==========================================
 # SIDEBAR
@@ -153,7 +129,6 @@ if "active_menu" not in st.session_state:
 def sidebar_menu_button(label, icon, target_key):
     is_active = st.session_state.active_menu == target_key
     button_label = f"{icon}  {label}"
-    
     active_border = "border-left: 4px solid #00d4ff !important;" if is_active else "border-left: 4px solid transparent !important;"
     active_bg = "background-color: rgba(0, 212, 255, 0.15) !important; color: #00d4ff !important;" if is_active else ""
     
@@ -181,7 +156,6 @@ sidebar_menu_button("Orderbook", "📊", "📊 Orderbook")
 menu = st.session_state.active_menu
 
 st.sidebar.markdown("---")
-
 st.sidebar.markdown("### 🎨 Tema Tampilan")
 selected_theme = st.sidebar.selectbox(
     "Pilih Tema",
@@ -189,19 +163,18 @@ selected_theme = st.sidebar.selectbox(
     index=0,
     label_visibility="collapsed"
 )
-
 apply_theme_and_background(selected_theme, "bg.mp4")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="text-align:center; color:#94a3b8; font-size:12px; padding-top:5px;">
     ABEL FX Tools<br>
-    <span style="color:#64748b;">v2.0 (XAU + BTC Spread)</span>
+    <span style="color:#64748b;">v2.1 (Fixed + Aggregation 1000/10000)</span>
 </div>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# ASTRODOX ENGINE
+# ASTRODOX (tetap sama)
 # ==========================================
 ZODIAC_SYMBOLS = ["♈", "♉", "♊", "♋", "♌", "♍", "♎", "♏", "♐", "♑", "♒", "♓"]
 ZODIAC_NAMES = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
@@ -296,7 +269,7 @@ def generate_astrodox_wheel_only(target_date: datetime):
     return fig, img_buf, aspect_counts, planet_positions
 
 # ==========================================
-# ORDERBOOK + PRICE FUNCTIONS
+# MARKET DATA FUNCTIONS
 # ==========================================
 def get_okx_orderbook(symbol="XAUT-USDT", limit=80):
     try:
@@ -328,7 +301,8 @@ def get_okx_ticker(symbol="XAUT-USDT"):
             "vol24h": float(t["vol24h"]),
             "change_pct": ((last - open24h) / open24h * 100) if open24h else 0
         }
-    except: return None
+    except:
+        return None
 
 def get_okx_trades(symbol="XAUT-USDT", limit=40):
     try:
@@ -342,7 +316,8 @@ def get_okx_trades(symbol="XAUT-USDT", limit=40):
             "size": float(t["sz"]),
             "side": t["side"]
         } for t in data["data"]]
-    except: return []
+    except:
+        return []
 
 def get_xauusd_price():
     try:
@@ -362,12 +337,19 @@ def get_xauusd_price():
     return None
 
 def get_btcusd_price():
-    """Ambil harga BTCUSD approx (bisa dari CoinGecko / sumber gratis)"""
     try:
-        r = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd", timeout=6)
+        r = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd", timeout=8)
         data = r.json()
-        if "bitcoin" in data:
+        if "bitcoin" in data and "usd" in data["bitcoin"]:
             return float(data["bitcoin"]["usd"])
+    except:
+        pass
+    try:
+        # fallback
+        r = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT", timeout=6)
+        data = r.json()
+        if "price" in data:
+            return float(data["price"])
     except:
         pass
     return None
@@ -416,7 +398,6 @@ def show_orderbook_visual(bids, asks, aggregation=0.1, sort_order="Default (Harg
     max_display = 30 if aggregation >= 10 else 25
 
     c1, c2 = st.columns(2)
-    
     with c1:
         st.markdown("### 🟢 Beli (Bids)")
         for item in bids_data[:max_display]:
@@ -475,7 +456,6 @@ elif menu == "🔮 Astrodox":
     st.markdown("---")
     
     fig, img_buf, aspect_counts, planet_positions = generate_astrodox_wheel_only(event_datetime)
-    
     st.subheader("🔮 Roda Astrodox Transit")
     st.pyplot(fig, use_container_width=True)
     
@@ -493,29 +473,51 @@ elif menu == "📊 Orderbook":
     with c1:
         symbol = st.selectbox("Pair", ["XAUT-USDT", "BTC-USDT"])
     with c2:
-        aggregation = st.selectbox("Aggregation", [0.1, 1, 10, 100], index=0, format_func=lambda x: f"{x}")
+        aggregation = st.selectbox(
+            "Aggregation",
+            [0.1, 1, 10, 100, 1000, 10000],
+            index=0,
+            format_func=lambda x: f"{x}"
+        )
     with c3:
-        st.write(""); st.write("")
+        st.write("")
+        st.write("")
         auto_refresh = st.checkbox("Auto Refresh")
 
     sort_order = st.selectbox("Urutan", ["Default (Harga)", "Size Kecil → Besar", "Size Besar → Kecil"], index=0)
 
-    if aggregation == 0.1: depth = 80
-    elif aggregation == 1: depth = 120
-    elif aggregation == 10: depth = 250
-    else: depth = 400
+    # Dynamic depth
+    if aggregation <= 0.1:
+        depth = 80
+    elif aggregation <= 1:
+        depth = 120
+    elif aggregation <= 10:
+        depth = 250
+    elif aggregation <= 100:
+        depth = 400
+    else:
+        depth = 400   # max API
 
     if st.button("🔄 Refresh Sekarang", type="primary") or auto_refresh or "market_data" not in st.session_state:
-        with st.spinner(f"Mengambil data {symbol}..."):
+        with st.spinner(f"Mengambil data {symbol} (depth={depth})..."):
             bids, asks, err = get_okx_orderbook(symbol, limit=depth)
             ticker = get_okx_ticker(symbol)
             trades = get_okx_trades(symbol, 40)
-            xauusd = get_xauusd_price()
-            btcusd = get_btcusd_price()
+            
+            # Ambil harga referensi sesuai pair
+            if symbol == "XAUT-USDT":
+                ref_price = get_xauusd_price()
+            else:
+                ref_price = get_btcusd_price()
+                
             st.session_state.market_data = {
-                "bids": bids, "asks": asks, "err": err,
-                "ticker": ticker, "trades": trades,
-                "symbol": symbol, "xauusd": xauusd, "btcusd": btcusd
+                "bids": bids,
+                "asks": asks,
+                "err": err,
+                "ticker": ticker,
+                "trades": trades,
+                "symbol": symbol,
+                "ref_price": ref_price
             }
 
     data = st.session_state.market_data
@@ -524,8 +526,7 @@ elif menu == "📊 Orderbook":
     bids = data.get("bids")
     asks = data.get("asks")
     err = data.get("err")
-    xauusd_price = data.get("xauusd")
-    btcusd_price = data.get("btcusd")
+    ref_price = data.get("ref_price")
 
     if ticker:
         sign = "+" if ticker["change_pct"] >= 0 else ""
@@ -553,146 +554,142 @@ elif menu == "📊 Orderbook":
                 <span style="color:#ff1744;">🔴 Seller: {sell_vol:,.2f}</span>
             </div>""", unsafe_allow_html=True)
 
-    # ===================== XAUUSD SECTION =====================
+    # ===================== SPREAD SECTION (hanya sesuai pair) =====================
     st.markdown("---")
-    st.subheader("📈 XAUUSD (OANDA) vs XAUT")
-
-    col1, col2 = st.columns([1.4, 1])
-
-    with col1:
-        tv_xau = """
-        <div class="tradingview-widget-container">
-          <div class="tradingview-widget-container__widget"></div>
-          <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js" async>
-          {
-          "symbols": [["OANDA:XAUUSD|1D"]],
-          "chartOnly": false,
-          "width": "100%",
-          "height": 320,
-          "locale": "en",
-          "colorTheme": "dark",
-          "autosize": true,
-          "showVolume": false,
-          "showMA": false,
-          "hideDateRanges": false,
-          "hideMarketStatus": false,
-          "hideSymbolLogo": false,
-          "scalePosition": "right",
-          "scaleMode": "Normal",
-          "fontFamily": "-apple-system, BlinkMacSystemFont, Trebuchet MS, Roboto, Ubuntu, sans-serif",
-          "fontSize": "10",
-          "noTimeScale": false,
-          "valuesTracking": "1",
-          "changeMode": "price-and-percent",
-          "chartType": "area",
-          "lineWidth": 2,
-          "lineType": 0,
-          "dateRanges": ["1d|1","1m|30","3m|60","12m|1D","60m|1W","all|1M"]
-        }
-          </script>
-        </div>
-        """
-        components.html(tv_xau, height=340)
-
-    with col2:
-        st.markdown("#### Perhitungan Selisih XAUT")
-        if ticker and xauusd_price:
-            xaut = ticker["last"]
-            selisih = xaut - xauusd_price
-            
-            st.metric("XAUT (OKX)", f"{xaut:,.2f}")
-            st.metric("XAUUSD (approx)", f"{xauusd_price:,.2f}")
-            st.metric("Selisih", f"{selisih:+.2f}", delta=f"{'Premium' if selisih > 0 else 'Discount'}")
-            
-            st.markdown("---")
-            st.markdown("**Contoh Otomatis (pakai harga sekarang):**")
-            
-            contoh_harga = 4100  # contoh
-            adjusted = contoh_harga - selisih
-            
-            st.markdown(f"""
-            **Asumsikan kamu lihat level di XAUT = `{contoh_harga}`**
-
-            - **Mau SELL di OANDA** → Entry di **`{adjusted:,.2f}`**  
-              (karena `4100 − ({selisih:+.2f}) = {adjusted:,.2f}`)
-
-            - **Mau BUY di OANDA** → Entry di **`{adjusted:,.2f}`**  
-              (rumus sama)
-            """)
-            
-            st.info("Rumus: Harga OANDA ≈ Harga XAUT − Selisih")
-        else:
-            st.warning("Data XAUUSD belum tersedia")
-
-    # ===================== BTC SECTION =====================
-    st.markdown("---")
-    st.subheader("₿ BTCUSD (OANDA) vs BTC-USDT")
-
-    col3, col4 = st.columns([1.4, 1])
-
-    with col3:
-        tv_btc = """
-        <div class="tradingview-widget-container">
-          <div class="tradingview-widget-container__widget"></div>
-          <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js" async>
-          {
-          "symbols": [["OANDA:BTCUSD|1D"]],
-          "chartOnly": false,
-          "width": "100%",
-          "height": 320,
-          "locale": "en",
-          "colorTheme": "dark",
-          "autosize": true,
-          "showVolume": false,
-          "showMA": false,
-          "hideDateRanges": false,
-          "hideMarketStatus": false,
-          "hideSymbolLogo": false,
-          "scalePosition": "right",
-          "scaleMode": "Normal",
-          "fontFamily": "-apple-system, BlinkMacSystemFont, Trebuchet MS, Roboto, Ubuntu, sans-serif",
-          "fontSize": "10",
-          "noTimeScale": false,
-          "valuesTracking": "1",
-          "changeMode": "price-and-percent",
-          "chartType": "area",
-          "lineWidth": 2,
-          "lineType": 0,
-          "dateRanges": ["1d|1","1m|30","3m|60","12m|1D","60m|1W","all|1M"]
-        }
-          </script>
-        </div>
-        """
-        components.html(tv_btc, height=340)
-
-    with col4:
-        st.markdown("#### Perhitungan Selisih BTC")
+    
+    if symbol == "XAUT-USDT":
+        st.subheader("📈 XAUUSD (OANDA) vs XAUT")
         
-        # Ambil ticker BTC jika sedang di pair BTC, atau fetch terpisah
-        btc_ticker = get_okx_ticker("BTC-USDT") if symbol != "BTC-USDT" else ticker
+        col1, col2 = st.columns([1.4, 1])
         
-        if btc_ticker and btcusd_price:
-            btc_okx = btc_ticker["last"]
-            selisih_btc = btc_okx - btcusd_price
-            
-            st.metric("BTC-USDT (OKX)", f"{btc_okx:,.2f}")
-            st.metric("BTCUSD (approx)", f"{btcusd_price:,.2f}")
-            st.metric("Selisih", f"{selisih_btc:+.2f}", delta=f"{'Premium' if selisih_btc > 0 else 'Discount'}")
-            
-            st.markdown("---")
-            st.markdown("**Contoh Otomatis BTC:**")
-            
-            contoh_btc = 95000
-            adjusted_btc = contoh_btc - selisih_btc
-            
-            st.markdown(f"""
-            **Asumsikan level di BTC-USDT = `{contoh_btc:,}`**
+        with col1:
+            tv_code = """
+            <div class="tradingview-widget-container">
+              <div class="tradingview-widget-container__widget"></div>
+              <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js" async>
+              {
+              "symbols": [["OANDA:XAUUSD|1D"]],
+              "chartOnly": false,
+              "width": "100%",
+              "height": 320,
+              "locale": "en",
+              "colorTheme": "dark",
+              "autosize": true,
+              "showVolume": false,
+              "showMA": false,
+              "hideDateRanges": false,
+              "hideMarketStatus": false,
+              "hideSymbolLogo": false,
+              "scalePosition": "right",
+              "scaleMode": "Normal",
+              "fontFamily": "-apple-system, BlinkMacSystemFont, Trebuchet MS, Roboto, Ubuntu, sans-serif",
+              "fontSize": "10",
+              "noTimeScale": false,
+              "valuesTracking": "1",
+              "changeMode": "price-and-percent",
+              "chartType": "area",
+              "lineWidth": 2,
+              "lineType": 0,
+              "dateRanges": ["1d|1","1m|30","3m|60","12m|1D","60m|1W","all|1M"]
+            }
+              </script>
+            </div>
+            """
+            components.html(tv_code, height=340)
+        
+        with col2:
+            st.markdown("#### Perhitungan Selisih XAUT")
+            if ticker and ref_price:
+                xaut = ticker["last"]
+                selisih = xaut - ref_price
+                
+                st.metric("XAUT (OKX)", f"{xaut:,.2f}")
+                st.metric("XAUUSD (approx)", f"{ref_price:,.2f}")
+                st.metric("Selisih", f"{selisih:+.2f}", delta="Premium" if selisih > 0 else "Discount")
+                
+                st.markdown("---")
+                st.markdown("**Contoh Otomatis:**")
+                
+                contoh = 4100
+                adjusted = contoh - selisih
+                
+                st.markdown(f"""
+                Asumsikan level di XAUT = **`{contoh}`**
+                
+                - **Mau SELL di OANDA** → Entry di **`{adjusted:,.2f}`**  
+                  (`{contoh} − ({selisih:+.2f}) = {adjusted:,.2f}`)
+                
+                - **Mau BUY di OANDA** → Entry di **`{adjusted:,.2f}`**
+                """)
+                st.info("Rumus: Harga OANDA ≈ Harga XAUT − Selisih")
+            else:
+                st.warning("Data XAUUSD belum tersedia. Coba refresh.")
 
-            - **Mau SELL di OANDA** → Entry di **`{adjusted_btc:,.2f}`**
-            - **Mau BUY di OANDA** → Entry di **`{adjusted_btc:,.2f}`**
-            """)
-        else:
-            st.warning("Data BTCUSD belum tersedia")
+    else:  # BTC-USDT
+        st.subheader("₿ BTCUSD (OANDA) vs BTC-USDT")
+        
+        col1, col2 = st.columns([1.4, 1])
+        
+        with col1:
+            tv_code = """
+            <div class="tradingview-widget-container">
+              <div class="tradingview-widget-container__widget"></div>
+              <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js" async>
+              {
+              "symbols": [["OANDA:BTCUSD|1D"]],
+              "chartOnly": false,
+              "width": "100%",
+              "height": 320,
+              "locale": "en",
+              "colorTheme": "dark",
+              "autosize": true,
+              "showVolume": false,
+              "showMA": false,
+              "hideDateRanges": false,
+              "hideMarketStatus": false,
+              "hideSymbolLogo": false,
+              "scalePosition": "right",
+              "scaleMode": "Normal",
+              "fontFamily": "-apple-system, BlinkMacSystemFont, Trebuchet MS, Roboto, Ubuntu, sans-serif",
+              "fontSize": "10",
+              "noTimeScale": false,
+              "valuesTracking": "1",
+              "changeMode": "price-and-percent",
+              "chartType": "area",
+              "lineWidth": 2,
+              "lineType": 0,
+              "dateRanges": ["1d|1","1m|30","3m|60","12m|1D","60m|1W","all|1M"]
+            }
+              </script>
+            </div>
+            """
+            components.html(tv_code, height=340)
+        
+        with col2:
+            st.markdown("#### Perhitungan Selisih BTC")
+            if ticker and ref_price:
+                btc = ticker["last"]
+                selisih = btc - ref_price
+                
+                st.metric("BTC-USDT (OKX)", f"{btc:,.2f}")
+                st.metric("BTCUSD (approx)", f"{ref_price:,.2f}")
+                st.metric("Selisih", f"{selisih:+.2f}", delta="Premium" if selisih > 0 else "Discount")
+                
+                st.markdown("---")
+                st.markdown("**Contoh Otomatis:**")
+                
+                contoh = 95000
+                adjusted = contoh - selisih
+                
+                st.markdown(f"""
+                Asumsikan level di BTC-USDT = **`{contoh:,}`**
+                
+                - **Mau SELL di OANDA** → Entry di **`{adjusted:,.2f}`**
+                - **Mau BUY di OANDA** → Entry di **`{adjusted:,.2f}`**
+                """)
+                st.info("Rumus: Harga OANDA ≈ Harga BTC − Selisih")
+            else:
+                st.warning("Data BTCUSD belum tersedia. Coba refresh beberapa detik.")
 
     st.markdown("---")
     st.subheader("Orderbook")
