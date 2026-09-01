@@ -17,6 +17,12 @@ st.set_page_config(
     layout="wide"
 )
 
+# ================= PWA LINK CONFIG =================
+st.markdown("""
+    <link rel="manifest" href="/app/static/manifest.json">
+    <meta name="theme-color" content="#070a0f">
+""", unsafe_allow_html=True)
+
 # ================= THEME & BACKGROUND =================
 def apply_theme_and_background(theme_mode, video_file):
     css_base = """
@@ -451,7 +457,7 @@ def show_orderbook_visual(bids, asks, aggregation=0.1, sort_order="Default (Harg
             </div>""", unsafe_allow_html=True)
 
 # ==========================================
-# ROLLING HEATMAP COMPONENT (PERFECT ALIGNED THEME)
+# ROLLING HEATMAP COMPONENT
 # ==========================================
 def render_rolling_heatmap(bids, asks, symbol):
     st.markdown("### 🔥 Orderbook Liquidity Heatmap (Bookmap Theme)")
@@ -576,7 +582,6 @@ def render_rolling_heatmap(bids, asks, symbol):
         else:
             color_code = "#e06b1e"
 
-        # Kotak highlight di sumbu harga kanan
         shapes.append(dict(
             type="rect",
             xref="paper", yref="y",
@@ -588,7 +593,6 @@ def render_rolling_heatmap(bids, asks, symbol):
             line=dict(color=color_code, width=2)
         ))
 
-        # Tampilkan harga di dalam kotak (atas) agar tetap terlihat meskipun di-zoom out
         display_price_str = f"{p_min:,.1f}" if p_min == p_max else f"{p_min:,.1f}"
         annotations.append(dict(
             xref="paper", yref="y",
@@ -601,7 +605,6 @@ def render_rolling_heatmap(bids, asks, symbol):
             yanchor="bottom"
         ))
 
-        # Teks skor heat di sebelah kanan kotak dengan koordinat paper.y agar tidak terpengaruh auto-hide zoom Plotly
         annotations.append(dict(
             xref="paper", yref="y",
             x=1.085,
@@ -630,7 +633,6 @@ def render_rolling_heatmap(bids, asks, symbol):
     
     st.plotly_chart(fig_heat, use_container_width=True)
 
-    # Panel Bawah: Zona Likuiditas Tinggi
     st.markdown("#### ⚡ Zona Likuiditas Tinggi (Heat Score > 15)")
     if high_heat_prices:
         cols = st.columns(min(3, len(high_heat_prices)))
@@ -745,7 +747,6 @@ elif menu == "🔮 Astrodox":
     
     st.markdown("---")
 
-    # ========== PAPAN PROMPT 1 ==========
     st.subheader("📋 Papan Prompt 1 — Full Analysis (Makro + Geopolitik + 3 Setup)")
 
     prompt_full_1 = f"""Cek dan update harga XAUUSD (Gold) secara realtime saat ini terlebih dahulu melalui pencarian/web.
@@ -816,7 +817,6 @@ Fokus pada confluence Astro + Makro + Orderflow.
 
     st.markdown("---")
 
-    # ========== PAPAN PROMPT 2 ==========
     st.subheader("📋 Papan Prompt 2 — Simple Astrodox Only")
 
     prompt_simple = f"""Kamu adalah Senior Quantitative Trader + Financial Astrologer spesialis XAUUSD.
