@@ -200,8 +200,7 @@ apply_theme_and_background(selected_theme, "bg.mp4")
 st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="text-align:center; color:#94a3b8; font-size:12px; padding-top:5px;">
-    ABEL FX Tools<br>
-    <span style="color:#64748b;">v3.7 (Perfect Aligned Heat Theme)</span>
+    ABEL FX Tools
 </div>
 """, unsafe_allow_html=True)
 
@@ -509,7 +508,6 @@ def render_rolling_heatmap(bids, asks, symbol):
     flat_z = [val for row in z_matrix for val in row]
     max_z_val = max(flat_z) if flat_z else 1.0
 
-    # Menyaring harga dengan heat score > 15
     raw_high_heat = []
     for i, p in enumerate(y_prices):
         avg_p_val = np.mean(z_matrix[i]) if z_matrix[i] else 0
@@ -517,14 +515,12 @@ def render_rolling_heatmap(bids, asks, symbol):
         if heat_score > 15.0:
             raw_high_heat.append({"price": p, "heat": heat_score})
 
-    # Mengelompokkan level harga yang berdekatan agar kotak highlight mencakup rentang yang akurat
     high_heat_prices = []
     if raw_high_heat:
         raw_high_heat.sort(key=lambda x: x["price"])
         current_cluster = [raw_high_heat[0]]
         
         for item in raw_high_heat[1:]:
-            # Jika selisih harga <= 1.5, gabungkan dalam satu cluster zona
             if item["price"] - current_cluster[-1]["price"] <= 1.5:
                 current_cluster.append(item)
             else:
@@ -534,7 +530,6 @@ def render_rolling_heatmap(bids, asks, symbol):
                 high_heat_prices.append({"min_price": p_min, "max_price": p_max, "heat": max_h})
                 current_cluster = [item]
         
-        # Masukkan cluster terakhir
         p_min = current_cluster[0]["price"]
         p_max = current_cluster[-1]["price"]
         max_h = max(c["heat"] for c in current_cluster)
@@ -574,27 +569,39 @@ def render_rolling_heatmap(bids, asks, symbol):
         h_val = item['heat']
         mid_p = (p_min + p_max) / 2
 
-        # Menentukan warna berdasarkan tingkat heat
         if h_val >= 22.0:
-            color_code = "#ffffff"  # Putih
+            color_code = "#ffffff"
         elif h_val >= 18.0:
-            color_code = "#f5bc18"  # Kuning
+            color_code = "#f5bc18"
         else:
-            color_code = "#e06b1e"  # Oranye
+            color_code = "#e06b1e"
 
-        # Border kotak di sumbu harga kanan yang membentang pas dari min sampai max harga
+        # Kotak highlight di sumbu harga kanan
         shapes.append(dict(
             type="rect",
             xref="paper", yref="y",
             x0=1.0, x1=1.07,
             y0=p_min - 0.5, 
             y1=p_max + 0.5,
-            fillcolor="rgba(0,0,0,0)",  # Background transparan
+            fillcolor="rgba(0,0,0,0)",
             opacity=1.0,
             line=dict(color=color_code, width=2)
         ))
 
-        # Teks skor heat di samping kotak dengan posisi pas di tengah rentang harga tersebut
+        # Tampilkan harga di dalam kotak (atas) agar tetap terlihat meskipun di-zoom out
+        display_price_str = f"{p_min:,.1f}" if p_min == p_max else f"{p_min:,.1f}"
+        annotations.append(dict(
+            xref="paper", yref="y",
+            x=1.035,
+            y=p_max + 0.2,
+            text=f"<b>{display_price_str}</b>",
+            showarrow=False,
+            font=dict(size=9, color=color_code),
+            xanchor="center",
+            yanchor="bottom"
+        ))
+
+        # Teks skor heat di sebelah kanan kotak dengan koordinat paper.y agar tidak terpengaruh auto-hide zoom Plotly
         annotations.append(dict(
             xref="paper", yref="y",
             x=1.085,
@@ -611,7 +618,7 @@ def render_rolling_heatmap(bids, asks, symbol):
         xaxis_title="",
         yaxis_title="Harga",
         height=540,
-        margin=dict(l=80, r=110, t=30, b=10),
+        margin=dict(l=80, r=125, t=30, b=10),
         paper_bgcolor='#070a0f',
         plot_bgcolor='#070a0f',
         font=dict(color='#94a3b8'),
@@ -623,7 +630,7 @@ def render_rolling_heatmap(bids, asks, symbol):
     
     st.plotly_chart(fig_heat, use_container_width=True)
 
-    # Panel Bawah: Zona Likuiditas Tinggi dengan Border Sesuai Warna Heat & Background Transparan
+    # Panel Bawah: Zona Likuiditas Tinggi
     st.markdown("#### ⚡ Zona Likuiditas Tinggi (Heat Score > 15)")
     if high_heat_prices:
         cols = st.columns(min(3, len(high_heat_prices)))
