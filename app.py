@@ -201,7 +201,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="text-align:center; color:#94a3b8; font-size:12px; padding-top:5px;">
     ABEL FX Tools<br>
-    <span style="color:#64748b;">v3.2 (Bookmap Heat Axis Highlight)</span>
+    <span style="color:#64748b;">v3.3 (Bookmap Heat Axis Highlight)</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -554,13 +554,10 @@ def render_rolling_heatmap(bids, asks, symbol):
         # Menentukan warna kotak highlight berdasarkan besaran heat score
         if h_val >= 22.0:
             box_color = "#ffffff"  # Putih menyala untuk heat sangat tinggi
-            text_color = "#000000"
         elif h_val >= 19.0:
             box_color = "#f5bc18"  # Kuning terang
-            text_color = "#000000"
         else:
             box_color = "#e06b1e"  # Oranye
-            text_color = "#ffffff"
 
         # Kotak highlight di area sumbu harga (y-axis kanan)
         shapes.append(dict(
@@ -595,7 +592,7 @@ def render_rolling_heatmap(bids, asks, symbol):
         paper_bgcolor='#070a0f',
         plot_bgcolor='#070a0f',
         font=dict(color='#94a3b8'),
-        yaxis=dict(side="right", gridcolor="#111827", zeroline=false=True),
+        yaxis=dict(side="right", gridcolor="#111827", zeroline=False),
         xaxis=dict(gridcolor="#111827"),
         shapes=shapes,
         annotations=annotations
