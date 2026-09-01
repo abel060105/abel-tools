@@ -199,8 +199,7 @@ apply_theme_and_background(selected_theme, "bg.mp4")
 st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="text-align:center; color:#94a3b8; font-size:12px; padding-top:5px;">
-    ABEL FX Tools<br>
-    <span style="color:#64748b;">v2.5 (Clean Main Menu)</span>
+    ABEL FX Tools
 </div>
 """, unsafe_allow_html=True)
 
