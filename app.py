@@ -126,11 +126,11 @@ def apply_theme_and_background(theme_mode, video_file):
     elif theme_mode == "🌙 Dark Clean":
         st.markdown("""
         <style>
-            .stApp { background-color: #0e1117 !important; }
-            section[data-testid="stSidebar"] { background-color: #161b22 !important; }
+            .stApp { background-color: #070a0f !important; }
+            section[data-testid="stSidebar"] { background-color: #0b1118 !important; }
             .welcome-box, .info-box {
-                background: #161b22 !important;
-                border: 1px solid #30363d !important;
+                background: #0b1118 !important;
+                border: 1px solid #1e293b !important;
             }
         </style>
         """, unsafe_allow_html=True)
@@ -201,7 +201,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="text-align:center; color:#94a3b8; font-size:12px; padding-top:5px;">
     ABEL FX Tools<br>
-    <span style="color:#64748b;">v2.9 (Coinglass Heatmap Style)</span>
+    <span style="color:#64748b;">v3.0 (Bookmap Style Heatmap)</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -253,8 +253,8 @@ def compute_planetary_positions(dt_utc):
 def generate_astrodox_wheel_only(target_date: datetime):
     dt_utc = target_date - timedelta(hours=7)
     planet_degrees, planet_positions = compute_planetary_positions(dt_utc)
-    fig = plt.figure(figsize=(10.5, 10.5), facecolor='#0e1117')
-    ax = fig.add_subplot(111, polar=True, facecolor='#0e1117')
+    fig = plt.figure(figsize=(10.5, 10.5), facecolor='#070a0f')
+    ax = fig.add_subplot(111, polar=True, facecolor='#070a0f')
     ax.set_theta_zero_location("W")
     ax.set_theta_direction(-1)
     ax.grid(False)
@@ -296,7 +296,7 @@ def generate_astrodox_wheel_only(target_date: datetime):
     ax.set_title(f"{target_date.strftime('%d.%m.%Y %H:%M WIB')}", color='white', fontsize=16, pad=18, fontweight='bold')
     plt.tight_layout()
     img_buf = io.BytesIO()
-    plt.savefig(img_buf, format='png', dpi=220, bbox_inches='tight', facecolor='#0e1117')
+    plt.savefig(img_buf, format='png', dpi=220, bbox_inches='tight', facecolor='#070a0f')
     img_buf.seek(0)
     return fig, img_buf, aspect_counts, planet_positions
 
@@ -452,16 +452,16 @@ def show_orderbook_visual(bids, asks, aggregation=0.1, sort_order="Default (Harg
             </div>""", unsafe_allow_html=True)
 
 # ==========================================
-# ROLLING HEATMAP COMPONENT (COINGLASS STYLE)
+# ROLLING HEATMAP COMPONENT (BOOKMAP STYLE)
 # ==========================================
 def render_rolling_heatmap(bids, asks, symbol):
-    st.markdown("### 🔥 Orderbook Liquidity Heatmap (Coinglass Style)")
-    st.caption("Visualisasi konsentrasi likuiditas orderbook real-time dengan rentang harga dinamis.")
+    st.markdown("### 🔥 Orderbook Liquidity Heatmap (Bookmap Theme)")
+    st.caption("Visualisasi konsentrasi likuiditas real-time. Background gelap pekat, skala warna Bookmap (Biru ke Oranye/Kuning), Bar meteran di Kiri, Harga di Kanan.")
 
     if "heatmap_history" not in st.session_state:
         st.session_state.heatmap_history = {}
     
-    heat_key = f"{symbol}_coinglass_heatmap"
+    heat_key = f"{symbol}_bookmap_heatmap"
     if heat_key not in st.session_state.heatmap_history:
         st.session_state.heatmap_history[heat_key] = {"times": [], "price_map": defaultdict(list)}
 
@@ -506,25 +506,43 @@ def render_rolling_heatmap(bids, asks, symbol):
     z_matrix = [active_price_map[p] for p in y_prices]
     x_times = history["times"]
 
+    # Palet warna Bookmap (Dark Blue ke Cyan, Orange, Yellow terang menyala)
+    bookmap_colorscale = [
+        [0.0, '#040b18'],   # Biru sangat gelap (kosong/sepi)
+        [0.2, '#0d2347'],   # Biru gelap
+        [0.5, '#1d547f'],   # Biru sedang
+        [0.75, '#e06b1e'],  # Oranye (likuiditas sedang/tebal)
+        [0.9, '#f5bc18'],   # Kuning terang (likuiditas tinggi)
+        [1.0, '#ffffff']    # Putih menyala (maksimum order)
+    ]
+
     fig_heat = go.Figure(data=go.Heatmap(
         z=z_matrix,
         x=x_times,
         y=y_prices,
-        colorscale='Plasma',
-        hoverongaps=False
+        colorscale=bookmap_colorscale,
+        hoverongaps=False,
+        colorbar=dict(
+            title=dict(text="Likuiditas", font=dict(color="#94a3b8")),
+            x=-0.12,          # Menggeser bar meteran warna ke sebelah KIRI grafik
+            xanchor="right",
+            len=0.85,
+            thickness=14,
+            tickfont=dict(color="#94a3b8")
+        )
     ))
 
     fig_heat.update_layout(
         title=f"Liquidity Heatmap — {symbol}",
         xaxis_title="",
         yaxis_title="Harga",
-        height=500,
-        margin=dict(l=10, r=10, t=30, b=10),
-        paper_bgcolor='#0e1117',
-        plot_bgcolor='#0e1117',
+        height=520,
+        margin=dict(l=80, r=20, t=30, b=10), # Margin kiri diperlebar agar bar meteran muat dengan rapi
+        paper_bgcolor='#070a0f',
+        plot_bgcolor='#070a0f',
         font=dict(color='#94a3b8'),
-        yaxis=dict(side="right", gridcolor="#161b22"),
-        xaxis=dict(gridcolor="#161b22")
+        yaxis=dict(side="right", gridcolor="#111827"), # Sumbu harga tetap di KANAN
+        xaxis=dict(gridcolor="#111827")
     )
     
     st.plotly_chart(fig_heat, use_container_width=True)
