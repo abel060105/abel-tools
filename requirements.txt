@@ -1,4 +1,6 @@
 streamlit
-matplotlib
 numpy
+matplotlib
 requests
+pandas
+plotly
