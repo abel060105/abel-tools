@@ -9,6 +9,7 @@ import pandas as pd
 import time
 from collections import defaultdict
 import streamlit.components.v1 as components
+import plotly.graph_objects as go
 
 st.set_page_config(
     page_title="ABEL FX Tools",
@@ -199,7 +200,8 @@ apply_theme_and_background(selected_theme, "bg.mp4")
 st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="text-align:center; color:#94a3b8; font-size:12px; padding-top:5px;">
-    ABEL FX Tools
+    ABEL FX Tools<br>
+    <span style="color:#64748b;">v2.7 (Complete Restore)</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -450,10 +452,80 @@ def show_orderbook_visual(bids, asks, aggregation=0.1, sort_order="Default (Harg
             </div>""", unsafe_allow_html=True)
 
 # ==========================================
+# ROLLING HEATMAP COMPONENT (BOOKMAP STYLE)
+# ==========================================
+def render_rolling_heatmap(bids, asks, symbol):
+    st.markdown("### 🔥 Orderbook Heatmap (Bookmap Style)")
+    st.caption("Visualisasi likuiditas historis in-memory berdasarkan pergerakan orderbook real-time.")
+
+    if "heatmap_history" not in st.session_state:
+        st.session_state.heatmap_history = {}
+    if symbol not in st.session_state.heatmap_history:
+        st.session_state.heatmap_history[symbol] = {"times": [], "price_map": defaultdict(list)}
+
+    history = st.session_state.heatmap_history[symbol]
+    current_time = datetime.now().strftime("%H:%M:%S")
+
+    current_snapshot = {}
+    for p, s in bids:
+        current_snapshot[p] = s
+    for p, s in asks:
+        current_snapshot[p] = s
+
+    history["times"].append(current_time)
+    if len(history["times"]) > 25:
+        history["times"].pop(0)
+
+    all_prices = sorted(list(current_snapshot.keys()))
+    if not all_prices:
+        st.info("Menunggu data heatmap terkumpul...")
+        return
+
+    mid_idx = len(all_prices) // 2
+    focused_prices = all_prices[max(0, mid_idx - 20):min(len(all_prices), mid_idx + 20)]
+
+    for p in focused_prices:
+        if p not in history["price_map"]:
+            history["price_map"][p] = []
+        history["price_map"][p].append(current_snapshot.get(p, 0))
+        if len(history["price_map"][p]) > len(history["times"]):
+            history["price_map"][p] = history["price_map"][p][-len(history["times"]):]
+
+    active_price_map = {p: history["price_map"][p] for p in focused_prices if p in history["price_map"] and len(history["price_map"][p]) == len(history["times"])}
+
+    if not active_price_map:
+        st.info("Mengumpulkan riwayat snapshot...")
+        return
+
+    y_prices = list(active_price_map.keys())
+    z_matrix = [active_price_map[p] for p in y_prices]
+    x_times = history["times"]
+
+    fig_heat = go.Figure(data=go.Heatmap(
+        z=z_matrix,
+        x=x_times,
+        y=y_prices,
+        colorscale='Viridis',
+        hoverongaps=False
+    ))
+
+    fig_heat.update_layout(
+        title=f"Liquidity Density Map — {symbol}",
+        xaxis_title="Waktu (Snapshot)",
+        yaxis_title="Level Harga",
+        height=380,
+        margin=dict(l=10, r=10, t=40, b=10),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='#94a3b8')
+    )
+    
+    st.plotly_chart(fig_heat, use_container_width=True)
+
+# ==========================================
 # HALAMAN
 # ==========================================
 if menu == "🏠 Menu Utama":
-    # Kosongkan saja, biar background kelihatan penuh
     pass
 
 elif menu == "🔮 Astrodox":
@@ -665,7 +737,6 @@ elif menu == "📊 Orderbook":
     else:
         depth = 400
 
-    # Force refresh when pair berubah
     if "last_symbol" not in st.session_state:
         st.session_state.last_symbol = symbol
 
@@ -735,9 +806,7 @@ elif menu == "📊 Orderbook":
     
     if symbol == "XAUT-USDT":
         st.subheader("📈 XAUUSD (OANDA) vs XAUT")
-        
         col1, col2 = st.columns([1.4, 1])
-        
         with col1:
             tv_code = """
             <div class="tradingview-widget-container">
@@ -745,67 +814,28 @@ elif menu == "📊 Orderbook":
               <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js" async>
               {
               "symbols": [["OANDA:XAUUSD|1D"]],
-              "chartOnly": false,
-              "width": "100%",
-              "height": 320,
-              "locale": "en",
-              "colorTheme": "dark",
-              "autosize": true,
-              "showVolume": false,
-              "showMA": false,
-              "hideDateRanges": false,
-              "hideMarketStatus": false,
-              "hideSymbolLogo": false,
-              "scalePosition": "right",
-              "scaleMode": "Normal",
-              "fontFamily": "-apple-system, BlinkMacSystemFont, Trebuchet MS, Roboto, Ubuntu, sans-serif",
-              "fontSize": "10",
-              "noTimeScale": false,
-              "valuesTracking": "1",
-              "changeMode": "price-and-percent",
-              "chartType": "area",
-              "lineWidth": 2,
-              "lineType": 0,
-              "dateRanges": ["1d|1","1m|30","3m|60","12m|1D","60m|1W","all|1M"]
+              "chartOnly": false, "width": "100%", "height": 320, "locale": "en", "colorTheme": "dark", "autosize": true,
+              "showVolume": false, "showMA": false, "hideDateRanges": false, "hideMarketStatus": false, "hideSymbolLogo": false,
+              "scalePosition": "right", "scaleMode": "Normal", "fontFamily": "-apple-system, BlinkMacSystemFont, Trebuchet MS, Roboto, sans-serif",
+              "fontSize": "10", "noTimeScale": false, "valuesTracking": "1", "changeMode": "price-and-percent", "chartType": "area",
+              "lineWidth": 2, "lineType": 0, "dateRanges": ["1d|1","1m|30","3m|60","12m|1D","60m|1W","all|1M"]
             }
               </script>
             </div>
             """
             components.html(tv_code, height=340)
-        
         with col2:
             st.markdown("#### Perhitungan Selisih XAUT")
             if ticker and ref_price:
                 xaut = ticker["last"]
                 selisih = xaut - ref_price
-                
                 st.metric("XAUT (OKX)", f"{xaut:,.2f}")
                 st.metric("XAUUSD (approx)", f"{ref_price:,.2f}")
                 st.metric("Selisih", f"{selisih:+.2f}", delta="Premium" if selisih > 0 else "Discount")
-                
-                st.markdown("---")
-                st.markdown("**Contoh Otomatis:**")
-                
-                contoh = 4100
-                adjusted = contoh - selisih
-                
-                st.markdown(f"""
-                Asumsikan level di XAUT = **`{contoh}`**
-                
-                - **Mau SELL di OANDA** → Entry di **`{adjusted:,.2f}`**  
-                  (`{contoh} − ({selisih:+.2f}) = {adjusted:,.2f}`)
-                
-                - **Mau BUY di OANDA** → Entry di **`{adjusted:,.2f}`**
-                """)
-                st.info("Rumus: Harga OANDA ≈ Harga XAUT − Selisih")
-            else:
-                st.warning("Data XAUUSD belum tersedia. Coba refresh.")
 
     else:
         st.subheader("₿ BTCUSD (OANDA) vs BTC-USDT")
-        
         col1, col2 = st.columns([1.4, 1])
-        
         with col1:
             tv_code = """
             <div class="tradingview-widget-container">
@@ -813,59 +843,24 @@ elif menu == "📊 Orderbook":
               <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js" async>
               {
               "symbols": [["OANDA:BTCUSD|1D"]],
-              "chartOnly": false,
-              "width": "100%",
-              "height": 320,
-              "locale": "en",
-              "colorTheme": "dark",
-              "autosize": true,
-              "showVolume": false,
-              "showMA": false,
-              "hideDateRanges": false,
-              "hideMarketStatus": false,
-              "hideSymbolLogo": false,
-              "scalePosition": "right",
-              "scaleMode": "Normal",
-              "fontFamily": "-apple-system, BlinkMacSystemFont, Trebuchet MS, Roboto, Ubuntu, sans-serif",
-              "fontSize": "10",
-              "noTimeScale": false,
-              "valuesTracking": "1",
-              "changeMode": "price-and-percent",
-              "chartType": "area",
-              "lineWidth": 2,
-              "lineType": 0,
-              "dateRanges": ["1d|1","1m|30","3m|60","12m|1D","60m|1W","all|1M"]
+              "chartOnly": false, "width": "100%", "height": 320, "locale": "en", "colorTheme": "dark", "autosize": true,
+              "showVolume": false, "showMA": false, "hideDateRanges": false, "hideMarketStatus": false, "hideSymbolLogo": false,
+              "scalePosition": "right", "scaleMode": "Normal", "fontFamily": "-apple-system, BlinkMacSystemFont, Trebuchet MS, Roboto, sans-serif",
+              "fontSize": "10", "noTimeScale": false, "valuesTracking": "1", "changeMode": "price-and-percent", "chartType": "area",
+              "lineWidth": 2, "lineType": 0, "dateRanges": ["1d|1","1m|30","3m|60","12m|1D","60m|1W","all|1M"]
             }
               </script>
             </div>
             """
             components.html(tv_code, height=340)
-        
         with col2:
             st.markdown("#### Perhitungan Selisih BTC")
             if ticker and ref_price:
                 btc = ticker["last"]
                 selisih = btc - ref_price
-                
                 st.metric("BTC-USDT (OKX)", f"{btc:,.2f}")
                 st.metric("BTCUSD (approx)", f"{ref_price:,.2f}")
                 st.metric("Selisih", f"{selisih:+.2f}", delta="Premium" if selisih > 0 else "Discount")
-                
-                st.markdown("---")
-                st.markdown("**Contoh Otomatis:**")
-                
-                contoh = 95000
-                adjusted = contoh - selisih
-                
-                st.markdown(f"""
-                Asumsikan level di BTC-USDT = **`{contoh:,}`**
-                
-                - **Mau SELL di OANDA** → Entry di **`{adjusted:,.2f}`**
-                - **Mau BUY di OANDA** → Entry di **`{adjusted:,.2f}`**
-                """)
-                st.info("Rumus: Harga OANDA ≈ Harga BTC − Selisih")
-            else:
-                st.warning("Data BTCUSD belum tersedia. Coba refresh.")
 
     st.markdown("---")
     st.subheader("Orderbook")
@@ -873,7 +868,14 @@ elif menu == "📊 Orderbook":
     if err:
         st.error(err)
     elif bids and asks:
+        # 1. Visualisasi Orderbook Standar (Bids vs Asks Bar)
         show_orderbook_visual(bids, asks, aggregation=aggregation, sort_order=sort_order)
+        
+        st.markdown("---")
+        
+        # 2. HEATMAP DI TENGAH (DI BAWAH ORDERBOOK, DI ATAS RECENT TRADES)
+        render_rolling_heatmap(bids, asks, symbol)
+        
     else:
         st.info("Sedang memuat orderbook...")
 
