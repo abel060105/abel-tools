@@ -201,7 +201,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="text-align:center; color:#94a3b8; font-size:12px; padding-top:5px;">
     ABEL FX Tools<br>
-    <span style="color:#64748b;">v2.7 (Complete Restore)</span>
+    <span style="color:#64748b;">v2.8 (Full Multi-Agg Heatmap)</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -303,7 +303,7 @@ def generate_astrodox_wheel_only(target_date: datetime):
 # ==========================================
 # MARKET DATA
 # ==========================================
-def get_okx_orderbook(symbol="XAUT-USDT", limit=80):
+def get_okx_orderbook(symbol="XAUT-USDT", limit=400):
     try:
         url = f"https://www.okx.com/api/v5/market/books?instId={symbol}&sz={limit}"
         r = requests.get(url, timeout=10)
@@ -452,46 +452,54 @@ def show_orderbook_visual(bids, asks, aggregation=0.1, sort_order="Default (Harg
             </div>""", unsafe_allow_html=True)
 
 # ==========================================
-# ROLLING HEATMAP COMPONENT (BOOKMAP STYLE)
+# ROLLING HEATMAP COMPONENT (FULL MULTI-AGGREGATION FUSION: 0.1 s/d 10.000)
 # ==========================================
 def render_rolling_heatmap(bids, asks, symbol):
-    st.markdown("### 🔥 Orderbook Heatmap (Bookmap Style)")
-    st.caption("Visualisasi likuiditas historis in-memory berdasarkan pergerakan orderbook real-time.")
+    st.markdown("### 🔥 Orderbook Heatmap (All-Aggregation Fusion)")
+    st.caption("Visualisasi likuiditas menggabungkan seluruh level aggregation (0.1, 1, 10, 100, 1000, 10.000) dari harga dekat hingga harga jauh.")
 
     if "heatmap_history" not in st.session_state:
         st.session_state.heatmap_history = {}
-    if symbol not in st.session_state.heatmap_history:
-        st.session_state.heatmap_history[symbol] = {"times": [], "price_map": defaultdict(list)}
+    
+    heat_key = f"{symbol}_all_agg_fusion"
+    if heat_key not in st.session_state.heatmap_history:
+        st.session_state.heatmap_history[heat_key] = {"times": [], "price_map": defaultdict(list)}
 
-    history = st.session_state.heatmap_history[symbol]
+    history = st.session_state.heatmap_history[heat_key]
     current_time = datetime.now().strftime("%H:%M:%S")
 
-    current_snapshot = {}
-    for p, s in bids:
-        current_snapshot[p] = s
-    for p, s in asks:
-        current_snapshot[p] = s
+    # Menggabungkan data dari SEMUA tingkat aggregation secara paralel
+    combined_snapshot = {}
+    all_aggregations = [0.1, 1, 10, 100, 1000, 10000]
+    
+    for agg in all_aggregations:
+        agg_bids = aggregate_orders(bids, agg, side="bid")
+        agg_asks = aggregate_orders(asks, agg, side="ask")
+        for p, s in agg_bids + agg_asks:
+            # Normalisasi key harga berdasarkan agertasinya
+            if agg >= 1:
+                rounded_p = round(p / agg) * agg
+            else:
+                rounded_p = round(p, 1)
+            combined_snapshot[rounded_p] = combined_snapshot.get(rounded_p, 0) + s
 
     history["times"].append(current_time)
-    if len(history["times"]) > 25:
+    if len(history["times"]) > 35:
         history["times"].pop(0)
 
-    all_prices = sorted(list(current_snapshot.keys()))
+    all_prices = sorted(list(combined_snapshot.keys()))
     if not all_prices:
         st.info("Menunggu data heatmap terkumpul...")
         return
 
-    mid_idx = len(all_prices) // 2
-    focused_prices = all_prices[max(0, mid_idx - 20):min(len(all_prices), mid_idx + 20)]
-
-    for p in focused_prices:
+    for p in all_prices:
         if p not in history["price_map"]:
             history["price_map"][p] = []
-        history["price_map"][p].append(current_snapshot.get(p, 0))
+        history["price_map"][p].append(combined_snapshot.get(p, 0))
         if len(history["price_map"][p]) > len(history["times"]):
             history["price_map"][p] = history["price_map"][p][-len(history["times"]):]
 
-    active_price_map = {p: history["price_map"][p] for p in focused_prices if p in history["price_map"] and len(history["price_map"][p]) == len(history["times"])}
+    active_price_map = {p: history["price_map"][p] for p in all_prices if p in history["price_map"] and len(history["price_map"][p]) == len(history["times"])}
 
     if not active_price_map:
         st.info("Mengumpulkan riwayat snapshot...")
@@ -510,10 +518,10 @@ def render_rolling_heatmap(bids, asks, symbol):
     ))
 
     fig_heat.update_layout(
-        title=f"Liquidity Density Map — {symbol}",
+        title=f"Full-Range Liquidity Density ({symbol}) — Aggregations: 0.1 to 10k",
         xaxis_title="Waktu (Snapshot)",
-        yaxis_title="Level Harga",
-        height=380,
+        yaxis_title="Level Harga (Gabungan Semua Skala)",
+        height=520,
         margin=dict(l=10, r=10, t=40, b=10),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
@@ -728,14 +736,8 @@ elif menu == "📊 Orderbook":
 
     sort_order = st.selectbox("Urutan", ["Default (Harga)", "Size Kecil → Besar", "Size Besar → Kecil"], index=0)
 
-    if aggregation <= 0.1:
-        depth = 80
-    elif aggregation <= 1:
-        depth = 120
-    elif aggregation <= 10:
-        depth = 250
-    else:
-        depth = 400
+    # Tarik depth lebih besar agar data orderbook bawah & atas tercakup luas
+    depth = 400
 
     if "last_symbol" not in st.session_state:
         st.session_state.last_symbol = symbol
@@ -873,7 +875,7 @@ elif menu == "📊 Orderbook":
         
         st.markdown("---")
         
-        # 2. HEATMAP DI TENGAH (DI BAWAH ORDERBOOK, DI ATAS RECENT TRADES)
+        # 2. HEATMAP FUSION DARI SEMUA AGGREGATION (0.1 S/D 10.000)
         render_rolling_heatmap(bids, asks, symbol)
         
     else:
