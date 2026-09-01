@@ -1,0 +1,15 @@
+{
+  "name": "ABEL FX",
+  "short_name": "ABEL FX",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#070a0f",
+  "theme_color": "#070a0f",
+  "icons": [
+    {
+      "src": "/app/static/icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
