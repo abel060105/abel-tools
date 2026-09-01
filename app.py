@@ -201,7 +201,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="text-align:center; color:#94a3b8; font-size:12px; padding-top:5px;">
     ABEL FX Tools<br>
-    <span style="color:#64748b;">v3.1 (Bookmap Heat > 15 Highlight)</span>
+    <span style="color:#64748b;">v3.2 (Bookmap Heat Axis Highlight)</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -452,11 +452,11 @@ def show_orderbook_visual(bids, asks, aggregation=0.1, sort_order="Default (Harg
             </div>""", unsafe_allow_html=True)
 
 # ==========================================
-# ROLLING HEATMAP COMPONENT (BOOKMAP STYLE + HEAT > 15 HIGHLIGHT)
+# ROLLING HEATMAP COMPONENT (BOOKMAP STYLE + HEAT > 15 HIGHLIGHT ON AXIS)
 # ==========================================
 def render_rolling_heatmap(bids, asks, symbol):
     st.markdown("### 🔥 Orderbook Liquidity Heatmap (Bookmap Theme)")
-    st.caption("Visualisasi konsentrasi likuiditas real-time. Harga dengan tingkat heat > 15 ditandai khusus dengan kotak dan skor heat disamping harga.")
+    st.caption("Visualisasi konsentrasi likuiditas real-time. Harga di sumbu kanan dengan heat > 15 diberi kotak penanda dengan warna sesuai tingkat heat-nya.")
 
     if "heatmap_history" not in st.session_state:
         st.session_state.heatmap_history = {}
@@ -506,25 +506,23 @@ def render_rolling_heatmap(bids, asks, symbol):
     z_matrix = [active_price_map[p] for p in y_prices]
     x_times = history["times"]
 
-    # Menghitung skala heat (0-25) untuk setiap harga berdasarkan nilai maksimum z
+    # Menghitung skala heat (0-25) untuk setiap harga
     flat_z = [val for row in z_matrix for val in row]
     max_z_val = max(flat_z) if flat_z else 1.0
 
-    # Mencari harga-harga yang memiliki tingkat heat > 15
     high_heat_prices = []
     for i, p in enumerate(y_prices):
         avg_p_val = np.mean(z_matrix[i]) if z_matrix[i] else 0
-        # Normalisasi ke skala 0-25
         heat_score = min(25.0, (avg_p_val / (max_z_val if max_z_val > 0 else 1.0)) * 25.0)
         if heat_score > 15.0:
             high_heat_prices.append({"price": p, "heat": heat_score})
 
     # Palet warna Bookmap
     bookmap_colorscale = [
-        [0.0, '#040b18'],   # Biru sangat gelap (kosong/sepi)
+        [0.0, '#040b18'],   # Biru sangat gelap
         [0.2, '#0d2347'],   # Biru gelap
         [0.5, '#1d547f'],   # Biru sedang
-        [0.75, '#e06b1e'],  # Oranye (likuiditas tinggi)
+        [0.75, '#e06b1e'],  # Oranye
         [0.9, '#f5bc18'],   # Kuning terang
         [1.0, '#ffffff']    # Putih menyala
     ]
@@ -537,7 +535,7 @@ def render_rolling_heatmap(bids, asks, symbol):
         hoverongaps=False,
         colorbar=dict(
             title=dict(text="Likuiditas", font=dict(color="#94a3b8")),
-            x=-0.12,          # Bar meteran warna di KIRI grafik
+            x=-0.12,
             xanchor="right",
             len=0.85,
             thickness=14,
@@ -545,38 +543,98 @@ def render_rolling_heatmap(bids, asks, symbol):
         )
     ))
 
+    # Menambahkan penanda kotak (shapes) dan keterangan teks pada sumbu harga kanan untuk heat > 15
+    annotations = []
+    shapes = []
+    
+    for item in high_heat_prices:
+        p_val = item['price']
+        h_val = item['heat']
+        
+        # Menentukan warna kotak highlight berdasarkan besaran heat score
+        if h_val >= 22.0:
+            box_color = "#ffffff"  # Putih menyala untuk heat sangat tinggi
+            text_color = "#000000"
+        elif h_val >= 19.0:
+            box_color = "#f5bc18"  # Kuning terang
+            text_color = "#000000"
+        else:
+            box_color = "#e06b1e"  # Oranye
+            text_color = "#ffffff"
+
+        # Kotak highlight di area sumbu harga (y-axis kanan)
+        shapes.append(dict(
+            type="rect",
+            xref="paper", yref="y",
+            x0=1.0, x1=1.06,  # Sedikit di luar area plot sebelah kanan
+            y0=p_val - (max(y_prices)*0.0005 if y_prices else 0.5), 
+            y1=p_val + (max(y_prices)*0.0005 if y_prices else 0.5),
+            fillcolor=box_color,
+            opacity=0.85,
+            line=dict(color=box_color, width=1)
+        ))
+
+        # Teks angka skor heat di sebelah kanan kotak harga
+        annotations.append(dict(
+            xref="paper", yref="y",
+            x=1.075,
+            y=p_val,
+            text=f"<b>{h_val:.1f}</b>",
+            showarrow=False,
+            font=dict(size=10, color=box_color),
+            xanchor="left",
+            yanchor="middle"
+        ))
+
     fig_heat.update_layout(
-        title=f"Liquidity Heatmap — {symbol}",
+        title=dict(text=f"Liquidity Heatmap — {symbol}", font=dict(color="#ffffff")),
         xaxis_title="",
         yaxis_title="Harga",
-        height=520,
-        margin=dict(l=80, r=20, t=30, b=10),
+        height=540,
+        margin=dict(l=80, r=90, t=30, b=10), # Margin kanan diperlebar untuk ruang highlight axis
         paper_bgcolor='#070a0f',
         plot_bgcolor='#070a0f',
         font=dict(color='#94a3b8'),
-        yaxis=dict(side="right", gridcolor="#111827"), # Harga di KANAN
-        xaxis=dict(gridcolor="#111827")
+        yaxis=dict(side="right", gridcolor="#111827", zeroline=false=True),
+        xaxis=dict(gridcolor="#111827"),
+        shapes=shapes,
+        annotations=annotations
     )
     
     st.plotly_chart(fig_heat, use_container_width=True)
 
-    # Panel Daftar Harga dengan Heat > 15 (Mirip Bookmap COB Highlight)
+    # Panel Bawah: Detail Zona Likuiditas Tinggi (Heat > 15) dengan Warna Sinkron
     st.markdown("#### ⚡ Zona Likuiditas Tinggi (Heat Score > 15)")
     if high_heat_prices:
         cols = st.columns(min(3, len(high_heat_prices)))
         for idx, item in enumerate(sorted(high_heat_prices, key=lambda x: x["price"], reverse=True)):
+            h_val = item['heat']
+            # Sinkronisasi warna border dan badge panel bawah
+            if h_val >= 22.0:
+                b_color = "#ffffff"
+                badge_bg = "#ffffff"
+                badge_txt = "#000000"
+            elif h_val >= 19.0:
+                b_color = "#f5bc18"
+                badge_bg = "#f5bc18"
+                badge_txt = "#000000"
+            else:
+                b_color = "#e06b1e"
+                badge_bg = "#e06b1e"
+                badge_txt = "#ffffff"
+
             with cols[idx % len(cols)]:
                 st.markdown(f"""
-                <div style="border: 2px solid #f5bc18; background: rgba(245, 188, 24, 0.1); 
+                <div style="border: 2px solid {b_color}; background: rgba(224, 107, 30, 0.08); 
                      border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; display: flex; 
                      justify-content: space-between; align-items: center;">
                     <div>
                         <span style="color: #94a3b8; font-size: 11px; display: block;">HARGA HEAT</span>
                         <span style="color: #ffffff; font-weight: bold; font-size: 16px;">{item['price']:,.1f}</span>
                     </div>
-                    <div style="background: #f5bc18; color: #000; font-weight: 800; font-size: 13px; 
+                    <div style="background: {badge_bg}; color: {badge_txt}; font-weight: 800; font-size: 13px; 
                          padding: 4px 8px; border-radius: 6px;">
-                        Heat: {item['heat']:.1f}
+                        Heat: {h_val:.1f}
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
