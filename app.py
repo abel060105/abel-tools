@@ -201,7 +201,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="text-align:center; color:#94a3b8; font-size:12px; padding-top:5px;">
     ABEL FX Tools<br>
-    <span style="color:#64748b;">v3.4 (Uniform Cyan Heat Highlight)</span>
+    <span style="color:#64748b;">v3.5 (Adaptive Heat Color & Fixed Text)</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -452,11 +452,11 @@ def show_orderbook_visual(bids, asks, aggregation=0.1, sort_order="Default (Harg
             </div>""", unsafe_allow_html=True)
 
 # ==========================================
-# ROLLING HEATMAP COMPONENT (BOOKMAP STYLE + UNIFORM CYAN HIGHLIGHT)
+# ROLLING HEATMAP COMPONENT (BOOKMAP STYLE + ADAPTIVE COLOR & BLACK TEXT)
 # ==========================================
 def render_rolling_heatmap(bids, asks, symbol):
     st.markdown("### 🔥 Orderbook Liquidity Heatmap (Bookmap Theme)")
-    st.caption("Visualisasi konsentrasi likuiditas real-time. Harga di sumbu kanan dengan heat > 15 diberi kotak penanda dengan warna Cyan Terang agar kontras dan mudah dibaca.")
+    st.caption("Visualisasi konsentrasi likuiditas real-time. Kotak penanda harga disesuaikan dengan warna heat, dengan teks angka berwarna hitam tebal agar tetap sangat jelas terbaca.")
 
     if "heatmap_history" not in st.session_state:
         st.session_state.heatmap_history = {}
@@ -543,35 +543,42 @@ def render_rolling_heatmap(bids, asks, symbol):
         )
     ))
 
-    # Menambahkan penanda kotak (shapes) dan keterangan teks pada sumbu harga kanan untuk heat > 15 (Warna Cyan Terang)
+    # Menyesuaikan warna kotak berdasarkan nilai heat, dan teks angka hitam tebal (#000000)
     annotations = []
     shapes = []
-    uniform_color = "#00f3ff"  # Cyan terang agar kontras di semua latar belakang
     
     for item in high_heat_prices:
         p_val = item['price']
         h_val = item['heat']
 
-        # Kotak highlight di area sumbu harga (y-axis kanan)
+        # Menentukan warna kotak highlight mengikuti tingkat panas heat
+        if h_val >= 22.0:
+            box_color = "#ffffff"  # Putih menyala
+        elif h_val >= 18.0:
+            box_color = "#f5bc18"  # Kuning terang
+        else:
+            box_color = "#e06b1e"  # Oranye
+
+        # Kotak highlight di sumbu harga kanan
         shapes.append(dict(
             type="rect",
             xref="paper", yref="y",
-            x0=1.0, x1=1.06,  # Sedikit di luar area plot sebelah kanan
+            x0=1.0, x1=1.07,  # Diperpanjang agar stabil saat fullscreen
             y0=p_val - (max(y_prices)*0.0005 if y_prices else 0.5), 
             y1=p_val + (max(y_prices)*0.0005 if y_prices else 0.5),
-            fillcolor=uniform_color,
-            opacity=0.85,
-            line=dict(color=uniform_color, width=1)
+            fillcolor=box_color,
+            opacity=0.95,
+            line=dict(color=box_color, width=1)
         ))
 
-        # Teks angka skor heat di sebelah kanan kotak harga
+        # Teks angka skor heat di sebelah kanan kotak agar tidak terpotong saat fullscreen
         annotations.append(dict(
             xref="paper", yref="y",
-            x=1.075,
+            x=1.085,
             y=p_val,
             text=f"<b>{h_val:.1f}</b>",
             showarrow=False,
-            font=dict(size=10, color=uniform_color),
+            font=dict(size=10, color="#00f3ff"),
             xanchor="left",
             yanchor="middle"
         ))
@@ -581,7 +588,7 @@ def render_rolling_heatmap(bids, asks, symbol):
         xaxis_title="",
         yaxis_title="Harga",
         height=540,
-        margin=dict(l=80, r=90, t=30, b=10), # Margin kanan diperlebar untuk ruang highlight axis
+        margin=dict(l=80, r=110, t=30, b=10), # Margin kanan diperlebar ke 110 untuk ruang aman full-screen
         paper_bgcolor='#070a0f',
         plot_bgcolor='#070a0f',
         font=dict(color='#94a3b8'),
@@ -593,22 +600,37 @@ def render_rolling_heatmap(bids, asks, symbol):
     
     st.plotly_chart(fig_heat, use_container_width=True)
 
-    # Panel Bawah: Detail Zona Likuiditas Tinggi (Heat > 15) dengan Warna Cyan Seragam
+    # Panel Bawah: Detail Zona Likuiditas Tinggi (Heat > 15) dengan Teks Hitam di dalam Kotak Heat
     st.markdown("#### ⚡ Zona Likuiditas Tinggi (Heat Score > 15)")
     if high_heat_prices:
         cols = st.columns(min(3, len(high_heat_prices)))
         for idx, item in enumerate(sorted(high_heat_prices, key=lambda x: x["price"], reverse=True)):
             h_val = item['heat']
+            
+            # Menyesuaikan warna card bawah dengan warna heat
+            if h_val >= 22.0:
+                card_bg = "#ffffff"
+                badge_bg = "#000000"
+                badge_fg = "#ffffff"
+            elif h_val >= 18.0:
+                card_bg = "#f5bc18"
+                badge_bg = "#000000"
+                badge_fg = "#f5bc18"
+            else:
+                card_bg = "#e06b1e"
+                badge_bg = "#000000"
+                badge_fg = "#e06b1e"
+
             with cols[idx % len(cols)]:
                 st.markdown(f"""
-                <div style="border: 2px solid #00f3ff; background: rgba(0, 243, 255, 0.08); 
+                <div style="border: 2px solid {card_bg}; background: {card_bg}; 
                      border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; display: flex; 
-                     justify-content: space-between; align-items: center;">
+                     justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
                     <div>
-                        <span style="color: #94a3b8; font-size: 11px; display: block;">HARGA HEAT</span>
-                        <span style="color: #ffffff; font-weight: bold; font-size: 16px;">{item['price']:,.1f}</span>
+                        <span style="color: #111111; font-size: 11px; display: block; font-weight: 700;">HARGA HEAT</span>
+                        <span style="color: #000000; font-weight: 900; font-size: 17px;">{item['price']:,.1f}</span>
                     </div>
-                    <div style="background: #00f3ff; color: #000000; font-weight: 800; font-size: 13px; 
+                    <div style="background: {badge_bg}; color: {badge_fg}; font-weight: 800; font-size: 13px; 
                          padding: 4px 8px; border-radius: 6px;">
                         Heat: {h_val:.1f}
                     </div>
