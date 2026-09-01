@@ -201,7 +201,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="text-align:center; color:#94a3b8; font-size:12px; padding-top:5px;">
     ABEL FX Tools<br>
-    <span style="color:#64748b;">v2.8 (Full Multi-Agg Heatmap)</span>
+    <span style="color:#64748b;">v2.9 (Coinglass Heatmap Style)</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -452,42 +452,39 @@ def show_orderbook_visual(bids, asks, aggregation=0.1, sort_order="Default (Harg
             </div>""", unsafe_allow_html=True)
 
 # ==========================================
-# ROLLING HEATMAP COMPONENT (FULL MULTI-AGGREGATION FUSION: 0.1 s/d 10.000)
+# ROLLING HEATMAP COMPONENT (COINGLASS STYLE)
 # ==========================================
 def render_rolling_heatmap(bids, asks, symbol):
-    st.markdown("### 🔥 Orderbook Heatmap (All-Aggregation Fusion)")
-    st.caption("Visualisasi likuiditas menggabungkan seluruh level aggregation (0.1, 1, 10, 100, 1000, 10.000) dari harga dekat hingga harga jauh.")
+    st.markdown("### 🔥 Orderbook Liquidity Heatmap (Coinglass Style)")
+    st.caption("Visualisasi konsentrasi likuiditas orderbook real-time dengan rentang harga dinamis.")
 
     if "heatmap_history" not in st.session_state:
         st.session_state.heatmap_history = {}
     
-    heat_key = f"{symbol}_all_agg_fusion"
+    heat_key = f"{symbol}_coinglass_heatmap"
     if heat_key not in st.session_state.heatmap_history:
         st.session_state.heatmap_history[heat_key] = {"times": [], "price_map": defaultdict(list)}
 
     history = st.session_state.heatmap_history[heat_key]
     current_time = datetime.now().strftime("%H:%M:%S")
 
-    # Menggabungkan data dari SEMUA tingkat aggregation secara paralel
-    combined_snapshot = {}
-    all_aggregations = [0.1, 1, 10, 100, 1000, 10000]
-    
-    for agg in all_aggregations:
-        agg_bids = aggregate_orders(bids, agg, side="bid")
-        agg_asks = aggregate_orders(asks, agg, side="ask")
-        for p, s in agg_bids + agg_asks:
-            # Normalisasi key harga berdasarkan agertasinya
-            if agg >= 1:
-                rounded_p = round(p / agg) * agg
-            else:
-                rounded_p = round(p, 1)
-            combined_snapshot[rounded_p] = combined_snapshot.get(rounded_p, 0) + s
+    current_mid_price = 0
+    if bids and asks:
+        current_mid_price = (bids[0][0] + asks[0][0]) / 2
+
+    current_snapshot = {}
+    for p, s in bids + asks:
+        if current_mid_price and (p < current_mid_price * 0.90 or p > current_mid_price * 1.10):
+            continue
+        
+        rounded_p = round(p, 1)
+        current_snapshot[rounded_p] = current_snapshot.get(rounded_p, 0) + s
 
     history["times"].append(current_time)
-    if len(history["times"]) > 35:
+    if len(history["times"]) > 40:
         history["times"].pop(0)
 
-    all_prices = sorted(list(combined_snapshot.keys()))
+    all_prices = sorted(list(current_snapshot.keys()))
     if not all_prices:
         st.info("Menunggu data heatmap terkumpul...")
         return
@@ -495,7 +492,7 @@ def render_rolling_heatmap(bids, asks, symbol):
     for p in all_prices:
         if p not in history["price_map"]:
             history["price_map"][p] = []
-        history["price_map"][p].append(combined_snapshot.get(p, 0))
+        history["price_map"][p].append(current_snapshot.get(p, 0))
         if len(history["price_map"][p]) > len(history["times"]):
             history["price_map"][p] = history["price_map"][p][-len(history["times"]):]
 
@@ -513,19 +510,21 @@ def render_rolling_heatmap(bids, asks, symbol):
         z=z_matrix,
         x=x_times,
         y=y_prices,
-        colorscale='Viridis',
+        colorscale='Plasma',
         hoverongaps=False
     ))
 
     fig_heat.update_layout(
-        title=f"Full-Range Liquidity Density ({symbol}) — Aggregations: 0.1 to 10k",
-        xaxis_title="Waktu (Snapshot)",
-        yaxis_title="Level Harga (Gabungan Semua Skala)",
-        height=520,
-        margin=dict(l=10, r=10, t=40, b=10),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#94a3b8')
+        title=f"Liquidity Heatmap — {symbol}",
+        xaxis_title="",
+        yaxis_title="Harga",
+        height=500,
+        margin=dict(l=10, r=10, t=30, b=10),
+        paper_bgcolor='#0e1117',
+        plot_bgcolor='#0e1117',
+        font=dict(color='#94a3b8'),
+        yaxis=dict(side="right", gridcolor="#161b22"),
+        xaxis=dict(gridcolor="#161b22")
     )
     
     st.plotly_chart(fig_heat, use_container_width=True)
@@ -736,7 +735,6 @@ elif menu == "📊 Orderbook":
 
     sort_order = st.selectbox("Urutan", ["Default (Harga)", "Size Kecil → Besar", "Size Besar → Kecil"], index=0)
 
-    # Tarik depth lebih besar agar data orderbook bawah & atas tercakup luas
     depth = 400
 
     if "last_symbol" not in st.session_state:
@@ -870,14 +868,9 @@ elif menu == "📊 Orderbook":
     if err:
         st.error(err)
     elif bids and asks:
-        # 1. Visualisasi Orderbook Standar (Bids vs Asks Bar)
         show_orderbook_visual(bids, asks, aggregation=aggregation, sort_order=sort_order)
-        
         st.markdown("---")
-        
-        # 2. HEATMAP FUSION DARI SEMUA AGGREGATION (0.1 S/D 10.000)
         render_rolling_heatmap(bids, asks, symbol)
-        
     else:
         st.info("Sedang memuat orderbook...")
 
