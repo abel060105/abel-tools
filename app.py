@@ -17,11 +17,26 @@ st.set_page_config(
     layout="wide"
 )
 
-# ================= PWA LINK CONFIG =================
-st.markdown("""
-    <link rel="manifest" href="/app/static/manifest.json">
-    <meta name="theme-color" content="#070a0f">
-""", unsafe_allow_html=True)
+# ================= PWA INJECTOR (MANDIRIAN) =================
+pwa_code = """
+<link rel="manifest" href="data:application/manifest+json;charset=utf-8,{
+  %22name%22: %22ABEL FX%22,
+  %22short_name%22: %22ABEL FX%22,
+  %22start_url%22: %22/%22,
+  %22display%22: %22standalone%22,
+  %22background_color%22: %22%23070a0f%22,
+  %22theme_color%22: %22%23070a0f%22,
+  %22icons%22: [
+    {
+      %22src%22: %22https://raw.githubusercontent.com/abel060105/abel-tools/main/static/icon.png%22,
+      %22sizes%22: %22512x512%22,
+      %22type%22: %22image/png%22
+    }
+  ]
+}">
+<meta name="theme-color" content="#070a0f">
+"""
+components.html(pwa_code, height=0)
 
 # ================= THEME & BACKGROUND =================
 def apply_theme_and_background(theme_mode, video_file):
