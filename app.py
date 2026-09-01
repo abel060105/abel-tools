@@ -201,7 +201,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="text-align:center; color:#94a3b8; font-size:12px; padding-top:5px;">
     ABEL FX Tools<br>
-    <span style="color:#64748b;">v3.6 (Transparent Border Heat Theme)</span>
+    <span style="color:#64748b;">v3.7 (Perfect Aligned Heat Theme)</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -452,11 +452,11 @@ def show_orderbook_visual(bids, asks, aggregation=0.1, sort_order="Default (Harg
             </div>""", unsafe_allow_html=True)
 
 # ==========================================
-# ROLLING HEATMAP COMPONENT (TRANSPARENT HEAT BORDER THEME)
+# ROLLING HEATMAP COMPONENT (PERFECT ALIGNED THEME)
 # ==========================================
 def render_rolling_heatmap(bids, asks, symbol):
     st.markdown("### 🔥 Orderbook Liquidity Heatmap (Bookmap Theme)")
-    st.caption("Visualisasi konsentrasi likuiditas real-time. Kotak harga menggunakan border transparan sesuai warna heat.")
+    st.caption("Visualisasi konsentrasi likuiditas real-time. Kotak harga menggunakan border transparan sesuai warna heat dan sejajar presisi.")
 
     if "heatmap_history" not in st.session_state:
         st.session_state.heatmap_history = {}
@@ -509,12 +509,36 @@ def render_rolling_heatmap(bids, asks, symbol):
     flat_z = [val for row in z_matrix for val in row]
     max_z_val = max(flat_z) if flat_z else 1.0
 
-    high_heat_prices = []
+    # Menyaring harga dengan heat score > 15
+    raw_high_heat = []
     for i, p in enumerate(y_prices):
         avg_p_val = np.mean(z_matrix[i]) if z_matrix[i] else 0
         heat_score = min(25.0, (avg_p_val / (max_z_val if max_z_val > 0 else 1.0)) * 25.0)
         if heat_score > 15.0:
-            high_heat_prices.append({"price": p, "heat": heat_score})
+            raw_high_heat.append({"price": p, "heat": heat_score})
+
+    # Mengelompokkan level harga yang berdekatan agar kotak highlight mencakup rentang yang akurat
+    high_heat_prices = []
+    if raw_high_heat:
+        raw_high_heat.sort(key=lambda x: x["price"])
+        current_cluster = [raw_high_heat[0]]
+        
+        for item in raw_high_heat[1:]:
+            # Jika selisih harga <= 1.5, gabungkan dalam satu cluster zona
+            if item["price"] - current_cluster[-1]["price"] <= 1.5:
+                current_cluster.append(item)
+            else:
+                p_min = current_cluster[0]["price"]
+                p_max = current_cluster[-1]["price"]
+                max_h = max(c["heat"] for c in current_cluster)
+                high_heat_prices.append({"min_price": p_min, "max_price": p_max, "heat": max_h})
+                current_cluster = [item]
+        
+        # Masukkan cluster terakhir
+        p_min = current_cluster[0]["price"]
+        p_max = current_cluster[-1]["price"]
+        max_h = max(c["heat"] for c in current_cluster)
+        high_heat_prices.append({"min_price": p_min, "max_price": p_max, "heat": max_h})
 
     bookmap_colorscale = [
         [0.0, '#040b18'],
@@ -545,8 +569,10 @@ def render_rolling_heatmap(bids, asks, symbol):
     shapes = []
     
     for item in high_heat_prices:
-        p_val = item['price']
+        p_min = item['min_price']
+        p_max = item['max_price']
         h_val = item['heat']
+        mid_p = (p_min + p_max) / 2
 
         # Menentukan warna berdasarkan tingkat heat
         if h_val >= 22.0:
@@ -556,23 +582,23 @@ def render_rolling_heatmap(bids, asks, symbol):
         else:
             color_code = "#e06b1e"  # Oranye
 
-        # Kotak border di sumbu harga kanan (background transparan)
+        # Border kotak di sumbu harga kanan yang membentang pas dari min sampai max harga
         shapes.append(dict(
             type="rect",
             xref="paper", yref="y",
             x0=1.0, x1=1.07,
-            y0=p_val - (max(y_prices)*0.0005 if y_prices else 0.5), 
-            y1=p_val + (max(y_prices)*0.0005 if y_prices else 0.5),
+            y0=p_min - 0.5, 
+            y1=p_max + 0.5,
             fillcolor="rgba(0,0,0,0)",  # Background transparan
             opacity=1.0,
             line=dict(color=color_code, width=2)
         ))
 
-        # Teks skor heat di samping kotak dengan warna sesuai heat
+        # Teks skor heat di samping kotak dengan posisi pas di tengah rentang harga tersebut
         annotations.append(dict(
             xref="paper", yref="y",
             x=1.085,
-            y=p_val,
+            y=mid_p,
             text=f"<b>{h_val:.1f}</b>",
             showarrow=False,
             font=dict(size=10, color=color_code),
@@ -601,8 +627,10 @@ def render_rolling_heatmap(bids, asks, symbol):
     st.markdown("#### ⚡ Zona Likuiditas Tinggi (Heat Score > 15)")
     if high_heat_prices:
         cols = st.columns(min(3, len(high_heat_prices)))
-        for idx, item in enumerate(sorted(high_heat_prices, key=lambda x: x["price"], reverse=True)):
+        for idx, item in enumerate(sorted(high_heat_prices, key=lambda x: x["min_price"], reverse=True)):
             h_val = item['heat']
+            p_min = item['min_price']
+            p_max = item['max_price']
             
             if h_val >= 22.0:
                 border_color = "#ffffff"
@@ -611,14 +639,16 @@ def render_rolling_heatmap(bids, asks, symbol):
             else:
                 border_color = "#e06b1e"
 
+            display_price_str = f"{p_min:,.1f}" if p_min == p_max else f"{p_min:,.1f} - {p_max:,.1f}"
+
             with cols[idx % len(cols)]:
                 st.markdown(f"""
                 <div style="border: 2px solid {border_color}; background: transparent; 
                      border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; display: flex; 
                      justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
                     <div>
-                        <span style="color: #94a3b8; font-size: 11px; display: block; font-weight: 600;">HARGA HEAT</span>
-                        <span style="color: #ffffff; font-weight: 800; font-size: 17px;">{item['price']:,.1f}</span>
+                        <span style="color: #94a3b8; font-size: 11px; display: block; font-weight: 600;">RENTANG HARGA</span>
+                        <span style="color: #ffffff; font-weight: 800; font-size: 16px;">{display_price_str}</span>
                     </div>
                     <div style="background: transparent; border: 1px solid {border_color}; color: {border_color}; font-weight: 800; font-size: 13px; 
                          padding: 4px 8px; border-radius: 6px;">
