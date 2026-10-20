@@ -577,7 +577,6 @@ def render_rolling_heatmap(bids, asks, symbol):
         else:
             color_code = "#e06b1e"
 
-        # Kotak highlight di sumbu harga kanan
         shapes.append(dict(
             type="rect",
             xref="paper", yref="y",
@@ -589,7 +588,6 @@ def render_rolling_heatmap(bids, asks, symbol):
             line=dict(color=color_code, width=2)
         ))
 
-        # Tampilkan harga di dalam kotak (atas) agar tetap terlihat meskipun di-zoom out
         display_price_str = f"{p_min:,.1f}" if p_min == p_max else f"{p_min:,.1f}"
         annotations.append(dict(
             xref="paper", yref="y",
@@ -602,7 +600,6 @@ def render_rolling_heatmap(bids, asks, symbol):
             yanchor="bottom"
         ))
 
-        # Teks skor heat di sebelah kanan kotak dengan koordinat paper.y agar tidak terpengaruh auto-hide zoom Plotly
         annotations.append(dict(
             xref="paper", yref="y",
             x=1.085,
@@ -631,7 +628,6 @@ def render_rolling_heatmap(bids, asks, symbol):
     
     st.plotly_chart(fig_heat, use_container_width=True)
 
-    # Panel Bawah: Zona Likuiditas Tinggi
     st.markdown("#### ⚡ Zona Likuiditas Tinggi (Heat Score > 15)")
     if high_heat_prices:
         cols = st.columns(min(3, len(high_heat_prices)))
@@ -746,7 +742,6 @@ elif menu == "🔮 Astrodox":
     
     st.markdown("---")
 
-    # ========== PAPAN PROMPT 1 ==========
     st.subheader("📋 Papan Prompt 1 — Full Analysis (Makro + Geopolitik + 3 Setup)")
 
     prompt_full_1 = f"""Cek dan update harga XAUUSD (Gold) secara realtime saat ini terlebih dahulu melalui pencarian/web.
@@ -817,7 +812,6 @@ Fokus pada confluence Astro + Makro + Orderflow.
 
     st.markdown("---")
 
-    # ========== PAPAN PROMPT 2 ==========
     st.subheader("📋 Papan Prompt 2 — Simple Astrodox Only")
 
     prompt_simple = f"""Kamu adalah Senior Quantitative Trader + Financial Astrologer spesialis XAUUSD.
@@ -1043,9 +1037,8 @@ elif menu == "🧮 Kalkulator":
         help="Masukkan kurs 1 USD ke Rupiah. Contoh: 17000"
     )
     
-    # Turunan kurs
-    kurs_usc_to_idr = kurs_idr / 100.0          # 1 USC = kurs_idr / 100
-    kurs_usd_to_usc = 100.0                     # 1 USD = 100 USC
+    kurs_usc_to_idr = kurs_idr / 100.0
+    kurs_usd_to_usc = 100.0
 
     c1, c2, c3 = st.columns(3)
     with c1:
@@ -1065,16 +1058,12 @@ elif menu == "🧮 Kalkulator":
     with col_lot:
         lot = st.number_input("Lot Size", min_value=0.01, max_value=100.0, value=0.01, step=0.01, format="%.2f")
     with col_sl:
-        sl_pips = st.number_input("SL (Pips)", min_value=0.0, max_value=5000.0, value=147.0, step=1.0, format="%.1f")
+        sl_pips = st.number_input("SL (Pips)", min_value=0.0, max_value=5000.0, value=150.0, step=1.0, format="%.1f")
     with col_tp:
         tp_pips = st.number_input("TP (Pips)", min_value=0.0, max_value=5000.0, value=400.0, step=1.0, format="%.1f")
 
-    # Hitung pip value
-    # 1 lot → 1 pip = $1
-    # 0.01 lot → 1 pip = $0.01
-    pip_value_usd = lot * 1.0          # USD per pip
+    pip_value_usd = lot * 1.0
 
-    # PnL
     pnl_sl_usd = -sl_pips * pip_value_usd
     pnl_tp_usd = tp_pips * pip_value_usd
 
@@ -1086,7 +1075,6 @@ elif menu == "🧮 Kalkulator":
 
     st.markdown("#### Hasil Perhitungan PnL")
 
-    # Tampilkan dalam 3 kolom
     r1, r2, r3 = st.columns(3)
     
     with r1:
@@ -1108,7 +1096,6 @@ elif menu == "🧮 Kalkulator":
         st.metric("Risk : Reward", f"1 : {risk_reward:.2f}")
         st.caption(f"Lot {lot} | SL {sl_pips} pips | TP {tp_pips} pips")
 
-    # Info box ringkas
     st.markdown(f"""
     <div class="info-box">
     <strong>RINGKASAN CEPAT:</strong><br>
