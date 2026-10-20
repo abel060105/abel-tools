@@ -452,7 +452,7 @@ def show_orderbook_visual(bids, asks, aggregation=0.1, sort_order="Default (Harg
             </div>""", unsafe_allow_html=True)
 
 # ==========================================
-# ROLLING HEATMAP COMPONENT (PERFECT ALIGNED THEME)
+# ROLLING HEATMAP COMPONENT
 # ==========================================
 def render_rolling_heatmap(bids, asks, symbol):
     st.markdown("### 🔥 Orderbook Liquidity Heatmap (Bookmap Theme)")
@@ -1038,7 +1038,6 @@ elif menu == "🧮 Kalkulator":
     )
     
     kurs_usc_to_idr = kurs_idr / 100.0
-    kurs_usd_to_usc = 100.0
 
     c1, c2, c3 = st.columns(3)
     with c1:
@@ -1052,17 +1051,33 @@ elif menu == "🧮 Kalkulator":
 
     # ========== PnL CALCULATOR ==========
     st.subheader("📈 Kalkulator PnL XAUUSD")
-    st.caption("Asumsi standar (sesuai tabel kamu): **1 pip = $0.01 untuk 0.01 lot** → **1 pip = $1 per 1.00 lot**")
+    
+    # Pilihan Jenis Akun
+    account_type = st.radio(
+        "Jenis Akun",
+        ["Standard", "Cent"],
+        horizontal=True,
+        help="Standard: 1 lot = $1 per pip | Cent: 1 lot Cent = $0.01 per pip (1/100 dari Standard)"
+    )
+
+    if account_type == "Standard":
+        st.caption("Asumsi Standard: **1 pip = $0.01 untuk 0.01 lot** → **1 pip = $1 per 1.00 lot**")
+    else:
+        st.caption("Asumsi Cent: **1 pip = $0.0001 untuk 0.01 lot Cent** → **1 pip = $0.01 per 1.00 lot Cent**")
 
     col_lot, col_sl, col_tp = st.columns(3)
     with col_lot:
         lot = st.number_input("Lot Size", min_value=0.01, max_value=100.0, value=0.01, step=0.01, format="%.2f")
     with col_sl:
-        sl_pips = st.number_input("SL (Pips)", min_value=0.0, max_value=5000.0, value=150.0, step=1.0, format="%.1f")
+        sl_pips = st.number_input("SL (Pips)", min_value=0.0, max_value=10000.0, value=1500.0, step=1.0, format="%.1f")
     with col_tp:
-        tp_pips = st.number_input("TP (Pips)", min_value=0.0, max_value=5000.0, value=400.0, step=1.0, format="%.1f")
+        tp_pips = st.number_input("TP (Pips)", min_value=0.0, max_value=10000.0, value=4000.0, step=1.0, format="%.1f")
 
-    pip_value_usd = lot * 1.0
+    # Hitung pip value berdasarkan jenis akun
+    if account_type == "Standard":
+        pip_value_usd = lot * 1.0          # 1 lot Standard = $1 / pip
+    else:
+        pip_value_usd = lot * 0.01         # 1 lot Cent = $0.01 / pip
 
     pnl_sl_usd = -sl_pips * pip_value_usd
     pnl_tp_usd = tp_pips * pip_value_usd
@@ -1091,15 +1106,15 @@ elif menu == "🧮 Kalkulator":
 
     with r3:
         st.markdown("**📊 Ringkasan**")
-        st.metric("Pip Value / lot", f"${pip_value_usd:,.4f}")
+        st.metric("Pip Value", f"${pip_value_usd:,.4f}")
         risk_reward = abs(pnl_tp_usd / pnl_sl_usd) if pnl_sl_usd != 0 else 0
         st.metric("Risk : Reward", f"1 : {risk_reward:.2f}")
-        st.caption(f"Lot {lot} | SL {sl_pips} pips | TP {tp_pips} pips")
+        st.caption(f"{account_type} | Lot {lot} | SL {sl_pips} | TP {tp_pips}")
 
     st.markdown(f"""
     <div class="info-box">
     <strong>RINGKASAN CEPAT:</strong><br>
-    Lot: <b>{lot}</b> &nbsp;|&nbsp; SL: <b>{sl_pips} pips</b> &nbsp;|&nbsp; TP: <b>{tp_pips} pips</b><br>
+    Akun: <b>{account_type}</b> &nbsp;|&nbsp; Lot: <b>{lot}</b> &nbsp;|&nbsp; SL: <b>{sl_pips} pips</b> &nbsp;|&nbsp; TP: <b>{tp_pips} pips</b><br>
     ─────────────────────────────────────────────<br>
     • SL  → {pnl_sl_usd:,.2f} USD  =  {pnl_sl_usc:,.1f} USC  =  Rp {pnl_sl_idr:,.0f}<br>
     • TP  → +{pnl_tp_usd:,.2f} USD  =  +{pnl_tp_usc:,.1f} USC  =  Rp {pnl_tp_idr:,.0f}<br>
@@ -1146,4 +1161,4 @@ elif menu == "🧮 Kalkulator":
             st.info(f"**{usc_in:,.1f} USC** = **Rp {idr_out3:,.0f}**")
 
     st.markdown("---")
-    st.caption("Catatan: Kalkulator ini mengikuti asumsi dari Model Compounding Straddle Hedging kamu (1 pip = $0.01 untuk 0.01 lot). Hasil bisa sedikit berbeda tergantung broker (spread, komisi, dll).")
+    st.caption("Catatan: Standard = 1 lot = $1/pip | Cent = 1 lot = $0.01/pip. Hasil bisa sedikit berbeda tergantung broker (spread, komisi, dll).")
