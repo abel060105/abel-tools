@@ -17,27 +17,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# ================= PWA INJECTOR (MANDIRIAN) =================
-pwa_code = """
-<link rel="manifest" href="data:application/manifest+json;charset=utf-8,{
-  %22name%22: %22ABEL FX%22,
-  %22short_name%22: %22ABEL FX%22,
-  %22start_url%22: %22/%22,
-  %22display%22: %22standalone%22,
-  %22background_color%22: %22%23070a0f%22,
-  %22theme_color%22: %22%23070a0f%22,
-  %22icons%22: [
-    {
-      %22src%22: %22https://raw.githubusercontent.com/abel060105/abel-tools/main/static/icon.png%22,
-      %22sizes%22: %22512x512%22,
-      %22type%22: %22image/png%22
-    }
-  ]
-}">
-<meta name="theme-color" content="#070a0f">
-"""
-components.html(pwa_code, height=0)
-
 # ================= THEME & BACKGROUND =================
 def apply_theme_and_background(theme_mode, video_file):
     css_base = """
@@ -205,6 +184,7 @@ def sidebar_menu_button(label, icon, target_key):
 sidebar_menu_button("Menu Utama", "🏠", "🏠 Menu Utama")
 sidebar_menu_button("Astrodox", "🔮", "🔮 Astrodox")
 sidebar_menu_button("Orderbook", "📊", "📊 Orderbook")
+sidebar_menu_button("Kalkulator", "🧮", "🧮 Kalkulator")
 
 menu = st.session_state.active_menu
 
@@ -472,7 +452,7 @@ def show_orderbook_visual(bids, asks, aggregation=0.1, sort_order="Default (Harg
             </div>""", unsafe_allow_html=True)
 
 # ==========================================
-# ROLLING HEATMAP COMPONENT
+# ROLLING HEATMAP COMPONENT (PERFECT ALIGNED THEME)
 # ==========================================
 def render_rolling_heatmap(bids, asks, symbol):
     st.markdown("### 🔥 Orderbook Liquidity Heatmap (Bookmap Theme)")
@@ -597,6 +577,7 @@ def render_rolling_heatmap(bids, asks, symbol):
         else:
             color_code = "#e06b1e"
 
+        # Kotak highlight di sumbu harga kanan
         shapes.append(dict(
             type="rect",
             xref="paper", yref="y",
@@ -608,6 +589,7 @@ def render_rolling_heatmap(bids, asks, symbol):
             line=dict(color=color_code, width=2)
         ))
 
+        # Tampilkan harga di dalam kotak (atas) agar tetap terlihat meskipun di-zoom out
         display_price_str = f"{p_min:,.1f}" if p_min == p_max else f"{p_min:,.1f}"
         annotations.append(dict(
             xref="paper", yref="y",
@@ -620,6 +602,7 @@ def render_rolling_heatmap(bids, asks, symbol):
             yanchor="bottom"
         ))
 
+        # Teks skor heat di sebelah kanan kotak dengan koordinat paper.y agar tidak terpengaruh auto-hide zoom Plotly
         annotations.append(dict(
             xref="paper", yref="y",
             x=1.085,
@@ -648,6 +631,7 @@ def render_rolling_heatmap(bids, asks, symbol):
     
     st.plotly_chart(fig_heat, use_container_width=True)
 
+    # Panel Bawah: Zona Likuiditas Tinggi
     st.markdown("#### ⚡ Zona Likuiditas Tinggi (Heat Score > 15)")
     if high_heat_prices:
         cols = st.columns(min(3, len(high_heat_prices)))
@@ -762,6 +746,7 @@ elif menu == "🔮 Astrodox":
     
     st.markdown("---")
 
+    # ========== PAPAN PROMPT 1 ==========
     st.subheader("📋 Papan Prompt 1 — Full Analysis (Makro + Geopolitik + 3 Setup)")
 
     prompt_full_1 = f"""Cek dan update harga XAUUSD (Gold) secara realtime saat ini terlebih dahulu melalui pencarian/web.
@@ -832,6 +817,7 @@ Fokus pada confluence Astro + Makro + Orderflow.
 
     st.markdown("---")
 
+    # ========== PAPAN PROMPT 2 ==========
     st.subheader("📋 Papan Prompt 2 — Simple Astrodox Only")
 
     prompt_simple = f"""Kamu adalah Senior Quantitative Trader + Financial Astrologer spesialis XAUUSD.
@@ -1039,3 +1025,138 @@ elif menu == "📊 Orderbook":
     if auto_refresh:
         time.sleep(3)
         st.rerun()
+
+elif menu == "🧮 Kalkulator":
+    st.title("🧮 Kalkulator PnL & Converter")
+    st.caption("Kalkulator khusus untuk teknik War News / Straddle Hedging XAUUSD | Kurs bisa diubah sendiri")
+    st.markdown("---")
+
+    # ========== KURS ==========
+    st.subheader("💱 Kurs Saat Ini")
+    kurs_idr = st.number_input(
+        "1 USD = ... IDR",
+        min_value=1000.0,
+        max_value=100000.0,
+        value=17000.0,
+        step=100.0,
+        format="%.0f",
+        help="Masukkan kurs 1 USD ke Rupiah. Contoh: 17000"
+    )
+    
+    # Turunan kurs
+    kurs_usc_to_idr = kurs_idr / 100.0          # 1 USC = kurs_idr / 100
+    kurs_usd_to_usc = 100.0                     # 1 USD = 100 USC
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.metric("1 USD", f"Rp {kurs_idr:,.0f}")
+    with c2:
+        st.metric("1 USC", f"Rp {kurs_usc_to_idr:,.2f}")
+    with c3:
+        st.metric("100 USC", f"Rp {kurs_idr:,.0f}")
+
+    st.markdown("---")
+
+    # ========== PnL CALCULATOR ==========
+    st.subheader("📈 Kalkulator PnL XAUUSD")
+    st.caption("Asumsi standar (sesuai tabel kamu): **1 pip = $0.01 untuk 0.01 lot** → **1 pip = $1 per 1.00 lot**")
+
+    col_lot, col_sl, col_tp = st.columns(3)
+    with col_lot:
+        lot = st.number_input("Lot Size", min_value=0.01, max_value=100.0, value=0.01, step=0.01, format="%.2f")
+    with col_sl:
+        sl_pips = st.number_input("SL (Pips)", min_value=0.0, max_value=5000.0, value=147.0, step=1.0, format="%.1f")
+    with col_tp:
+        tp_pips = st.number_input("TP (Pips)", min_value=0.0, max_value=5000.0, value=400.0, step=1.0, format="%.1f")
+
+    # Hitung pip value
+    # 1 lot → 1 pip = $1
+    # 0.01 lot → 1 pip = $0.01
+    pip_value_usd = lot * 1.0          # USD per pip
+
+    # PnL
+    pnl_sl_usd = -sl_pips * pip_value_usd
+    pnl_tp_usd = tp_pips * pip_value_usd
+
+    pnl_sl_usc = pnl_sl_usd * 100
+    pnl_tp_usc = pnl_tp_usd * 100
+
+    pnl_sl_idr = pnl_sl_usd * kurs_idr
+    pnl_tp_idr = pnl_tp_usd * kurs_idr
+
+    st.markdown("#### Hasil Perhitungan PnL")
+
+    # Tampilkan dalam 3 kolom
+    r1, r2, r3 = st.columns(3)
+    
+    with r1:
+        st.markdown("**🔴 Stop Loss**")
+        st.metric("USD", f"{pnl_sl_usd:,.2f}")
+        st.metric("USC", f"{pnl_sl_usc:,.1f}")
+        st.metric("IDR", f"Rp {pnl_sl_idr:,.0f}")
+
+    with r2:
+        st.markdown("**🟢 Take Profit**")
+        st.metric("USD", f"+{pnl_tp_usd:,.2f}")
+        st.metric("USC", f"+{pnl_tp_usc:,.1f}")
+        st.metric("IDR", f"Rp {pnl_tp_idr:,.0f}")
+
+    with r3:
+        st.markdown("**📊 Ringkasan**")
+        st.metric("Pip Value / lot", f"${pip_value_usd:,.4f}")
+        risk_reward = abs(pnl_tp_usd / pnl_sl_usd) if pnl_sl_usd != 0 else 0
+        st.metric("Risk : Reward", f"1 : {risk_reward:.2f}")
+        st.caption(f"Lot {lot} | SL {sl_pips} pips | TP {tp_pips} pips")
+
+    # Info box ringkas
+    st.markdown(f"""
+    <div class="info-box">
+    <strong>RINGKASAN CEPAT:</strong><br>
+    Lot: <b>{lot}</b> &nbsp;|&nbsp; SL: <b>{sl_pips} pips</b> &nbsp;|&nbsp; TP: <b>{tp_pips} pips</b><br>
+    ─────────────────────────────────────────────<br>
+    • SL  → {pnl_sl_usd:,.2f} USD  =  {pnl_sl_usc:,.1f} USC  =  Rp {pnl_sl_idr:,.0f}<br>
+    • TP  → +{pnl_tp_usd:,.2f} USD  =  +{pnl_tp_usc:,.1f} USC  =  Rp {pnl_tp_idr:,.0f}<br>
+    • Risk:Reward ≈ 1 : {risk_reward:.2f}
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # ========== CONVERTER ==========
+    st.subheader("🔄 Currency Converter (IDR • USD • USC)")
+    st.caption(f"Menggunakan kurs yang kamu input di atas (1 USD = Rp {kurs_idr:,.0f})")
+
+    tab1, tab2, tab3 = st.tabs(["💵 USD → IDR / USC", "🇮🇩 IDR → USD / USC", "🪙 USC → USD / IDR"])
+
+    with tab1:
+        usd_in = st.number_input("Masukkan jumlah USD", min_value=0.0, value=100.0, step=1.0, format="%.2f", key="conv_usd")
+        idr_out = usd_in * kurs_idr
+        usc_out = usd_in * 100
+        c1, c2 = st.columns(2)
+        with c1:
+            st.success(f"**{usd_in:,.2f} USD** = **Rp {idr_out:,.0f}**")
+        with c2:
+            st.info(f"**{usd_in:,.2f} USD** = **{usc_out:,.1f} USC**")
+
+    with tab2:
+        idr_in = st.number_input("Masukkan jumlah IDR (Rupiah)", min_value=0.0, value=1700000.0, step=1000.0, format="%.0f", key="conv_idr")
+        usd_out = idr_in / kurs_idr if kurs_idr > 0 else 0
+        usc_out2 = usd_out * 100
+        c1, c2 = st.columns(2)
+        with c1:
+            st.success(f"**Rp {idr_in:,.0f}** = **{usd_out:,.2f} USD**")
+        with c2:
+            st.info(f"**Rp {idr_in:,.0f}** = **{usc_out2:,.1f} USC**")
+
+    with tab3:
+        usc_in = st.number_input("Masukkan jumlah USC", min_value=0.0, value=1000.0, step=10.0, format="%.1f", key="conv_usc")
+        usd_out3 = usc_in / 100
+        idr_out3 = usd_out3 * kurs_idr
+        c1, c2 = st.columns(2)
+        with c1:
+            st.success(f"**{usc_in:,.1f} USC** = **{usd_out3:,.2f} USD**")
+        with c2:
+            st.info(f"**{usc_in:,.1f} USC** = **Rp {idr_out3:,.0f}**")
+
+    st.markdown("---")
+    st.caption("Catatan: Kalkulator ini mengikuti asumsi dari Model Compounding Straddle Hedging kamu (1 pip = $0.01 untuk 0.01 lot). Hasil bisa sedikit berbeda tergantung broker (spread, komisi, dll).")
