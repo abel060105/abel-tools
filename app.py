@@ -540,33 +540,58 @@ def show_orderbook_visual(bids, asks, aggregation=0.1, sort_order="Default (Harg
                 <span style="color:#ff4d4d;font-weight:600;">{item['size']:,.2f} <span style="color:#94a3b8;font-size:12px;">(${item['notional']:,.0f})</span></span>
             </div>""", unsafe_allow_html=True)
 
-# ================= TAMBAHAN REQUEST: GAMBAR ZONA LIKUIDITAS =================
+# ================= TAMBAHAN REQUEST: GAMBAR ZONA LIKUIDITAS - FIX MLETOT + JAM WIB + JUDUL DOBEL =================
 def generate_zona_image(high_heat_prices, symbol, exchange_label=""):
+    # FIX JUDUL DOBEL: symbol yang masuk formatnya "XAUT-USDT_OKX", jangan ditulis 2x
+    clean_symbol = symbol
+    clean_exchange = exchange_label
+    if "_" in symbol:
+        parts = symbol.split("_")
+        clean_symbol = parts[0]
+        clean_exchange = "_".join(parts[1:]) if len(parts) > 1 else exchange_label
+    if clean_exchange == symbol:
+        clean_exchange = ""
+    title_pair = clean_symbol if not clean_exchange else f"{clean_symbol} - {clean_exchange}"
+
+    # FIX JAM: server Streamlit itu UTC, +7 jadi WIB
+    now_wib = datetime.now() + timedelta(hours=7)
+    time_str = now_wib.strftime('%d %b %Y %H:%M:%S WIB')
+
     sorted_zones = sorted(high_heat_prices, key=lambda x: x["min_price"], reverse=True)
     n = len(sorted_zones)
     fig_w = 12
-    fig_h = max(4.5, 2.2 + n * 0.85)
+    fig_h = 3.2 + n * 1.05
     fig, ax = plt.subplots(figsize=(fig_w, fig_h), facecolor='#070a0f')
-    ax.set_xlim(0, 10); ax.set_ylim(0, fig_h); ax.axis('off')
-    fig.patch.set_facecolor('#070a0f'); ax.set_facecolor('#070a0f')
+    ax.set_xlim(0, 10)
+    ax.set_ylim(0, fig_h)
+    ax.axis('off')
+    fig.patch.set_facecolor('#070a0f')
+    ax.set_facecolor('#070a0f')
+
     ax.text(0.3, fig_h - 0.7, "⚡ ABEL FX - ZONA LIKUIDITAS TINGGI", color='#00d4ff', fontsize=16, fontweight='bold', va='center', ha='left')
-    ax.text(0.3, fig_h - 1.25, f"{symbol} - {exchange_label}  |  Heat Score > 15  |  {datetime.now().strftime('%d %b %Y %H:%M:%S WIB')}", color='#94a3b8', fontsize=11, va='center', ha='left')
+    ax.text(0.3, fig_h - 1.25, f"{title_pair}  |  Heat Score > 15  |  {time_str}", color='#94a3b8', fontsize=11, va='center', ha='left')
     ax.plot([0.3, 9.7], [fig_h - 1.6, fig_h - 1.6], color='#1e293b', linewidth=1.5)
-    y = fig_h - 2.4
+
     from matplotlib.patches import FancyBboxPatch
+    y_top = fig_h - 2.15
     for item in sorted_zones:
-        p_min=item['min_price']; p_max=item['max_price']; h_val=item['heat']
-        border='#ffffff' if h_val>=22.0 else ('#f5bc18' if h_val>=18.0 else '#e06b1e')
-        price_str=f"{p_min:,.1f}" if p_min==p_max else f"{p_min:,.1f} - {p_max:,.1f}"
-        box=FancyBboxPatch((0.3, y-0.55), 9.4, 0.75, boxstyle="round,pad=0.05,rounding_size=0.12", facecolor='#0b1118', edgecolor=border, linewidth=2.0)
+        p_min = item['min_price']; p_max = item['max_price']; h_val = item['heat']
+        border = '#ffffff' if h_val >= 22.0 else ('#f5bc18' if h_val >= 18.0 else '#e06b1e')
+        price_str = f"{p_min:,.1f}" if p_min == p_max else f"{p_min:,.1f} - {p_max:,.1f}"
+        box = FancyBboxPatch((0.3, y_top - 0.75), 9.4, 0.75, boxstyle="round,pad=0.02,rounding_size=0.12", facecolor='#0b1118', edgecolor=border, linewidth=2.0)
         ax.add_patch(box)
-        ax.text(0.6, y-0.18, "RENTANG HARGA", color='#94a3b8', fontsize=8, fontweight='bold', va='center', ha='left')
-        ax.text(0.6, y+0.18, price_str, color='white', fontsize=15, fontweight='bold', va='center', ha='left')
-        ax.text(9.4, y-0.18, f"Heat: {h_val:.1f}", color=border, fontsize=12, fontweight='bold', va='center', ha='right')
-        y-=0.95
-    ax.text(0.3, 0.25, "ABEL FX Tools - Screenshot zona ini untuk pengingat level. Bukan sinyal pasti, konfirmasi dengan struktur harga.", color='#64748b', fontsize=9, va='center', ha='left')
-    plt.tight_layout()
-    buf=io.BytesIO(); plt.savefig(buf, format='png', dpi=200, bbox_inches='tight', facecolor='#070a0f'); plt.close(fig); buf.seek(0)
+        # FIX MLETOT: harga & label DI DALAM kotak, tengah kotak = y_top - 0.375
+        center_y = y_top - 0.375
+        ax.text(0.6, center_y + 0.15, price_str, color='white', fontsize=15, fontweight='bold', va='center', ha='left')
+        ax.text(0.6, center_y - 0.20, "RENTANG HARGA", color='#94a3b8', fontsize=8, fontweight='bold', va='center', ha='left')
+        ax.text(9.4, center_y, f"Heat: {h_val:.1f}", color=border, fontsize=12, fontweight='bold', va='center', ha='right')
+        y_top -= 1.05
+
+    ax.text(0.3, 0.35, "ABEL FX Tools - Simpan zona ini untuk pengingat level. Bukan sinyal pasti, konfirmasi dengan struktur harga.", color='#64748b', fontsize=9, va='center', ha='left')
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', dpi=200, bbox_inches='tight', facecolor='#070a0f', pad_inches=0.2)
+    plt.close(fig)
+    buf.seek(0)
     return buf
 # ================= END GAMBAR ZONA =================
 
@@ -754,7 +779,7 @@ def render_rolling_heatmap(bids, asks, symbol):
         try:
             zona_buf = generate_zona_image(high_heat_prices, symbol, exchange_label=symbol)
             st.download_button(label="📥 Download Zona Likuiditas (.png)", data=zona_buf, file_name=f"Zona_Likuiditas_{symbol}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png", mime="image/png", use_container_width=True, key=f"dl_zona_{symbol}_{datetime.now().strftime('%H%M%S')}")
-            st.caption("Gambar berisi semua zona di atas + jam snapshot, biar bisa lo simpan / share.")
+            st.caption("Gambar berisi semua zona di atas + jam snapshot WIB, biar bisa lo simpan / share.")
         except Exception as e:
             st.warning(f"Gagal bikin gambar zona: {e}")
     else:
