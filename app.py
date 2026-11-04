@@ -18,8 +18,6 @@ st.set_page_config(
 )
 
 # ================= THEME & BACKGROUND =================
-# FIX BG: st.markdown sekarang buang <script>, jadi video gak pernah ke-play.
-# Solusi: suntik video lewat components.html ke parent document.
 def apply_theme_and_background(theme_mode, video_file):
     css_base = """
     <style>
@@ -60,7 +58,6 @@ def apply_theme_and_background(theme_mode, video_file):
     </style>
     """
     st.markdown(css_base, unsafe_allow_html=True)
-
     if theme_mode == "🖼️ Wallpaper Mode":
         try:
             with open(video_file, "rb") as f:
@@ -123,18 +120,14 @@ def apply_theme_and_background(theme_mode, video_file):
 # ==========================================
 st.sidebar.markdown('<div class="sidebar-brand">⚡ ABEL FX</div>', unsafe_allow_html=True)
 st.sidebar.markdown('<div class="sidebar-sub">Trading Tools</div>', unsafe_allow_html=True)
-
 st.sidebar.markdown("### 📌 Navigasi Menu")
-
 if "active_menu" not in st.session_state:
     st.session_state.active_menu = "🏠 Menu Utama"
-
 def sidebar_menu_button(label, icon, target_key):
     is_active = st.session_state.active_menu == target_key
     button_label = f"{icon}  {label}"
     active_border = "border-left: 4px solid #00d4ff !important;" if is_active else "border-left: 4px solid transparent !important;"
     active_bg = "background-color: rgba(0, 212, 255, 0.15) !important; color: #00d4ff !important;" if is_active else ""
-    
     st.markdown(f"""
     <style>
     div.stButton > button[kind="secondary"][data-baseweb="button"]:has-text("{label}") {{
@@ -147,42 +140,26 @@ def sidebar_menu_button(label, icon, target_key):
     }}
     </style>
     """, unsafe_allow_html=True)
-    
     if st.sidebar.button(button_label, use_container_width=True, key=f"btn_{target_key}"):
         st.session_state.active_menu = target_key
         st.rerun()
-
 sidebar_menu_button("Menu Utama", "🏠", "🏠 Menu Utama")
 sidebar_menu_button("Astrodox", "🔮", "🔮 Astrodox")
 sidebar_menu_button("Orderbook", "📊", "📊 Orderbook")
 sidebar_menu_button("Kalkulator", "🧮", "🧮 Kalkulator")
-
 menu = st.session_state.active_menu
-
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🎨 Tema Tampilan")
-selected_theme = st.sidebar.selectbox(
-    "Pilih Tema",
-    ["🖼️ Wallpaper Mode", "🌙 Dark Clean", "☀️ Light Clean"],
-    index=0,
-    label_visibility="collapsed"
-)
+selected_theme = st.sidebar.selectbox("Pilih Tema", ["🖼️ Wallpaper Mode", "🌙 Dark Clean", "☀️ Light Clean"], index=0, label_visibility="collapsed")
 apply_theme_and_background(selected_theme, "bg.mp4")
-
 st.sidebar.markdown("---")
-st.sidebar.markdown("""
-<div style="text-align:center; color:#94a3b8; font-size:12px; padding-top:5px;">
-    ABEL FX Tools
-</div>
-""", unsafe_allow_html=True)
+st.sidebar.markdown("""<div style="text-align:center; color:#94a3b8; font-size:12px; padding-top:5px;">ABEL FX Tools</div>""", unsafe_allow_html=True)
 
 # ==========================================
 # ASTRODOX ENGINE
 # ==========================================
 ZODIAC_SYMBOLS = ["♈", "♉", "♊", "♋", "♌", "♍", "♎", "♏", "♐", "♑", "♒", "♓"]
-ZODIAC_NAMES = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
-                "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
-
+ZODIAC_NAMES = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
 def compute_planetary_positions(dt_utc):
     year, month, day = dt_utc.year, dt_utc.month, dt_utc.day
     hour = dt_utc.hour + dt_utc.minute / 60.0 + dt_utc.second / 3600.0
@@ -207,12 +184,7 @@ def compute_planetary_positions(dt_utc):
     uranus_lon = (58.00 + 0.011728 * d) % 360
     neptune_lon = (358.00 + 0.005981 * d) % 360
     pluto_lon = (302.00 + 0.003970 * d) % 360
-    raw_degs = {
-        "Sun ☉": sun_lon, "Moon ☽": moon_lon, "Mercury ☿": mercury_lon,
-        "Venus ♀": venus_lon, "Mars ♂": mars_lon, "Jupiter ♃": jupiter_lon,
-        "Saturn ♄": saturn_lon, "Uranus ♅": uranus_lon, "Neptune ♆": neptune_lon,
-        "Pluto ♇": pluto_lon
-    }
+    raw_degs = {"Sun ☉": sun_lon, "Moon ☽": moon_lon, "Mercury ☿": mercury_lon, "Venus ♀": venus_lon, "Mars ♂": mars_lon, "Jupiter ♃": jupiter_lon, "Saturn ♄": saturn_lon, "Uranus ♅": uranus_lon, "Neptune ♆": neptune_lon, "Pluto ♇": pluto_lon}
     formatted_pos = {}
     for name, deg in raw_degs.items():
         z_idx = int(deg // 30)
@@ -220,7 +192,6 @@ def compute_planetary_positions(dt_utc):
         z_min = int(((deg % 30) - z_deg) * 60)
         formatted_pos[name] = f"{ZODIAC_NAMES[z_idx]} {z_deg}°{z_min:02d}'"
     return raw_degs, formatted_pos
-
 def generate_astrodox_wheel_only(target_date: datetime):
     dt_utc = target_date - timedelta(hours=7)
     planet_degrees, planet_positions = compute_planetary_positions(dt_utc)
@@ -235,10 +206,8 @@ def generate_astrodox_wheel_only(target_date: datetime):
     for i in range(12):
         theta_start = np.radians(i * 30)
         theta_end = np.radians((i + 1) * 30)
-        ax.bar(x=(theta_start + theta_end)/2, height=0.25, width=np.radians(30),
-               bottom=0.75, color=colors[i], alpha=0.6, edgecolor='#555555')
-        ax.text((theta_start + theta_end)/2, 0.88, ZODIAC_SYMBOLS[i],
-                color='white', fontsize=16, ha='center', va='center', fontweight='bold')
+        ax.bar(x=(theta_start + theta_end)/2, height=0.25, width=np.radians(30), bottom=0.75, color=colors[i], alpha=0.6, edgecolor='#555555')
+        ax.text((theta_start + theta_end)/2, 0.88, ZODIAC_SYMBOLS[i], color='white', fontsize=16, ha='center', va='center', fontweight='bold')
     for name, deg in planet_degrees.items():
         rad = np.radians(deg)
         ax.plot(rad, 0.70, marker='o', color='#00ffff', markersize=7)
@@ -287,7 +256,6 @@ def get_okx_orderbook(symbol="XAUT-USDT", limit=400):
         return bids, asks, None
     except Exception as e:
         return None, None, str(e)
-
 def get_okx_ticker(symbol="XAUT-USDT"):
     try:
         url = f"https://www.okx.com/api/v5/market/ticker?instId={symbol}"
@@ -297,31 +265,18 @@ def get_okx_ticker(symbol="XAUT-USDT"):
         t = data["data"][0]
         last = float(t["last"])
         open24h = float(t["open24h"])
-        return {
-            "last": last,
-            "high24h": float(t["high24h"]),
-            "low24h": float(t["low24h"]),
-            "vol24h": float(t["vol24h"]),
-            "change_pct": ((last - open24h) / open24h * 100) if open24h else 0
-        }
+        return {"last": last, "high24h": float(t["high24h"]), "low24h": float(t["low24h"]), "vol24h": float(t["vol24h"]), "change_pct": ((last - open24h) / open24h * 100) if open24h else 0}
     except:
         return None
-
 def get_okx_trades(symbol="XAUT-USDT", limit=40):
     try:
         url = f"https://www.okx.com/api/v5/market/trades?instId={symbol}&limit={limit}"
         r = requests.get(url, timeout=8)
         data = r.json()
         if data.get("code") != "0": return []
-        return [{
-            "time": datetime.fromtimestamp(int(t["ts"])/1000).strftime("%H:%M:%S"),
-            "price": float(t["px"]),
-            "size": float(t["sz"]),
-            "side": t["side"]
-        } for t in data["data"]]
+        return [{"time": datetime.fromtimestamp(int(t["ts"])/1000).strftime("%H:%M:%S"), "price": float(t["px"]), "size": float(t["sz"]), "side": t["side"]} for t in data["data"]]
     except:
         return []
-
 # ================= TAMBAHAN REQUEST: BINANCE + BYBIT + GABUNGAN =================
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Accept": "application/json"}
 def _safe_json(resp):
@@ -447,7 +402,6 @@ def get_combined_trades(symbol="XAUT-USDT", limit=40):
     all_trades.sort(key=lambda x: x["time"], reverse=True)
     return all_trades[:limit]
 # ================= END TAMBAHAN BINANCE/BYBIT =================
-
 def get_xauusd_price():
     try:
         r = requests.get("https://api.goldprice.dev/v1/prices?symbol=XAU-USD-SPOT", timeout=6)
@@ -464,7 +418,6 @@ def get_xauusd_price():
     except:
         pass
     return None
-
 def get_btcusd_price():
     try:
         r = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd", timeout=8)
@@ -481,7 +434,6 @@ def get_btcusd_price():
     except:
         pass
     return None
-
 def aggregate_orders(orders, aggregation: float, side: str = "bid"):
     if aggregation <= 0.1:
         return [[round(p, 1), s] for p, s in orders]
@@ -498,7 +450,6 @@ def aggregate_orders(orders, aggregation: float, side: str = "bid"):
     else:
         result.sort(key=lambda x: x[0])
     return result
-
 def show_orderbook_visual(bids, asks, aggregation=0.1, sort_order="Default (Harga)"):
     if not bids or not asks:
         st.warning("Data orderbook kosong")
@@ -513,10 +464,7 @@ def show_orderbook_visual(bids, asks, aggregation=0.1, sort_order="Default (Harg
     elif sort_order == "Size Besar → Kecil":
         bids_data = sorted(bids_data, key=lambda x: x["size"], reverse=True)
         asks_data = sorted(asks_data, key=lambda x: x["size"], reverse=True)
-    max_size = max(
-        max([x["size"] for x in bids_data[:40]], default=1),
-        max([x["size"] for x in asks_data[:40]], default=1)
-    )
+    max_size = max(max([x["size"] for x in bids_data[:40]], default=1), max([x["size"] for x in asks_data[:40]], default=1))
     max_display = 30 if aggregation >= 10 else 25
     c1, c2 = st.columns(2)
     with c1:
@@ -540,9 +488,18 @@ def show_orderbook_visual(bids, asks, aggregation=0.1, sort_order="Default (Harg
                 <span style="color:#ff4d4d;font-weight:600;">{item['size']:,.2f} <span style="color:#94a3b8;font-size:12px;">(${item['notional']:,.0f})</span></span>
             </div>""", unsafe_allow_html=True)
 
-# ================= TAMBAHAN REQUEST: GAMBAR ZONA LIKUIDITAS - FIX MLETOT + JAM WIB + JUDUL DOBEL =================
-def generate_zona_image(high_heat_prices, symbol, exchange_label=""):
-    # FIX JUDUL DOBEL: symbol yang masuk formatnya "XAUT-USDT_OKX", jangan ditulis 2x
+# ================= BARU: MAPPING XAUT -> XAUUSD / BTC -> BTCUSD =================
+# Selisih = Harga Token (XAUT/BTC) - Harga Spot (XAUUSD/BTCUSD)
+# Harga Spot setara zona = Harga Zona - Selisih
+def _calc_spot_mapping(symbol_clean, token_last, spot_ref):
+    if token_last is None or spot_ref is None:
+        return None, None, None
+    selisih = token_last - spot_ref
+    label = "XAUUSD" if "XAUT" in symbol_clean else ("BTCUSD" if "BTC" in symbol_clean else "SPOT")
+    return selisih, label, spot_ref
+
+# ================= GAMBAR ZONA LIKUIDITAS + MAPPING XAUUSD =================
+def generate_zona_image(high_heat_prices, symbol, exchange_label="", token_last=None, spot_ref=None):
     clean_symbol = symbol
     clean_exchange = exchange_label
     if "_" in symbol:
@@ -552,41 +509,52 @@ def generate_zona_image(high_heat_prices, symbol, exchange_label=""):
     if clean_exchange == symbol:
         clean_exchange = ""
     title_pair = clean_symbol if not clean_exchange else f"{clean_symbol} - {clean_exchange}"
-
-    # FIX JAM: server Streamlit itu UTC, +7 jadi WIB
     now_wib = datetime.now() + timedelta(hours=7)
     time_str = now_wib.strftime('%d %b %Y %H:%M:%S WIB')
-
+    selisih, spot_label, _ = _calc_spot_mapping(clean_symbol, token_last, spot_ref)
     sorted_zones = sorted(high_heat_prices, key=lambda x: x["min_price"], reverse=True)
     n = len(sorted_zones)
     fig_w = 12
-    fig_h = 3.2 + n * 1.05
+    # Header lebih tinggi karena ada baris mapping selisih
+    fig_h = 4.1 + n * 1.15
     fig, ax = plt.subplots(figsize=(fig_w, fig_h), facecolor='#070a0f')
     ax.set_xlim(0, 10)
     ax.set_ylim(0, fig_h)
     ax.axis('off')
     fig.patch.set_facecolor('#070a0f')
     ax.set_facecolor('#070a0f')
-
     ax.text(0.3, fig_h - 0.7, "⚡ ABEL FX - ZONA LIKUIDITAS TINGGI", color='#00d4ff', fontsize=16, fontweight='bold', va='center', ha='left')
     ax.text(0.3, fig_h - 1.25, f"{title_pair}  |  Heat Score > 15  |  {time_str}", color='#94a3b8', fontsize=11, va='center', ha='left')
-    ax.plot([0.3, 9.7], [fig_h - 1.6, fig_h - 1.6], color='#1e293b', linewidth=1.5)
-
+    # BARU: Baris mapping selisih di header gambar
+    if selisih is not None:
+        tag = "Premium" if selisih > 0 else ("Discount" if selisih < 0 else "Par")
+        token_name = "XAUT" if "XAUT" in clean_symbol else ("BTC" if "BTC" in clean_symbol else "TOKEN")
+        ax.text(0.3, fig_h - 1.75, f"{token_name} {token_last:,.1f}  |  {spot_label} {spot_ref:,.1f}  |  Selisih {selisih:+.1f} ({tag})  |  Rumus: Zona {spot_label} = Zona {token_name} - Selisih", color='#f5bc18', fontsize=11, fontweight='bold', va='center', ha='left')
+        ax.plot([0.3, 9.7], [fig_h - 2.05, fig_h - 2.05], color='#1e293b', linewidth=1.5)
+        y_top = fig_h - 2.65
+    else:
+        ax.plot([0.3, 9.7], [fig_h - 1.6, fig_h - 1.6], color='#1e293b', linewidth=1.5)
+        y_top = fig_h - 2.15
     from matplotlib.patches import FancyBboxPatch
-    y_top = fig_h - 2.15
     for item in sorted_zones:
         p_min = item['min_price']; p_max = item['max_price']; h_val = item['heat']
         border = '#ffffff' if h_val >= 22.0 else ('#f5bc18' if h_val >= 18.0 else '#e06b1e')
         price_str = f"{p_min:,.1f}" if p_min == p_max else f"{p_min:,.1f} - {p_max:,.1f}"
-        box = FancyBboxPatch((0.3, y_top - 0.75), 9.4, 0.75, boxstyle="round,pad=0.02,rounding_size=0.12", facecolor='#0b1118', edgecolor=border, linewidth=2.0)
+        # Kotak lebih tinggi dikit buat muat baris mapping XAUUSD
+        box = FancyBboxPatch((0.3, y_top - 0.85), 9.4, 0.85, boxstyle="round,pad=0.02,rounding_size=0.12", facecolor='#0b1118', edgecolor=border, linewidth=2.0)
         ax.add_patch(box)
-        # FIX MLETOT: harga & label DI DALAM kotak, tengah kotak = y_top - 0.375
-        center_y = y_top - 0.375
-        ax.text(0.6, center_y + 0.15, price_str, color='white', fontsize=15, fontweight='bold', va='center', ha='left')
-        ax.text(0.6, center_y - 0.20, "RENTANG HARGA", color='#94a3b8', fontsize=8, fontweight='bold', va='center', ha='left')
+        center_y = y_top - 0.425
+        ax.text(0.6, center_y + 0.22, price_str, color='white', fontsize=15, fontweight='bold', va='center', ha='left')
+        ax.text(0.6, center_y - 0.12, "RENTANG HARGA", color='#94a3b8', fontsize=8, fontweight='bold', va='center', ha='left')
+        # BARU: Mapping ke XAUUSD / BTCUSD di bawah harga zona
+        if selisih is not None:
+            if p_min == p_max:
+                spot_str = f"≈ {spot_label} {p_min - selisih:,.1f}"
+            else:
+                spot_str = f"≈ {spot_label} {p_min - selisih:,.1f} - {p_max - selisih:,.1f}"
+            ax.text(0.6, center_y - 0.32, spot_str, color='#00d4ff', fontsize=11, fontweight='bold', va='center', ha='left')
         ax.text(9.4, center_y, f"Heat: {h_val:.1f}", color=border, fontsize=12, fontweight='bold', va='center', ha='right')
-        y_top -= 1.05
-
+        y_top -= 1.15
     ax.text(0.3, 0.35, "ABEL FX Tools - Simpan zona ini untuk pengingat level. Bukan sinyal pasti, konfirmasi dengan struktur harga.", color='#64748b', fontsize=9, va='center', ha='left')
     buf = io.BytesIO()
     plt.savefig(buf, format='png', dpi=200, bbox_inches='tight', facecolor='#070a0f', pad_inches=0.2)
@@ -598,7 +566,7 @@ def generate_zona_image(high_heat_prices, symbol, exchange_label=""):
 # ==========================================
 # ROLLING HEATMAP COMPONENT
 # ==========================================
-def render_rolling_heatmap(bids, asks, symbol):
+def render_rolling_heatmap(bids, asks, symbol, ref_price=None, last_price=None):
     st.markdown("### 🔥 Orderbook Liquidity Heatmap (Bookmap Theme)")
     st.caption("Visualisasi konsentrasi likuiditas real-time. Kotak harga menggunakan border transparan sesuai warna heat dan sejajar presisi.")
     if "heatmap_history" not in st.session_state:
@@ -662,29 +630,8 @@ def render_rolling_heatmap(bids, asks, symbol):
         p_max = current_cluster[-1]["price"]
         max_h = max(c["heat"] for c in current_cluster)
         high_heat_prices.append({"min_price": p_min, "max_price": p_max, "heat": max_h})
-    bookmap_colorscale = [
-        [0.0, '#040b18'],
-        [0.2, '#0d2347'],
-        [0.5, '#1d547f'],
-        [0.75, '#e06b1e'],
-        [0.9, '#f5bc18'],
-        [1.0, '#ffffff']
-    ]
-    fig_heat = go.Figure(data=go.Heatmap(
-        z=z_matrix,
-        x=x_times,
-        y=y_prices,
-        colorscale=bookmap_colorscale,
-        hoverongaps=False,
-        colorbar=dict(
-            title=dict(text="Likuiditas", font=dict(color="#94a3b8")),
-            x=-0.12,
-            xanchor="right",
-            len=0.85,
-            thickness=14,
-            tickfont=dict(color="#94a3b8")
-        )
-    ))
+    bookmap_colorscale = [[0.0, '#040b18'], [0.2, '#0d2347'], [0.5, '#1d547f'], [0.75, '#e06b1e'], [0.9, '#f5bc18'], [1.0, '#ffffff']]
+    fig_heat = go.Figure(data=go.Heatmap(z=z_matrix, x=x_times, y=y_prices, colorscale=bookmap_colorscale, hoverongaps=False, colorbar=dict(title=dict(text="Likuiditas", font=dict(color="#94a3b8")), x=-0.12, xanchor="right", len=0.85, thickness=14, tickfont=dict(color="#94a3b8"))))
     annotations = []
     shapes = []
     for item in high_heat_prices:
@@ -698,53 +645,20 @@ def render_rolling_heatmap(bids, asks, symbol):
             color_code = "#f5bc18"
         else:
             color_code = "#e06b1e"
-        shapes.append(dict(
-            type="rect",
-            xref="paper", yref="y",
-            x0=1.0, x1=1.07,
-            y0=p_min - 0.5, 
-            y1=p_max + 0.5,
-            fillcolor="rgba(0,0,0,0)",
-            opacity=1.0,
-            line=dict(color=color_code, width=2)
-        ))
+        shapes.append(dict(type="rect", xref="paper", yref="y", x0=1.0, x1=1.07, y0=p_min - 0.5, y1=p_max + 0.5, fillcolor="rgba(0,0,0,0)", opacity=1.0, line=dict(color=color_code, width=2)))
         display_price_str = f"{p_min:,.1f}" if p_min == p_max else f"{p_min:,.1f}"
-        annotations.append(dict(
-            xref="paper", yref="y",
-            x=1.035,
-            y=p_max + 0.2,
-            text=f"<b>{display_price_str}</b>",
-            showarrow=False,
-            font=dict(size=9, color=color_code),
-            xanchor="center",
-            yanchor="bottom"
-        ))
-        annotations.append(dict(
-            xref="paper", yref="y",
-            x=1.085,
-            y=mid_p,
-            text=f"<b>{h_val:.1f}</b>",
-            showarrow=False,
-            font=dict(size=10, color=color_code),
-            xanchor="left",
-            yanchor="middle"
-        ))
-    fig_heat.update_layout(
-        title=dict(text=f"Liquidity Heatmap — {symbol}", font=dict(color="#ffffff")),
-        xaxis_title="",
-        yaxis_title="Harga",
-        height=540,
-        margin=dict(l=80, r=125, t=30, b=10),
-        paper_bgcolor='#070a0f',
-        plot_bgcolor='#070a0f',
-        font=dict(color='#94a3b8'),
-        yaxis=dict(side="right", gridcolor="#111827", zeroline=False),
-        xaxis=dict(gridcolor="#111827"),
-        shapes=shapes,
-        annotations=annotations
-    )
+        annotations.append(dict(xref="paper", yref="y", x=1.035, y=p_max + 0.2, text=f"<b>{display_price_str}</b>", showarrow=False, font=dict(size=9, color=color_code), xanchor="center", yanchor="bottom"))
+        annotations.append(dict(xref="paper", yref="y", x=1.085, y=mid_p, text=f"<b>{h_val:.1f}</b>", showarrow=False, font=dict(size=10, color=color_code), xanchor="left", yanchor="middle"))
+    fig_heat.update_layout(title=dict(text=f"Liquidity Heatmap — {symbol}", font=dict(color="#ffffff")), xaxis_title="", yaxis_title="Harga", height=540, margin=dict(l=80, r=125, t=30, b=10), paper_bgcolor='#070a0f', plot_bgcolor='#070a0f', font=dict(color='#94a3b8'), yaxis=dict(side="right", gridcolor="#111827", zeroline=False), xaxis=dict(gridcolor="#111827"), shapes=shapes, annotations=annotations)
     st.plotly_chart(fig_heat, use_container_width=True)
     st.markdown("#### ⚡ Zona Likuiditas Tinggi (Heat Score > 15)")
+    # BARU: Info selisih + mapping di web juga, biar gak cuma di gambar
+    clean_for_label = symbol.split("_")[0] if "_" in symbol else symbol
+    selisih_web, spot_label_web, _ = _calc_spot_mapping(clean_for_label, last_price, ref_price)
+    if selisih_web is not None:
+        tag_web = "Premium" if selisih_web > 0 else ("Discount" if selisih_web < 0 else "Par")
+        token_name_web = "XAUT" if "XAUT" in clean_for_label else ("BTC" if "BTC" in clean_for_label else "TOKEN")
+        st.info(f"📐 Mapping: {token_name_web} {last_price:,.1f} | {spot_label_web} {ref_price:,.1f} | Selisih {selisih_web:+.1f} ({tag_web}) — Zona {spot_label_web} = Zona {token_name_web} - Selisih")
     if high_heat_prices:
         cols = st.columns(min(3, len(high_heat_prices)))
         for idx, item in enumerate(sorted(high_heat_prices, key=lambda x: x["min_price"], reverse=True)):
@@ -759,6 +673,14 @@ def render_rolling_heatmap(bids, asks, symbol):
                 border_color = "#e06b1e"
             display_price_str = f"{p_min:,.1f}" if p_min == p_max else f"{p_min:,.1f} - {p_max:,.1f}"
             with cols[idx % len(cols)]:
+                # Tambah mapping di kartu web
+                mapping_html = ""
+                if selisih_web is not None:
+                    if p_min == p_max:
+                        spot_str_web = f"{p_min - selisih_web:,.1f}"
+                    else:
+                        spot_str_web = f"{p_min - selisih_web:,.1f} - {p_max - selisih_web:,.1f}"
+                    mapping_html = f"""<div style="color:#00d4ff;font-weight:700;font-size:13px;margin-top:4px;">≈ {spot_label_web} {spot_str_web}</div>"""
                 st.markdown(f"""
                 <div style="border: 2px solid {border_color}; background: transparent; 
                      border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; display: flex; 
@@ -766,6 +688,7 @@ def render_rolling_heatmap(bids, asks, symbol):
                     <div>
                         <span style="color: #94a3b8; font-size: 11px; display: block; font-weight: 600;">RENTANG HARGA</span>
                         <span style="color: #ffffff; font-weight: 800; font-size: 16px;">{display_price_str}</span>
+                        {mapping_html}
                     </div>
                     <div style="background: transparent; border: 1px solid {border_color}; color: {border_color}; font-weight: 800; font-size: 13px; 
                          padding: 4px 8px; border-radius: 6px;">
@@ -773,13 +696,12 @@ def render_rolling_heatmap(bids, asks, symbol):
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
-    # === TAMBAHAN REQUEST: DOWNLOAD ZONA ===
     if high_heat_prices:
         st.markdown("---")
         try:
-            zona_buf = generate_zona_image(high_heat_prices, symbol, exchange_label=symbol)
+            zona_buf = generate_zona_image(high_heat_prices, symbol, exchange_label=symbol, token_last=last_price, spot_ref=ref_price)
             st.download_button(label="📥 Download Zona Likuiditas (.png)", data=zona_buf, file_name=f"Zona_Likuiditas_{symbol}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png", mime="image/png", use_container_width=True, key=f"dl_zona_{symbol}_{datetime.now().strftime('%H%M%S')}")
-            st.caption("Gambar berisi semua zona di atas + jam snapshot WIB, biar bisa lo simpan / share.")
+            st.caption("Gambar berisi zona + mapping XAUUSD + jam snapshot WIB, biar bisa lo simpan / share.")
         except Exception as e:
             st.warning(f"Gagal bikin gambar zona: {e}")
     else:
@@ -790,7 +712,6 @@ def render_rolling_heatmap(bids, asks, symbol):
 # ==========================================
 if menu == "🏠 Menu Utama":
     pass
-
 elif menu == "🔮 Astrodox":
     st.title("🔮 Astrodox Wheel")
     st.caption("Roda Transit Planet + Rekap Aspek Geometri | Siap untuk di-copy ke AI eksternal")
@@ -817,13 +738,7 @@ elif menu == "🔮 Astrodox":
     st.pyplot(fig, use_container_width=True)
     col_dl1, col_dl2 = st.columns([1, 3])
     with col_dl1:
-        st.download_button(
-            label="📥 Download Roda (.png)",
-            data=img_buf,
-            file_name=f"Astrodox_Wheel_{event_datetime.strftime('%Y%m%d_%H%M')}.png",
-            mime="image/png",
-            use_container_width=True
-        )
+        st.download_button(label="📥 Download Roda (.png)", data=img_buf, file_name=f"Astrodox_Wheel_{event_datetime.strftime('%Y%m%d_%H%M')}.png", mime="image/png", use_container_width=True)
     st.markdown("---")
     st.subheader("📋 Dashboard Info Astrodox")
     pos_lines = []
@@ -840,79 +755,27 @@ elif menu == "🔮 Astrodox":
 - HIJAU  (Trine 120°)            : {aspect_counts['hijau']} Garis  → Expansion Trend
 - BIRU   (Sextile 60°)           : {aspect_counts['biru']} Garis  → Retest Zone
 - KUNING (Conjunction 0°)        : {aspect_counts['kuning']} Garis  → Turning Point"""
-    info_html = f"""
-    <div class="info-box">
-    <strong>POSISI PLANET TRANSIT ({event_datetime.strftime('%d %b %Y %H:%M WIB')}):</strong><br>
-    {"─" * 68}<br>
-    {pos_text.replace(chr(10), "<br>")}<br><br>
-    <strong>REKAP GARIS ASPEK GEOMETRI ASTRODOX:</strong><br>
-    {"─" * 68}<br>
-    {aspek_text.replace(chr(10), "<br>")}
-    </div>
-    """
+    info_html = f"""<div class="info-box"><strong>POSISI PLANET TRANSIT ({event_datetime.strftime('%d %b %Y %H:%M WIB')}):</strong><br>{"─" * 68}<br>{pos_text.replace(chr(10), "<br>")}<br><br><strong>REKAP GARIS ASPEK GEOMETRI ASTRODOX:</strong><br>{"─" * 68}<br>{aspek_text.replace(chr(10), "<br>")}</div>"""
     st.markdown(info_html, unsafe_allow_html=True)
     st.markdown("---")
     st.subheader("📋 Papan Prompt 1 — Full Analysis (Makro + Geopolitik + 3 Setup)")
     prompt_full_1 = f"""Cek dan update harga XAUUSD (Gold) secara realtime saat ini terlebih dahulu melalui pencarian/web.
-
 Kamu adalah Senior Quantitative Trader + Macro Analyst + Financial Astrologer spesialis XAUUSD.
-
 Gunakan data Astrodox di bawah ini + pengetahuan teknikal, makro, dan geopolitik terbaru kamu untuk menghasilkan analisis lengkap.
-
 === DATA ASTRODOX TRANSIT ===
 Waktu: {event_datetime.strftime('%d %B %Y %H:%M WIB')}
-
 POSISI PLANET:
 {pos_text}
-
 REKAP GARIS ASPEK GEOMETRI:
 {aspek_text}
-
 === INSTRUKSI OUTPUT (WAJIB LENGKAP) ===
-
-1. **Harga Realtime XAUUSD**
-   - Tampilkan harga market Gold saat ini hasil pengecekan Anda.
-
-2. **Rekap Data News & Indikator Pendukung**
-   - Tentukan sendiri news utama yang relevan (NFP / CPI / FOMC / dll) berdasarkan waktu di atas.
-   - Tampilkan data pendukung yang paling relevan (Actual | Forecast | Previous).
-   - AI yang menentukan indikator mana yang paling penting.
-
-3. **Analisis Makro**
-   - Bias makro saat ini (Bullish USD / Bearish USD / Neutral).
-   - Skor dan alasan singkat berdasarkan data pendukung.
-
-4. **Update Geopolitik Terbaru**
-   - Isu geopolitik krusial terkini yang mempengaruhi XAUUSD & USD.
-   - Dampak gabungan ke USD dan XAUUSD.
-
-5. **Kesimpulan AI untuk Entry**
-   - Bias utama: BULLISH / BEARISH / WHIPSAW / NEUTRAL
-   - Peringatan Whipsaw (jika ada)
-   - Proyeksi Besaran Range (hanya tampilkan ukuran besaran jaraknya saja dalam bentuk Pips / Dollar, BUKAN harga dari sekian sampai sekian):
-     - Sweep Range (contoh: 80-150 Pips / $8.0-$15.0)
-     - Trend Range (contoh: 200-350 Pips / $20.0-$35.0)
-     - Reversal Range (contoh: 80-130 Pips / $8.0-$13.0)
-
-6. **3 Setup Entry Lengkap**
-   A. Setup dari AI Macro Engine
-      - Zona Entry
-      - Stop Loss
-      - Take Profit
-
-   B. Setup dari Astrodox Engine
-      - Zona Entry (berdasarkan aspek dominan)
-      - Stop Loss
-      - Take Profit
-
-   C. Setup dari Orderflow / SMC / Liquidity
-      - BSL / SSL
-      - Supply & Demand / Order Block
-      - FVG
-      - Entry Zone + SL + TP (dua arah jika whipsaw)
-
+1. **Harga Realtime XAUUSD** - Tampilkan harga market Gold saat ini hasil pengecekan Anda.
+2. **Rekap Data News & Indikator Pendukung** - Tentukan sendiri news utama yang relevan (NFP / CPI / FOMC / dll) berdasarkan waktu di atas.
+3. **Analisis Makro** - Bias makro saat ini (Bullish USD / Bearish USD / Neutral).
+4. **Update Geopolitik Terbaru** - Isu geopolitik krusial terkini yang mempengaruhi XAUUSD & USD.
+5. **Kesimpulan AI untuk Entry** - Bias utama: BULLISH / BEARISH / WHIPSAW / NEUTRAL
+6. **3 Setup Entry Lengkap** A. Macro B. Astrodox C. Orderflow / SMC / Liquidity
 Format jawaban harus rapi, jelas, dan siap dibaca trader.
-Fokus pada confluence Astro + Makro + Orderflow.
 """
     st.markdown("Salin prompt bagian 1 di bawah ini lalu paste ke AI (Grok / Claude / GPT / dll):")
     st.code(prompt_full_1, language="text")
@@ -920,37 +783,24 @@ Fokus pada confluence Astro + Makro + Orderflow.
     st.markdown("---")
     st.subheader("📋 Papan Prompt 2 — Simple Astrodox Only")
     prompt_simple = f"""Kamu adalah Senior Quantitative Trader + Financial Astrologer spesialis XAUUSD.
-
 Gunakan data Astrodox di bawah ini + pengetahuan teknikal & makro kamu untuk memberikan proyeksi range pips yang presisi.
-
 === DATA ASTRODOX TRANSIT ===
 Waktu: {event_datetime.strftime('%d %B %Y %H:%M WIB')}
-
 POSISI PLANET:
 {pos_text}
-
 REKAP GARIS ASPEK GEOMETRI:
 {aspek_text}
-
 === INSTRUKSI OUTPUT ===
-Berikan jawaban dalam format ringkas dan jelas:
-
 1. **Bias Utama** : BULLISH / BEARISH / WHIPSAW / NEUTRAL
-2. **Peringatan Whipsaw** : (hanya jika ada risiko whipsaw yang signifikan, jika tidak ada cukup tulis "Tidak signifikan")
-3. **Sweep Range** : (hanya tampilkan ukuran besaran jaraknya saja, contoh: 80-150 Pips / $8.0-$15.0)
-4. **Trend Range** : (hanya tampilkan ukuran besaran jaraknya saja, contoh: 200-350 Pips / $20.0-$35.0)
-5. **Reversal Range** : (hanya tampilkan ukuran besaran jaraknya saja, contoh: 80-130 Pips / $8.0-$13.0)
-
-Catatan:
-- Fokus hanya pada confluence Astro + Price Action / SMC structure.
-- Tidak perlu memberikan zona entry, SL, atau TP (sudah di-handle di sistem lain).
-- Jelaskan singkat alasan bias berdasarkan aspek dominan (Merah/Hijau/Biru/Kuning).
+2. **Peringatan Whipsaw** : (hanya jika ada risiko whipsaw yang signifikan)
+3. **Sweep Range** : (hanya tampilkan ukuran besaran jaraknya saja)
+4. **Trend Range** : (hanya tampilkan ukuran besaran jaraknya saja)
+5. **Reversal Range** : (hanya tampilkan ukuran besaran jaraknya saja)
 """
     st.markdown("Salin prompt di bawah ini lalu paste ke AI (Grok / Claude / GPT / dll):")
     st.code(prompt_simple, language="text")
     st.caption("Klik ikon copy di pojok kanan atas blok kode di atas untuk menyalin prompt.")
     st.markdown("---")
-
 elif menu == "📊 Orderbook":
     st.title("📊 Orderbook & Market Data")
     c1, c2, c3, c4 = st.columns([1.6, 1.5, 1.2, 1.2])
@@ -959,12 +809,7 @@ elif menu == "📊 Orderbook":
     with c2:
         exchange = st.selectbox("Exchange", ["OKX", "Binance", "Bybit", "Gabungan 3 Exchange"], key="exchange_select", index=0)
     with c3:
-        aggregation = st.selectbox(
-            "Aggregation",
-            [0.1, 1, 10, 100, 1000, 10000],
-            index=0,
-            format_func=lambda x: f"{x}"
-        )
+        aggregation = st.selectbox("Aggregation", [0.1, 1, 10, 100, 1000, 10000], index=0, format_func=lambda x: f"{x}")
     with c4:
         st.write("")
         st.write("")
@@ -1006,16 +851,7 @@ elif menu == "📊 Orderbook":
                 ref_price = get_xauusd_price()
             else:
                 ref_price = get_btcusd_price()
-            st.session_state.market_data = {
-                "bids": bids,
-                "asks": asks,
-                "err": err,
-                "ticker": ticker,
-                "trades": trades,
-                "symbol": symbol,
-                "exchange": exchange,
-                "ref_price": ref_price
-            }
+            st.session_state.market_data = {"bids": bids, "asks": asks, "err": err, "ticker": ticker, "trades": trades, "symbol": symbol, "exchange": exchange, "ref_price": ref_price}
     data = st.session_state.get("market_data", {})
     ticker = data.get("ticker")
     trades = data.get("trades", [])
@@ -1038,35 +874,13 @@ elif menu == "📊 Orderbook":
             total = buy_vol + sell_vol or 1
             buy_pct = buy_vol / total * 100
             st.markdown("#### Dominasi Buyer vs Seller")
-            st.markdown(f"""
-            <div style="display:flex;height:28px;border-radius:8px;overflow:hidden;margin-bottom:6px;">
-                <div style="width:{buy_pct}%;background:#00c853;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:13px;">{buy_pct:.1f}%</div>
-                <div style="width:{100-buy_pct}%;background:#ff1744;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:13px;">{100-buy_pct:.1f}%</div>
-            </div>
-            <div style="display:flex;justify-content:space-between;font-size:13px;">
-                <span style="color:#00c853;">🟢 Buyer: {buy_vol:,.2f}</span>
-                <span style="color:#ff1744;">🔴 Seller: {sell_vol:,.2f}</span>
-            </div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div style="display:flex;height:28px;border-radius:8px;overflow:hidden;margin-bottom:6px;"><div style="width:{buy_pct}%;background:#00c853;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:13px;">{buy_pct:.1f}%</div><div style="width:{100-buy_pct}%;background:#ff1744;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:13px;">{100-buy_pct:.1f}%</div></div><div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:#00c853;">🟢 Buyer: {buy_vol:,.2f}</span><span style="color:#ff1744;">🔴 Seller: {sell_vol:,.2f}</span></div>""", unsafe_allow_html=True)
     st.markdown("---")
     if symbol == "XAUT-USDT":
         st.subheader("📈 XAUUSD (OANDA) vs XAUT")
         col1, col2 = st.columns([1.4, 1])
         with col1:
-            tv_code = """
-            <div class="tradingview-widget-container">
-              <div class="tradingview-widget-container__widget"></div>
-              <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js" async>
-              {
-              "symbols": [["OANDA:XAUUSD|1D"]],
-              "chartOnly": false, "width": "100%", "height": 320, "locale": "en", "colorTheme": "dark", "autosize": true,
-              "showVolume": false, "showMA": false, "hideDateRanges": false, "hideMarketStatus": false, "hideSymbolLogo": false,
-              "scalePosition": "right", "scaleMode": "Normal", "fontFamily": "-apple-system, BlinkMacSystemFont, Trebuchet MS, Roboto, sans-serif",
-              "fontSize": "10", "noTimeScale": false, "valuesTracking": "1", "changeMode": "price-and-percent", "chartType": "area",
-              "lineWidth": 2, "lineType": 0, "dateRanges": ["1d|1","1m|30","3m|60","12m|1D","60m|1W","all|1M"]
-            }
-              </script>
-            </div>
-            """
+            tv_code = """<div class="tradingview-widget-container"><div class="tradingview-widget-container__widget"></div><script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js" async>{"symbols": [["OANDA:XAUUSD|1D"]], "chartOnly": false, "width": "100%", "height": 320, "locale": "en", "colorTheme": "dark", "autosize": true, "showVolume": false, "showMA": false, "hideDateRanges": false, "hideMarketStatus": false, "hideSymbolLogo": false, "scalePosition": "right", "scaleMode": "Normal", "fontFamily": "-apple-system, BlinkMacSystemFont, Trebuchet MS, Roboto, sans-serif", "fontSize": "10", "noTimeScale": false, "valuesTracking": "1", "changeMode": "price-and-percent", "chartType": "area", "lineWidth": 2, "lineType": 0, "dateRanges": ["1d|1","1m|30","3m|60","12m|1D","60m|1W","all|1M"]}</script></div>"""
             components.html(tv_code, height=340)
         with col2:
             st.markdown("#### Perhitungan Selisih XAUT")
@@ -1080,21 +894,7 @@ elif menu == "📊 Orderbook":
         st.subheader("₿ BTCUSD (OANDA) vs BTC-USDT")
         col1, col2 = st.columns([1.4, 1])
         with col1:
-            tv_code = """
-            <div class="tradingview-widget-container">
-              <div class="tradingview-widget-container__widget"></div>
-              <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js" async>
-              {
-              "symbols": [["OANDA:BTCUSD|1D"]],
-              "chartOnly": false, "width": "100%", "height": 320, "locale": "en", "colorTheme": "dark", "autosize": true,
-              "showVolume": false, "showMA": false, "hideDateRanges": false, "hideMarketStatus": false, "hideSymbolLogo": false,
-              "scalePosition": "right", "scaleMode": "Normal", "fontFamily": "-apple-system, BlinkMacSystemFont, Trebuchet MS, Roboto, sans-serif",
-              "fontSize": "10", "noTimeScale": false, "valuesTracking": "1", "changeMode": "price-and-percent", "chartType": "area",
-              "lineWidth": 2, "lineType": 0, "dateRanges": ["1d|1","1m|30","3m|60","12m|1D","60m|1W","all|1M"]
-            }
-              </script>
-            </div>
-            """
+            tv_code = """<div class="tradingview-widget-container"><div class="tradingview-widget-container__widget"></div><script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js" async>{"symbols": [["OANDA:BTCUSD|1D"]], "chartOnly": false, "width": "100%", "height": 320, "locale": "en", "colorTheme": "dark", "autosize": true, "showVolume": false, "showMA": false, "hideDateRanges": false, "hideMarketStatus": false, "hideSymbolLogo": false, "scalePosition": "right", "scaleMode": "Normal", "fontFamily": "-apple-system, BlinkMacSystemFont, Trebuchet MS, Roboto, sans-serif", "fontSize": "10", "noTimeScale": false, "valuesTracking": "1", "changeMode": "price-and-percent", "chartType": "area", "lineWidth": 2, "lineType": 0, "dateRanges": ["1d|1","1m|30","3m|60","12m|1D","60m|1W","all|1M"]}</script></div>"""
             components.html(tv_code, height=340)
         with col2:
             st.markdown("#### Perhitungan Selisih BTC")
@@ -1113,7 +913,7 @@ elif menu == "📊 Orderbook":
     elif bids and asks:
         show_orderbook_visual(bids, asks, aggregation=aggregation, sort_order=sort_order)
         st.markdown("---")
-        render_rolling_heatmap(bids, asks, f"{symbol}_{exchange}")
+        render_rolling_heatmap(bids, asks, f"{symbol}_{exchange}", ref_price=ref_price, last_price=(ticker["last"] if ticker else None))
     elif err:
         st.error(err)
     else:
@@ -1130,48 +930,28 @@ elif menu == "📊 Orderbook":
     if auto_refresh:
         time.sleep(3)
         st.rerun()
-
 elif menu == "🧮 Kalkulator":
     st.title("🧮 Kalkulator PnL & Converter")
     st.caption("Kalkulator khusus untuk teknik War News / Straddle Hedging XAUUSD | Kurs bisa diubah sendiri")
     st.markdown("---")
     st.subheader("💱 Kurs Saat Ini")
-    kurs_idr = st.number_input(
-        "1 USD = ... IDR",
-        min_value=1000.0,
-        max_value=100000.0,
-        value=17000.0,
-        step=100.0,
-        format="%.0f",
-        help="Masukkan kurs 1 USD ke Rupiah. Contoh: 17000"
-    )
+    kurs_idr = st.number_input("1 USD = ... IDR", min_value=1000.0, max_value=100000.0, value=17000.0, step=100.0, format="%.0f", help="Masukkan kurs 1 USD ke Rupiah. Contoh: 17000")
     kurs_usc_to_idr = kurs_idr / 100.0
     c1, c2, c3 = st.columns(3)
-    with c1:
-        st.metric("1 USD", f"Rp {kurs_idr:,.0f}")
-    with c2:
-        st.metric("1 USC", f"Rp {kurs_usc_to_idr:,.2f}")
-    with c3:
-        st.metric("100 USC", f"Rp {kurs_idr:,.0f}")
+    with c1: st.metric("1 USD", f"Rp {kurs_idr:,.0f}")
+    with c2: st.metric("1 USC", f"Rp {kurs_usc_to_idr:,.2f}")
+    with c3: st.metric("100 USC", f"Rp {kurs_idr:,.0f}")
     st.markdown("---")
     st.subheader("📈 Kalkulator PnL XAUUSD")
-    account_type = st.radio(
-        "Jenis Akun",
-        ["Standard", "Cent"],
-        horizontal=True,
-        help="Standard: 1 lot = $1 per pip | Cent: 1 lot Cent = $0.01 per pip (1/100 dari Standard)"
-    )
+    account_type = st.radio("Jenis Akun", ["Standard", "Cent"], horizontal=True, help="Standard: 1 lot = $1 per pip | Cent: 1 lot Cent = $0.01 per pip (1/100 dari Standard)")
     if account_type == "Standard":
         st.caption("Asumsi Standard: **1 pip = $0.01 untuk 0.01 lot** → **1 pip = $1 per 1.00 lot**")
     else:
         st.caption("Asumsi Cent: **1 pip = $0.0001 untuk 0.01 lot Cent** → **1 pip = $0.01 per 1.00 lot Cent**")
     col_lot, col_sl, col_tp = st.columns(3)
-    with col_lot:
-        lot = st.number_input("Lot Size", min_value=0.01, max_value=100.0, value=0.01, step=0.01, format="%.2f")
-    with col_sl:
-        sl_pips = st.number_input("SL (Pips)", min_value=0.0, max_value=10000.0, value=1500.0, step=1.0, format="%.1f")
-    with col_tp:
-        tp_pips = st.number_input("TP (Pips)", min_value=0.0, max_value=10000.0, value=4000.0, step=1.0, format="%.1f")
+    with col_lot: lot = st.number_input("Lot Size", min_value=0.01, max_value=100.0, value=0.01, step=0.01, format="%.2f")
+    with col_sl: sl_pips = st.number_input("SL (Pips)", min_value=0.0, max_value=10000.0, value=1500.0, step=1.0, format="%.1f")
+    with col_tp: tp_pips = st.number_input("TP (Pips)", min_value=0.0, max_value=10000.0, value=4000.0, step=1.0, format="%.1f")
     if account_type == "Standard":
         pip_value_usd = lot * 1.0
     else:
@@ -1200,16 +980,7 @@ elif menu == "🧮 Kalkulator":
         risk_reward = abs(pnl_tp_usd / pnl_sl_usd) if pnl_sl_usd != 0 else 0
         st.metric("Risk : Reward", f"1 : {risk_reward:.2f}")
         st.caption(f"{account_type} | Lot {lot} | SL {sl_pips} | TP {tp_pips}")
-    st.markdown(f"""
-    <div class="info-box">
-    <strong>RINGKASAN CEPAT:</strong><br>
-    Akun: <b>{account_type}</b> &nbsp;|&nbsp; Lot: <b>{lot}</b> &nbsp;|&nbsp; SL: <b>{sl_pips} pips</b> &nbsp;|&nbsp; TP: <b>{tp_pips} pips</b><br>
-    ─────────────────────────────────────────────<br>
-    - SL  → {pnl_sl_usd:,.2f} USD  =  {pnl_sl_usc:,.1f} USC  =  Rp {pnl_sl_idr:,.0f}<br>
-    - TP  → +{pnl_tp_usd:,.2f} USD  =  +{pnl_tp_usc:,.1f} USC  =  Rp {pnl_tp_idr:,.0f}<br>
-    - Risk:Reward ≈ 1 : {risk_reward:.2f}
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f"""<div class="info-box"><strong>RINGKASAN CEPAT:</strong><br>Akun: <b>{account_type}</b> &nbsp;|&nbsp; Lot: <b>{lot}</b> &nbsp;|&nbsp; SL: <b>{sl_pips} pips</b> &nbsp;|&nbsp; TP: <b>{tp_pips} pips</b><br>─────────────────────────────────────────────<br>- SL  → {pnl_sl_usd:,.2f} USD  =  {pnl_sl_usc:,.1f} USC  =  Rp {pnl_sl_idr:,.0f}<br>- TP  → +{pnl_tp_usd:,.2f} USD  =  +{pnl_tp_usc:,.1f} USC  =  Rp {pnl_tp_idr:,.0f}<br>- Risk:Reward ≈ 1 : {risk_reward:.2f}</div>""", unsafe_allow_html=True)
     st.markdown("---")
     st.subheader("🔄 Currency Converter (IDR • USD • USC)")
     st.caption(f"Menggunakan kurs yang kamu input di atas (1 USD = Rp {kurs_idr:,.0f})")
@@ -1219,27 +990,21 @@ elif menu == "🧮 Kalkulator":
         idr_out = usd_in * kurs_idr
         usc_out = usd_in * 100
         c1, c2 = st.columns(2)
-        with c1:
-            st.success(f"**{usd_in:,.2f} USD** = **Rp {idr_out:,.0f}**")
-        with c2:
-            st.info(f"**{usd_in:,.2f} USD** = **{usc_out:,.1f} USC**")
+        with c1: st.success(f"**{usd_in:,.2f} USD** = **Rp {idr_out:,.0f}**")
+        with c2: st.info(f"**{usd_in:,.2f} USD** = **{usc_out:,.1f} USC**")
     with tab2:
         idr_in = st.number_input("Masukkan jumlah IDR (Rupiah)", min_value=0.0, value=1700000.0, step=1000.0, format="%.0f", key="conv_idr")
         usd_out = idr_in / kurs_idr if kurs_idr > 0 else 0
         usc_out2 = usd_out * 100
         c1, c2 = st.columns(2)
-        with c1:
-            st.success(f"**Rp {idr_in:,.0f}** = **{usd_out:,.2f} USD**")
-        with c2:
-            st.info(f"**Rp {idr_in:,.0f}** = **{usc_out2:,.1f} USC**")
+        with c1: st.success(f"**Rp {idr_in:,.0f}** = **{usd_out:,.2f} USD**")
+        with c2: st.info(f"**Rp {idr_in:,.0f}** = **{usc_out2:,.1f} USC**")
     with tab3:
         usc_in = st.number_input("Masukkan jumlah USC", min_value=0.0, value=1000.0, step=10.0, format="%.1f", key="conv_usc")
         usd_out3 = usc_in / 100
         idr_out3 = usd_out3 * kurs_idr
         c1, c2 = st.columns(2)
-        with c1:
-            st.success(f"**{usc_in:,.1f} USC** = **{usd_out3:,.2f} USD**")
-        with c2:
-            st.info(f"**{usc_in:,.1f} USC** = **Rp {idr_out3:,.0f}**")
+        with c1: st.success(f"**{usc_in:,.1f} USC** = **{usd_out3:,.2f} USD**")
+        with c2: st.info(f"**{usc_in:,.1f} USC** = **Rp {idr_out3:,.0f}**")
     st.markdown("---")
     st.caption("Catatan: Standard = 1 lot = $1/pip | Cent = 1 lot = $0.01/pip. Hasil bisa sedikit berbeda tergantung broker (spread, komisi, dll).")
