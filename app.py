@@ -18,6 +18,7 @@ st.set_page_config(
 )
 
 # ================= THEME & BACKGROUND =================
+# === DIPULIHKAN 100% KE SKRIP AWAL LO, TIDAK DIKOMPRES LAGI ===
 def apply_theme_and_background(theme_mode, video_file):
     css_base = """
     <style>
@@ -64,17 +65,41 @@ def apply_theme_and_background(theme_mode, video_file):
             with open(video_file, "rb") as f:
                 data = f.read()
             encoded = base64.b64encode(data).decode()
+            
             css_wallpaper = """
             <style>
-                .stApp { background: transparent !important; }
-                #bg-video { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -999; object-fit: cover; }
-                @media only screen and (max-width: 768px) { #bg-video { object-fit: cover; } }
-                section[data-testid="stSidebar"] { background: rgba(10, 15, 28, 0.85) !important; }
-                .welcome-box, .info-box { background: rgba(11, 16, 30, 0.92) !important; backdrop-filter: blur(12px); border: 1px solid rgba(0, 212, 255, 0.3) !important; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5); }
+                .stApp {
+                    background: transparent !important;
+                }
+                #bg-video {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100vw;
+                    height: 100vh;
+                    z-index: -999;
+                    object-fit: cover;
+                }
+                @media only screen and (max-width: 768px) {
+                    #bg-video {
+                        object-fit: cover;
+                    }
+                }
+                section[data-testid="stSidebar"] {
+                    background: rgba(10, 15, 28, 0.85) !important;
+                }
+                .welcome-box, .info-box {
+                    background: rgba(11, 16, 30, 0.92) !important;
+                    backdrop-filter: blur(12px);
+                    border: 1px solid rgba(0, 212, 255, 0.3) !important;
+                    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+                }
             </style>
+
             <video autoplay muted loop playsinline webkit-playsinline id="bg-video">
                 <source src="data:video/mp4;base64,[STRIPPED]" type="video/mp4">
             </video>
+
             <script>
                 document.addEventListener('DOMContentLoaded', function() {
                     var video = document.getElementById('bg-video');
@@ -82,23 +107,32 @@ def apply_theme_and_background(theme_mode, video_file):
                         var playPromise = video.play();
                         if (playPromise !== undefined) {
                             playPromise.catch(function(error) {
-                                document.body.addEventListener('touchstart', function() { video.play(); }, { once: true });
-                                document.body.addEventListener('click', function() { video.play(); }, { once: true });
+                                document.body.addEventListener('touchstart', function() {
+                                    video.play();
+                                }, { once: true });
+                                document.body.addEventListener('click', function() {
+                                    video.play();
+                                }, { once: true });
                             });
                         }
                     }
                 });
             </script>
             """.replace("REPLACE_BASE64", encoded)
+            
             st.markdown(css_wallpaper, unsafe_allow_html=True)
         except Exception as e:
             st.warning(f"Gagal load video background: {e}")
+            
     elif theme_mode == "🌙 Dark Clean":
         st.markdown("""
         <style>
             .stApp { background-color: #070a0f !important; }
             section[data-testid="stSidebar"] { background-color: #0b1118 !important; }
-            .welcome-box, .info-box { background: #0b1118 !important; border: 1px solid #1e293b !important; }
+            .welcome-box, .info-box {
+                background: #0b1118 !important;
+                border: 1px solid #1e293b !important;
+            }
         </style>
         """, unsafe_allow_html=True)
     else:
@@ -106,7 +140,11 @@ def apply_theme_and_background(theme_mode, video_file):
         <style>
             .stApp { background-color: #ffffff !important; color: #000000 !important; }
             section[data-testid="stSidebar"] { background-color: #f0f2f6 !important; }
-            .welcome-box, .info-box { background: #f8f9fa !important; border: 1px solid #d1d5db !important; color: #111827 !important; }
+            .welcome-box, .info-box {
+                background: #f8f9fa !important;
+                border: 1px solid #d1d5db !important;
+                color: #111827 !important;
+            }
         </style>
         """, unsafe_allow_html=True)
 
@@ -126,7 +164,12 @@ def sidebar_menu_button(label, icon, target_key):
     st.markdown(f"""
     <style>
     div.stButton > button[kind="secondary"][data-baseweb="button"]:has-text("{label}") {{
-        text-align: left !important; width: 100% !important; border-radius: 6px !important; margin-bottom: 4px !important; {active_border} {active_bg}
+        text-align: left !important;
+        width: 100% !important;
+        border-radius: 6px !important;
+        margin-bottom: 4px !important;
+        {active_border}
+        {active_bg}
     }}
     </style>
     """, unsafe_allow_html=True)
@@ -233,10 +276,8 @@ def generate_astrodox_wheel_only(target_date: datetime):
 # ==========================================
 # MARKET DATA
 # ==========================================
-# === FIX GABUNGAN: safe JSON parser + headers biar Bybit ga error Cloudflare ===
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Accept": "application/json"}
 def _safe_json(resp):
-    # Kalau Bybit balikin HTML / Cloudflare, jangan crash, return None
     try:
         txt = resp.text.strip()
         if not txt or txt[0] not in "{[":
@@ -244,7 +285,6 @@ def _safe_json(resp):
         return resp.json()
     except Exception:
         return None
-
 def get_okx_orderbook(symbol="XAUT-USDT", limit=400):
     try:
         url = f"https://www.okx.com/api/v5/market/books?instId={symbol}&sz={limit}"
@@ -279,8 +319,6 @@ def get_okx_trades(symbol="XAUT-USDT", limit=40):
         return [{"time": datetime.fromtimestamp(int(t["ts"])/1000).strftime("%H:%M:%S"), "price": float(t["px"]), "size": float(t["sz"]), "side": t["side"]} for t in data["data"]]
     except:
         return []
-
-# ================= BINANCE + BYBIT =================
 def _to_binance_symbol(symbol):
     return symbol.replace("-", "").upper()
 def _to_bybit_symbol(symbol):
@@ -333,7 +371,6 @@ def get_binance_trades(symbol="XAUT-USDT", limit=40):
             continue
     return []
 def get_bybit_orderbook(symbol="XAUT-USDT", limit=50):
-    # FIX: Bybit limit spot valid: 1,5,10,25,50,100,200,500. Pakai 50 biar aman, jangan 200 yang kadang ditolak.
     sym = _to_bybit_symbol(symbol)
     try:
         url = f"https://api.bybit.com/v5/market/orderbook?category=spot&symbol={sym}&limit={limit}"
@@ -376,7 +413,6 @@ def get_bybit_trades(symbol="XAUT-USDT", limit=40):
     except:
         return []
 def get_combined_orderbook(symbol="XAUT-USDT", limit=400):
-    # FIX: Partial success tetap tampil, error cuma warning, bukan fatal
     all_bids = []
     all_asks = []
     errors = []
@@ -399,7 +435,6 @@ def get_combined_orderbook(symbol="XAUT-USDT", limit=400):
         return sorted([[k, v] for k, v in d.items()], key=lambda x: x[0])
     bids_m = sorted(merge(all_bids), key=lambda x: x[0], reverse=True)
     asks_m = sorted(merge(all_asks), key=lambda x: x[0])
-    # Kalau masih ada 1-2 exchange jalan, err jadi None biar UI tidak blokir. Simpan warning di session_state
     if errors:
         st.session_state["combined_warning"] = " | ".join(errors)
     else:
@@ -418,7 +453,6 @@ def get_combined_trades(symbol="XAUT-USDT", limit=40):
     all_trades.extend(get_bybit_trades(symbol, limit))
     all_trades.sort(key=lambda x: x["time"], reverse=True)
     return all_trades[:limit]
-# ================= END TAMBAHAN =================
 def get_xauusd_price():
     try:
         r = requests.get("https://api.goldprice.dev/v1/prices?symbol=XAU-USD-SPOT", timeout=6, headers=HEADERS)
@@ -494,6 +528,52 @@ def show_orderbook_visual(bids, asks, aggregation=0.1, sort_order="Default (Harg
         for item in asks_data[:max_display]:
             pct = min(item["size"] / max_size, 1.0)
             st.markdown(f"""<div style="display:flex;justify-content:space-between;align-items:center; background:linear-gradient(270deg,#3b0d0d {pct*100}%,transparent 0%); padding:7px 12px;margin:3px 0;border-radius:6px;font-size:14px;"> <span style="color:inherit;font-weight:500;">{item['price']:,.1f}</span> <span style="color:#ff4d4d;font-weight:600;">{item['size']:,.2f} <span style="color:#94a3b8;font-size:12px;">(${item['notional']:,.0f})</span></span> </div>""", unsafe_allow_html=True)
+
+# === BARU: BIKIN GAMBAR ZONA LIKUIDITAS BUAT DIDOWNLOAD ===
+def generate_zona_image(high_heat_prices, symbol, exchange_label=""):
+    # Gambar PNG mirip kartu di web, pakai matplotlib biar ga butuh kaleido
+    sorted_zones = sorted(high_heat_prices, key=lambda x: x["min_price"], reverse=True)
+    n = len(sorted_zones)
+    fig_w = 12
+    fig_h = max(4.5, 2.2 + n * 0.85)
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h), facecolor='#070a0f')
+    ax.set_xlim(0, 10)
+    ax.set_ylim(0, fig_h)
+    ax.axis('off')
+    fig.patch.set_facecolor('#070a0f')
+    ax.set_facecolor('#070a0f')
+    ax.text(0.3, fig_h - 0.7, "⚡ ABEL FX - ZONA LIKUIDITAS TINGGI", color='#00d4ff', fontsize=16, fontweight='bold', va='center', ha='left')
+    ax.text(0.3, fig_h - 1.25, f"{symbol} - {exchange_label}  |  Heat Score > 15  |  {datetime.now().strftime('%d %b %Y %H:%M:%S WIB')}", color='#94a3b8', fontsize=11, va='center', ha='left')
+    ax.plot([0.3, 9.7], [fig_h - 1.6, fig_h - 1.6], color='#1e293b', linewidth=1.5)
+    y = fig_h - 2.4
+    for item in sorted_zones:
+        p_min = item['min_price']
+        p_max = item['max_price']
+        h_val = item['heat']
+        if h_val >= 22.0:
+            border = '#ffffff'
+        elif h_val >= 18.0:
+            border = '#f5bc18'
+        else:
+            border = '#e06b1e'
+        price_str = f"{p_min:,.1f}" if p_min == p_max else f"{p_min:,.1f} - {p_max:,.1f}"
+        # Kotak
+        rect = plt.Rectangle((0.3, y - 0.55), 9.4, 0.75, facecolor='#0b1118', edgecolor=border, linewidth=2.0, boxstyle=None)
+        # Pakai FancyBbox biar rounded
+        from matplotlib.patches import FancyBboxPatch
+        box = FancyBboxPatch((0.3, y - 0.55), 9.4, 0.75, boxstyle="round,pad=0.05,rounding_size=0.12", facecolor='#0b1118', edgecolor=border, linewidth=2.0)
+        ax.add_patch(box)
+        ax.text(0.6, y - 0.18, "RENTANG HARGA", color='#94a3b8', fontsize=8, fontweight='bold', va='center', ha='left')
+        ax.text(0.6, y + 0.18, price_str, color='white', fontsize=15, fontweight='bold', va='center', ha='left')
+        ax.text(9.4, y - 0.18, f"Heat: {h_val:.1f}", color=border, fontsize=12, fontweight='bold', va='center', ha='right')
+        y -= 0.95
+    ax.text(0.3, 0.25, "ABEL FX Tools - Screenshot zona ini untuk pengingat level. Bukan sinyal pasti, konfirmasi dengan struktur harga.", color='#64748b', fontsize=9, va='center', ha='left')
+    plt.tight_layout()
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', dpi=200, bbox_inches='tight', facecolor='#070a0f')
+    plt.close(fig)
+    buf.seek(0)
+    return buf
 
 # ==========================================
 # ROLLING HEATMAP COMPONENT
@@ -599,6 +679,14 @@ def render_rolling_heatmap(bids, asks, symbol):
             display_price_str = f"{p_min:,.1f}" if p_min == p_max else f"{p_min:,.1f} - {p_max:,.1f}"
             with cols[idx % len(cols)]:
                 st.markdown(f"""<div style="border: 2px solid {border_color}; background: transparent; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.2);"> <div> <span style="color: #94a3b8; font-size: 11px; display: block; font-weight: 600;">RENTANG HARGA</span> <span style="color: #ffffff; font-weight: 800; font-size: 16px;">{display_price_str}</span> </div> <div style="background: transparent; border: 1px solid {border_color}; color: {border_color}; font-weight: 800; font-size: 13px; padding: 4px 8px; border-radius: 6px;"> Heat: {h_val:.1f} </div> </div>""", unsafe_allow_html=True)
+        # === BARU: DOWNLOAD ZONA JADI GAMBAR ===
+        st.markdown("---")
+        try:
+            zona_buf = generate_zona_image(high_heat_prices, symbol, exchange_label=symbol)
+            st.download_button(label="📥 Download Zona Likuiditas (.png)", data=zona_buf, file_name=f"Zona_Likuiditas_{symbol}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png", mime="image/png", use_container_width=True, key=f"dl_zona_{symbol}")
+            st.caption("Gambar berisi semua zona di atas + jam snapshot, biar bisa lo simpan / share.")
+        except Exception as e:
+            st.warning(f"Gagal bikin gambar zona: {e}")
     else:
         st.markdown("<p style='color: #94a3b8; font-style: italic;'>Belum ada level harga dengan heat > 15 saat ini.</p>", unsafe_allow_html=True)
 
@@ -647,9 +735,9 @@ elif menu == "🔮 Astrodox":
             pos_lines.append(f"• {p1:<12}: {v1}")
     pos_text = "\n".join(pos_lines)
     aspek_text = f"""• MERAH  (Square 90° / Opp 180°) : {aspect_counts['merah']} Garis  → Volatilitas Tinggi
-- HIJAU  (Trine 120°)            : {aspect_counts['hijau']} Garis  → Expansion Trend
-- BIRU   (Sextile 60°)           : {aspect_counts['biru']} Garis  → Retest Zone
-- KUNING (Conjunction 0°)        : {aspect_counts['kuning']} Garis  → Turning Point"""
+• HIJAU  (Trine 120°)            : {aspect_counts['hijau']} Garis  → Expansion Trend
+• BIRU   (Sextile 60°)           : {aspect_counts['biru']} Garis  → Retest Zone
+• KUNING (Conjunction 0°)        : {aspect_counts['kuning']} Garis  → Turning Point"""
     info_html = f"""<div class="info-box"><strong>POSISI PLANET TRANSIT ({event_datetime.strftime('%d %b %Y %H:%M WIB')}):</strong><br>{"─" * 68}<br>{pos_text.replace(chr(10), "<br>")}<br><br><strong>REKAP GARIS ASPEK GEOMETRI ASTRODOX:</strong><br>{"─" * 68}<br>{aspek_text.replace(chr(10), "<br>")}</div>"""
     st.markdown(info_html, unsafe_allow_html=True)
     st.markdown("---")
@@ -801,7 +889,6 @@ elif menu == "📊 Orderbook":
                 st.metric("Selisih", f"{selisih:+.2f}", delta="Premium" if selisih > 0 else "Discount")
     st.markdown("---")
     st.subheader(f"Orderbook — {exchange}")
-    # FIX: jangan blokir kalau cuma partial error
     if st.session_state.get("combined_warning"):
         st.warning(f"⚠️ Partial: {st.session_state.get('combined_warning')} — Data ditampilkan dari exchange yang berhasil.")
     if err and not bids:
