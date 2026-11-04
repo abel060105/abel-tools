@@ -351,6 +351,193 @@ def get_okx_trades(symbol="XAUT-USDT", limit=40):
     except:
         return []
 
+# ================= TAMBAHAN REQUEST: BINANCE + BYBIT =================
+# Mapping symbol OKX -> Binance / Bybit
+def _to_binance_symbol(symbol):
+    return symbol.replace("-", "").upper()
+
+def _to_bybit_symbol(symbol):
+    return symbol.replace("-", "").upper()
+
+def get_binance_orderbook(symbol="XAUT-USDT", limit=100):
+    # Binance limit max 5000, tapi kita pakai 100-400 biar ringan di Streamlit Cloud
+    # Coba 3 domain backup karena api.binance.com sering block IP Streamlit Cloud
+    sym = _to_binance_symbol(symbol)
+    urls = [
+        f"https://api.binance.com/api/v3/depth?symbol={sym}&limit={limit}",
+        f"https://api1.binance.com/api/v3/depth?symbol={sym}&limit={limit}",
+        f"https://data-api.binance.vision/api/v3/depth?symbol={sym}&limit={limit}",
+    ]
+    last_err = ""
+    for url in urls:
+        try:
+            r = requests.get(url, timeout=10)
+            data = r.json()
+            if "bids" in data and "asks" in data:
+                bids = [[float(p), float(q)] for p, q in data["bids"]]
+                asks = [[float(p), float(q)] for p, q in data["asks"]]
+                return bids, asks, None
+            last_err = str(data.get("msg", data))
+        except Exception as e:
+            last_err = str(e)
+            continue
+    return None, None, last_err or "Binance error"
+
+def get_binance_ticker(symbol="XAUT-USDT"):
+    sym = _to_binance_symbol(symbol)
+    urls = [
+        f"https://api.binance.com/api/v3/ticker/24hr?symbol={sym}",
+        f"https://api1.binance.com/api/v3/ticker/24hr?symbol={sym}",
+        f"https://data-api.binance.vision/api/v3/ticker/24hr?symbol={sym}",
+    ]
+    for url in urls:
+        try:
+            r = requests.get(url, timeout=8)
+            t = r.json()
+            if "lastPrice" in t:
+                last = float(t["lastPrice"])
+                open24h = float(t["openPrice"])
+                return {
+                    "last": last,
+                    "high24h": float(t["highPrice"]),
+                    "low24h": float(t["lowPrice"]),
+                    "vol24h": float(t["volume"]),
+                    "change_pct": ((last - open24h) / open24h * 100) if open24h else 0
+                }
+        except:
+            continue
+    return None
+
+def get_binance_trades(symbol="XAUT-USDT", limit=40):
+    sym = _to_binance_symbol(symbol)
+    urls = [
+        f"https://api.binance.com/api/v3/trades?symbol={sym}&limit={limit}",
+        f"https://api1.binance.com/api/v3/trades?symbol={sym}&limit={limit}",
+        f"https://data-api.binance.vision/api/v3/trades?symbol={sym}&limit={limit}",
+    ]
+    for url in urls:
+        try:
+            r = requests.get(url, timeout=8)
+            data = r.json()
+            if isinstance(data, list):
+                out = []
+                for t in data:
+                    # isBuyerMaker True = sell agresif, False = buy agresif
+                    side = "sell" if t.get("isBuyerMaker") else "buy"
+                    out.append({
+                        "time": datetime.fromtimestamp(int(t["time"])/1000).strftime("%H:%M:%S"),
+                        "price": float(t["price"]),
+                        "size": float(t["qty"]),
+                        "side": side
+                    })
+                return out
+        except:
+            continue
+    return []
+
+def get_bybit_orderbook(symbol="XAUT-USDT", limit=200):
+    sym = _to_bybit_symbol(symbol)
+    try:
+        url = f"https://api.bybit.com/v5/market/orderbook?category=spot&symbol={sym}&limit={limit}"
+        r = requests.get(url, timeout=10)
+        data = r.json()
+        if data.get("retCode") != 0:
+            return None, None, data.get("retMsg", "Bybit Error")
+        book = data["result"]
+        bids = [[float(p), float(q)] for p, q in book["b"]]
+        asks = [[float(p), float(q)] for p, q in book["a"]]
+        return bids, asks, None
+    except Exception as e:
+        return None, None, str(e)
+
+def get_bybit_ticker(symbol="XAUT-USDT"):
+    sym = _to_bybit_symbol(symbol)
+    try:
+        url = f"https://api.bybit.com/v5/market/tickers?category=spot&symbol={sym}"
+        r = requests.get(url, timeout=8)
+        data = r.json()
+        if data.get("retCode") != 0: return None
+        t = data["result"]["list"][0]
+        last = float(t["lastPrice"])
+        open24h = float(t["prevPrice24h"]) if t.get("prevPrice24h") else last
+        # Bybit kasih price24hPcnt langsung, tapi kita hitung manual biar konsisten
+        return {
+            "last": last,
+            "high24h": float(t["highPrice24h"]),
+            "low24h": float(t["lowPrice24h"]),
+            "vol24h": float(t["volume24h"]),
+            "change_pct": float(t.get("price24hPcnt", 0)) * 100 if t.get("price24hPcnt") else ((last - open24h) / open24h * 100 if open24h else 0)
+        }
+    except:
+        return None
+
+def get_bybit_trades(symbol="XAUT-USDT", limit=40):
+    sym = _to_bybit_symbol(symbol)
+    try:
+        url = f"https://api.bybit.com/v5/market/recent-trade?category=spot&symbol={sym}&limit={limit}"
+        r = requests.get(url, timeout=8)
+        data = r.json()
+        if data.get("retCode") != 0: return []
+        out = []
+        for t in data["result"]["list"]:
+            out.append({
+                "time": datetime.fromtimestamp(int(t["time"])/1000).strftime("%H:%M:%S"),
+                "price": float(t["price"]),
+                "size": float(t["size"]),
+                "side": "buy" if t.get("side", "").lower() == "buy" else "sell"
+            })
+        return out
+    except:
+        return []
+
+def get_combined_orderbook(symbol="XAUT-USDT", limit=400):
+    # Gabungan 3 exchange: jumlahkan qty di harga yang sama (dibulatkan 0.1)
+    # Dipakai untuk mode "Gabungan 3 Exchange"
+    all_bids = []
+    all_asks = []
+    errors = []
+    b1, a1, e1 = get_okx_orderbook(symbol, limit=limit)
+    if b1: all_bids.extend(b1); all_asks.extend(a1)
+    else: errors.append(f"OKX: {e1}")
+    b2, a2, e2 = get_binance_orderbook(symbol, limit=200)
+    if b2: all_bids.extend(b2); all_asks.extend(a2)
+    else: errors.append(f"Binance: {e2}")
+    b3, a3, e3 = get_bybit_orderbook(symbol, limit=200)
+    if b3: all_bids.extend(b3); all_asks.extend(a3)
+    else: errors.append(f"Bybit: {e3}")
+    if not all_bids and not all_asks:
+        return None, None, " | ".join(errors)
+    # Merge by rounded price 0.1
+    def merge(orders):
+        d = defaultdict(float)
+        for p, q in orders:
+            key = round(p, 1)
+            d[key] += q
+        return sorted([[k, v] for k, v in d.items()], key=lambda x: x[0])
+    bids_m = sorted(merge(all_bids), key=lambda x: x[0], reverse=True)
+    asks_m = sorted(merge(all_asks), key=lambda x: x[0])
+    err = " | ".join(errors) if errors else None
+    return bids_m, asks_m, err
+
+def get_combined_ticker(symbol="XAUT-USDT"):
+    # Prioritas OKX -> Binance -> Bybit, biar metric atas tetap ada walau 1 exchange down
+    for fn in [get_okx_ticker, get_binance_ticker, get_bybit_ticker]:
+        t = fn(symbol)
+        if t:
+            return t
+    return None
+
+def get_combined_trades(symbol="XAUT-USDT", limit=40):
+    # Gabung trades 3 exchange, urutkan by time string desc (sudah cukup untuk display)
+    all_trades = []
+    all_trades.extend(get_okx_trades(symbol, limit))
+    all_trades.extend(get_binance_trades(symbol, limit))
+    all_trades.extend(get_bybit_trades(symbol, limit))
+    # Sort by time desc biar yang terbaru diatas
+    all_trades.sort(key=lambda x: x["time"], reverse=True)
+    return all_trades[:limit]
+# ================= END TAMBAHAN REQUEST =================
+
 def get_xauusd_price():
     try:
         r = requests.get("https://api.goldprice.dev/v1/prices?symbol=XAU-USD-SPOT", timeout=6)
@@ -850,17 +1037,20 @@ Catatan:
 elif menu == "📊 Orderbook":
     st.title("📊 Orderbook & Market Data")
     
-    c1, c2, c3 = st.columns([2, 2, 1.5])
+    c1, c2, c3, c4 = st.columns([1.6, 1.4, 1.2, 1.2])
     with c1:
         symbol = st.selectbox("Pair", ["XAUT-USDT", "BTC-USDT"], key="pair_select")
     with c2:
+        # === BARU: PILIH EXCHANGE ===
+        exchange = st.selectbox("Exchange", ["OKX", "Binance", "Bybit", "Gabungan 3 Exchange"], key="exchange_select", index=0)
+    with c3:
         aggregation = st.selectbox(
             "Aggregation",
             [0.1, 1, 10, 100, 1000, 10000],
             index=0,
             format_func=lambda x: f"{x}"
         )
-    with c3:
+    with c4:
         st.write("")
         st.write("")
         auto_refresh = st.checkbox("Auto Refresh")
@@ -871,19 +1061,39 @@ elif menu == "📊 Orderbook":
 
     if "last_symbol" not in st.session_state:
         st.session_state.last_symbol = symbol
+    if "last_exchange" not in st.session_state:
+        st.session_state.last_exchange = exchange
 
     force_refresh = False
-    if st.session_state.last_symbol != symbol:
+    if st.session_state.last_symbol != symbol or st.session_state.last_exchange != exchange:
         st.session_state.last_symbol = symbol
+        st.session_state.last_exchange = exchange
         force_refresh = True
         if "market_data" in st.session_state:
             del st.session_state.market_data
+        # Reset heatmap history saat ganti exchange/pair biar gak kecampur
+        if "heatmap_history" in st.session_state:
+            st.session_state.heatmap_history = {}
 
     if st.button("🔄 Refresh Sekarang", type="primary") or auto_refresh or force_refresh or "market_data" not in st.session_state:
-        with st.spinner(f"Mengambil data {symbol}..."):
-            bids, asks, err = get_okx_orderbook(symbol, limit=depth)
-            ticker = get_okx_ticker(symbol)
-            trades = get_okx_trades(symbol, 40)
+        with st.spinner(f"Mengambil data {symbol} - {exchange}..."):
+            # === BARU: FETCH SESUAI EXCHANGE ===
+            if exchange == "OKX":
+                bids, asks, err = get_okx_orderbook(symbol, limit=depth)
+                ticker = get_okx_ticker(symbol)
+                trades = get_okx_trades(symbol, 40)
+            elif exchange == "Binance":
+                bids, asks, err = get_binance_orderbook(symbol, limit=200)
+                ticker = get_binance_ticker(symbol)
+                trades = get_binance_trades(symbol, 40)
+            elif exchange == "Bybit":
+                bids, asks, err = get_bybit_orderbook(symbol, limit=200)
+                ticker = get_bybit_ticker(symbol)
+                trades = get_bybit_trades(symbol, 40)
+            else:  # Gabungan 3 Exchange
+                bids, asks, err = get_combined_orderbook(symbol, limit=depth)
+                ticker = get_combined_ticker(symbol)
+                trades = get_combined_trades(symbol, 40)
             
             if symbol == "XAUT-USDT":
                 ref_price = get_xauusd_price()
@@ -897,6 +1107,7 @@ elif menu == "📊 Orderbook":
                 "ticker": ticker,
                 "trades": trades,
                 "symbol": symbol,
+                "exchange": exchange,
                 "ref_price": ref_price
             }
 
@@ -910,7 +1121,7 @@ elif menu == "📊 Orderbook":
 
     if ticker:
         sign = "+" if ticker["change_pct"] >= 0 else ""
-        st.markdown(f"### {data.get('symbol')}")
+        st.markdown(f"### {data.get('symbol')} — {data.get('exchange', exchange)}")
         m1, m2, m3, m4, m5 = st.columns(5)
         m1.metric("Harga Terakhir", f"{ticker['last']:,.2f}")
         m2.metric("Perubahan 24jam", f"{sign}{ticker['change_pct']:.2f}%")
@@ -961,7 +1172,7 @@ elif menu == "📊 Orderbook":
             if ticker and ref_price:
                 xaut = ticker["last"]
                 selisih = xaut - ref_price
-                st.metric("XAUT (OKX)", f"{xaut:,.2f}")
+                st.metric(f"XAUT ({exchange})", f"{xaut:,.2f}")
                 st.metric("XAUUSD (approx)", f"{ref_price:,.2f}")
                 st.metric("Selisih", f"{selisih:+.2f}", delta="Premium" if selisih > 0 else "Discount")
 
@@ -990,19 +1201,19 @@ elif menu == "📊 Orderbook":
             if ticker and ref_price:
                 btc = ticker["last"]
                 selisih = btc - ref_price
-                st.metric("BTC-USDT (OKX)", f"{btc:,.2f}")
+                st.metric(f"BTC-USDT ({exchange})", f"{btc:,.2f}")
                 st.metric("BTCUSD (approx)", f"{ref_price:,.2f}")
                 st.metric("Selisih", f"{selisih:+.2f}", delta="Premium" if selisih > 0 else "Discount")
 
     st.markdown("---")
-    st.subheader("Orderbook")
+    st.subheader(f"Orderbook — {exchange}")
     
     if err:
         st.error(err)
     elif bids and asks:
         show_orderbook_visual(bids, asks, aggregation=aggregation, sort_order=sort_order)
         st.markdown("---")
-        render_rolling_heatmap(bids, asks, symbol)
+        render_rolling_heatmap(bids, asks, f"{symbol}_{exchange}")
     else:
         st.info("Sedang memuat orderbook...")
 
