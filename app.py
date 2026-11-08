@@ -296,11 +296,16 @@ def generate_astrodox_wheel_only(target_date: datetime):
     return fig, img_buf, aspect_counts, planet_positions
 
 # ==========================================
-# MARKET DATA
+# MARKET DATA - SEMUA FUTURES
 # ==========================================
+# >>> FUTURES - OKX: XAUT-USDT -> XAUT-USDT-SWAP <<<
 def get_okx_orderbook(symbol="XAUT-USDT", limit=400):
     try:
-        url = f"https://www.okx.com/api/v5/market/books?instId={symbol}&sz={limit}"
+        if symbol.endswith("-SWAP"):
+            inst_id = symbol
+        else:
+            inst_id = f"{symbol}-SWAP"
+        url = f"https://www.okx.com/api/v5/market/books?instId={inst_id}&sz={limit}"
         r = requests.get(url, timeout=10)
         data = r.json()
         if data.get("code") != "0":
@@ -312,9 +317,14 @@ def get_okx_orderbook(symbol="XAUT-USDT", limit=400):
     except Exception as e:
         return None, None, str(e)
 
+# >>> FUTURES - OKX Ticker SWAP <<<
 def get_okx_ticker(symbol="XAUT-USDT"):
     try:
-        url = f"https://www.okx.com/api/v5/market/ticker?instId={symbol}"
+        if symbol.endswith("-SWAP"):
+            inst_id = symbol
+        else:
+            inst_id = f"{symbol}-SWAP"
+        url = f"https://www.okx.com/api/v5/market/ticker?instId={inst_id}"
         r = requests.get(url, timeout=8)
         data = r.json()
         if data.get("code") != "0":
@@ -333,9 +343,14 @@ def get_okx_ticker(symbol="XAUT-USDT"):
     except:
         return None
 
+# >>> FUTURES - OKX Trades SWAP <<<
 def get_okx_trades(symbol="XAUT-USDT", limit=40):
     try:
-        url = f"https://www.okx.com/api/v5/market/trades?instId={symbol}&limit={limit}"
+        if symbol.endswith("-SWAP"):
+            inst_id = symbol
+        else:
+            inst_id = f"{symbol}-SWAP"
+        url = f"https://www.okx.com/api/v5/market/trades?instId={inst_id}&limit={limit}"
         r = requests.get(url, timeout=8)
         data = r.json()
         if data.get("code") != "0":
@@ -375,12 +390,13 @@ def _to_binance_symbol(s):
 def _to_bybit_symbol(s):
     return s.replace("-", "").upper()
 
+# >>> FUTURES - Binance Orderbook fapi <<<
 def get_binance_orderbook(symbol="XAUT-USDT", limit=100):
     sym = _to_binance_symbol(symbol)
     urls = [
-        f"https://api.binance.com/api/v3/depth?symbol={sym}&limit={limit}",
-        f"https://api1.binance.com/api/v3/depth?symbol={sym}&limit={limit}",
-        f"https://data-api.binance.vision/api/v3/depth?symbol={sym}&limit={limit}"
+        f"https://fapi.binance.com/fapi/v1/depth?symbol={sym}&limit={limit}",
+        f"https://fapi1.binance.com/fapi/v1/depth?symbol={sym}&limit={limit}",
+        f"https://fapi2.binance.com/fapi/v1/depth?symbol={sym}&limit={limit}"
     ]
     last_err = ""
     for url in urls:
@@ -400,12 +416,13 @@ def get_binance_orderbook(symbol="XAUT-USDT", limit=100):
             continue
     return None, None, last_err or "Binance error"
 
+# >>> FUTURES - Binance Ticker fapi <<<
 def get_binance_ticker(symbol="XAUT-USDT"):
     sym = _to_binance_symbol(symbol)
     urls = [
-        f"https://api.binance.com/api/v3/ticker/24hr?symbol={sym}",
-        f"https://api1.binance.com/api/v3/ticker/24hr?symbol={sym}",
-        f"https://data-api.binance.vision/api/v3/ticker/24hr?symbol={sym}"
+        f"https://fapi.binance.com/fapi/v1/ticker/24hr?symbol={sym}",
+        f"https://fapi1.binance.com/fapi/v1/ticker/24hr?symbol={sym}",
+        f"https://fapi2.binance.com/fapi/v1/ticker/24hr?symbol={sym}"
     ]
     for url in urls:
         try:
@@ -426,12 +443,13 @@ def get_binance_ticker(symbol="XAUT-USDT"):
             continue
     return None
 
+# >>> FUTURES - Binance Trades fapi <<<
 def get_binance_trades(symbol="XAUT-USDT", limit=40):
     sym = _to_binance_symbol(symbol)
     urls = [
-        f"https://api.binance.com/api/v3/trades?symbol={sym}&limit={limit}",
-        f"https://api1.binance.com/api/v3/trades?symbol={sym}&limit={limit}",
-        f"https://data-api.binance.vision/api/v3/trades?symbol={sym}&limit={limit}"
+        f"https://fapi.binance.com/fapi/v1/trades?symbol={sym}&limit={limit}",
+        f"https://fapi1.binance.com/fapi/v1/trades?symbol={sym}&limit={limit}",
+        f"https://fapi2.binance.com/fapi/v1/trades?symbol={sym}&limit={limit}"
     ]
     for url in urls:
         try:
@@ -455,10 +473,11 @@ def get_binance_trades(symbol="XAUT-USDT", limit=40):
             continue
     return []
 
+# >>> FUTURES - Bybit Orderbook linear <<<
 def get_bybit_orderbook(symbol="XAUT-USDT", limit=50):
     sym = _to_bybit_symbol(symbol)
     try:
-        url = f"https://api.bybit.com/v5/market/orderbook?category=spot&symbol={sym}&limit={limit}"
+        url = f"https://api.bybit.com/v5/market/orderbook?category=linear&symbol={sym}&limit={limit}"
         r = requests.get(url, timeout=10, headers=HEADERS)
         data = _safe_json(r)
         if not data:
@@ -472,10 +491,11 @@ def get_bybit_orderbook(symbol="XAUT-USDT", limit=50):
     except Exception as e:
         return None, None, str(e)
 
+# >>> FUTURES - Bybit Ticker linear <<<
 def get_bybit_ticker(symbol="XAUT-USDT"):
     sym = _to_bybit_symbol(symbol)
     try:
-        url = f"https://api.bybit.com/v5/market/tickers?category=spot&symbol={sym}"
+        url = f"https://api.bybit.com/v5/market/tickers?category=linear&symbol={sym}"
         r = requests.get(url, timeout=8, headers=HEADERS)
         data = _safe_json(r)
         if not data or data.get("retCode") != 0:
@@ -503,10 +523,11 @@ def get_bybit_ticker(symbol="XAUT-USDT"):
     except:
         return None
 
+# >>> FUTURES - Bybit Trades linear <<<
 def get_bybit_trades(symbol="XAUT-USDT", limit=40):
     sym = _to_bybit_symbol(symbol)
     try:
-        url = f"https://api.bybit.com/v5/market/recent-trade?category=spot&symbol={sym}&limit={limit}"
+        url = f"https://api.bybit.com/v5/market/recent-trade?category=linear&symbol={sym}&limit={limit}"
         r = requests.get(url, timeout=8, headers=HEADERS)
         data = _safe_json(r)
         if not data or data.get("retCode") != 0:
@@ -611,7 +632,8 @@ def get_btcusd_price():
     except:
         pass
     try:
-        r = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT", timeout=6)
+        # >>> FUTURES fallback - Binance Futures BTCUSDT <<<
+        r = requests.get("https://fapi.binance.com/fapi/v1/ticker/price?symbol=BTCUSDT", timeout=6)
         data = r.json()
         if "price" in data:
             return float(data["price"])
