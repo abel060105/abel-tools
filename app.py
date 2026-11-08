@@ -296,12 +296,14 @@ def generate_astrodox_wheel_only(target_date: datetime):
     return fig, img_buf, aspect_counts, planet_positions
 
 # ==========================================
-# MARKET DATA - SEMUA FUTURES + FALLBACK ANTI-BLOCK
+# MARKET DATA - FUTURES BINANCE + BYBIT, OKX SPOT (KARENA OKX GAK PUNYA XAUT FUTURES)
 # ==========================================
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     "Accept": "application/json"
 }
+
+PROXY_PREFIX = "https://api.allorigins.win/raw?url="
 
 def _safe_json(resp):
     try:
@@ -320,223 +322,159 @@ def _to_binance_symbol(s):
 def _to_bybit_symbol(s):
     return s.replace("-", "").upper()
 
-# Helper OKX: coba beberapa Instrument ID futures yang valid untuk XAUT / BTC
-# OKX XAUT perpetual yang bener itu XAUT-USD-SWAP (coin-margined), bukan XAUT-USDT-SWAP
-def _okx_swap_candidates(symbol="XAUT-USDT"):
-    base = symbol.replace("-SWAP", "")
-    # urutan: yang paling mungkin ada dulu
-    cands = []
-    if "XAUT" in base:
-        cands = ["XAUT-USD-SWAP", "XAUT-USDT-SWAP", "XAUT-USD-PERP"]
-    elif "BTC" in base:
-        cands = ["BTC-USDT-SWAP", "BTC-USD-SWAP"]
-    else:
-        cands = [f"{base}-SWAP"]
-    # jangan duplikat, dan jangan masukin base-nya sendiri kalau udah SWAP
-    out = []
-    for c in cands:
-        if c not in out:
-            out.append(c)
-    return out
-
-def _okx_fetch_books(inst_id, limit):
-    url = f"https://www.okx.com/api/v5/market/books?instId={inst_id}&sz={limit}"
-    r = requests.get(url, timeout=10, headers=HEADERS)
-    data = _safe_json(r)
-    if not data or data.get("code") != "0":
-        return None, None, data.get("msg", "Error") if data else "Error"
-    book = data["data"][0]
-    bids = [[float(p), float(q)] for p, q, *_ in book["bids"]]
-    asks = [[float(p), float(q)] for p, q, *_ in book["asks"]]
-    return bids, asks, None
-
-def _okx_fetch_ticker(inst_id):
-    url = f"https://www.okx.com/api/v5/market/ticker?instId={inst_id}"
-    r = requests.get(url, timeout=8, headers=HEADERS)
-    data = _safe_json(r)
-    if not data or data.get("code") != "0":
+def _get_via_proxy(url):
+    try:
+        r = requests.get(url, timeout=10, headers=HEADERS)
+        d = _safe_json(r)
+        if d:
+            return d
+    except:
+        pass
+    try:
+        proxy_url = PROXY_PREFIX + url
+        r = requests.get(proxy_url, timeout=12, headers=HEADERS)
+        d = _safe_json(r)
+        return d
+    except:
         return None
-    t = data["data"][0]
-    last = float(t["last"])
-    open24h = float(t["open24h"])
-    change_pct = ((last - open24h) / open24h * 100) if open24h else 0
-    return {
-        "last": last,
-        "high24h": float(t["high24h"]),
-        "low24h": float(t["low24h"]),
-        "vol24h": float(t["vol24h"]),
-        "change_pct": change_pct
-    }
 
-def _okx_fetch_trades(inst_id, limit):
-    url = f"https://www.okx.com/api/v5/market/trades?instId={inst_id}&limit={limit}"
-    r = requests.get(url, timeout=8, headers=HEADERS)
-    data = _safe_json(r)
-    if not data or data.get("code") != "0":
-        return []
-    result = []
-    for t in data["data"]:
-        result.append({
-            "time": datetime.fromtimestamp(int(t["ts"]) / 1000).strftime("%H:%M:%S"),
-            "price": float(t["px"]),
-            "size": float(t["sz"]),
-            "side": t["side"]
-        })
-    return result
-
-# >>> FUTURES - OKX <<<
+# >>> OKX SPOT - karena OKX tidak punya XAUT-USDT-SWAP / XAUT-USD-SWAP, dipaksain futures error terus <<<
 def get_okx_orderbook(symbol="XAUT-USDT", limit=400):
-    last_err = ""
-    for inst_id in _okx_swap_candidates(symbol):
-        try:
-            bids, asks, err = _okx_fetch_books(inst_id, limit)
-            if bids:
-                return bids, asks, None
-            last_err = err or "Error"
-        except Exception as e:
-            last_err = str(e)
-            continue
-    return None, None, last_err or "OKX Error"
+    try:
+        url = f"https://www.okx.com/api/v5/market/books?instId={symbol}&sz={limit}"
+        r = requests.get(url, timeout=10, headers=HEADERS)
+        data = _safe_json(r)
+        if not data or data.get("code") != "0":
+            return None, None, data.get("msg", "Error") if data else "Error"
+        book = data["data"][0]
+        bids = [[float(p), float(q)] for p, q, *_ in book["bids"]]
+        asks = [[float(p), float(q)] for p, q, *_ in book["asks"]]
+        return bids, asks, None
+    except Exception as e:
+        return None, None, str(e)
 
 def get_okx_ticker(symbol="XAUT-USDT"):
-    for inst_id in _okx_swap_candidates(symbol):
-        try:
-            t = _okx_fetch_ticker(inst_id)
-            if t:
-                return t
-        except:
-            continue
-    return None
+    try:
+        url = f"https://www.okx.com/api/v5/market/ticker?instId={symbol}"
+        r = requests.get(url, timeout=8, headers=HEADERS)
+        data = _safe_json(r)
+        if not data or data.get("code") != "0":
+            return None
+        t = data["data"][0]
+        last = float(t["last"])
+        open24h = float(t["open24h"])
+        change_pct = ((last - open24h) / open24h * 100) if open24h else 0
+        return {
+            "last": last,
+            "high24h": float(t["high24h"]),
+            "low24h": float(t["low24h"]),
+            "vol24h": float(t["vol24h"]),
+            "change_pct": change_pct
+        }
+    except:
+        return None
 
 def get_okx_trades(symbol="XAUT-USDT", limit=40):
-    for inst_id in _okx_swap_candidates(symbol):
-        try:
-            out = _okx_fetch_trades(inst_id, limit)
-            if out:
-                return out
-        except:
-            continue
-    return []
+    try:
+        url = f"https://www.okx.com/api/v5/market/trades?instId={symbol}&limit={limit}"
+        r = requests.get(url, timeout=8, headers=HEADERS)
+        data = _safe_json(r)
+        if not data or data.get("code") != "0":
+            return []
+        result = []
+        for t in data["data"]:
+            result.append({
+                "time": datetime.fromtimestamp(int(t["ts"]) / 1000).strftime("%H:%M:%S"),
+                "price": float(t["px"]),
+                "size": float(t["sz"]),
+                "side": t["side"]
+            })
+        return result
+    except:
+        return []
 
-# >>> FUTURES - Binance: coba api.binance.com/fapi dulu (lolos block Streamlit), baru fapi.* <<<
+# ================= TAMBAHAN REQUEST: BINANCE + BYBIT + GABUNGAN =================
+# >>> FUTURES - Binance fapi via proxy <<<
 def get_binance_orderbook(symbol="XAUT-USDT", limit=100):
     sym = _to_binance_symbol(symbol)
     urls = [
-        f"https://api.binance.com/fapi/v1/depth?symbol={sym}&limit={limit}",
-        f"https://api1.binance.com/fapi/v1/depth?symbol={sym}&limit={limit}",
         f"https://fapi.binance.com/fapi/v1/depth?symbol={sym}&limit={limit}",
-        f"https://fapi1.binance.com/fapi/v1/depth?symbol={sym}&limit={limit}",
-        f"https://fapi2.binance.com/fapi/v1/depth?symbol={sym}&limit={limit}",
+        f"https://api.binance.com/fapi/v1/depth?symbol={sym}&limit={limit}",
     ]
-    last_err = ""
     for url in urls:
-        try:
-            r = requests.get(url, timeout=10, headers=HEADERS)
-            data = _safe_json(r)
-            if data and "bids" in data and "asks" in data:
-                bids = [[float(p), float(q)] for p, q in data["bids"]]
-                asks = [[float(p), float(q)] for p, q in data["asks"]]
-                return bids, asks, None
-            if data:
-                last_err = str(data.get("msg", "Binance: respon bukan JSON"))
-            else:
-                last_err = "Binance: respon bukan JSON"
-        except Exception as e:
-            last_err = str(e)
-            continue
-    return None, None, last_err or "Binance error"
+        data = _get_via_proxy(url)
+        if data and "bids" in data and "asks" in data:
+            bids = [[float(p), float(q)] for p, q in data["bids"]]
+            asks = [[float(p), float(q)] for p, q in data["asks"]]
+            return bids, asks, None
+    return None, None, "Binance: respon bukan JSON (coba Refresh lagi)"
 
 def get_binance_ticker(symbol="XAUT-USDT"):
     sym = _to_binance_symbol(symbol)
     urls = [
-        f"https://api.binance.com/fapi/v1/ticker/24hr?symbol={sym}",
-        f"https://api1.binance.com/fapi/v1/ticker/24hr?symbol={sym}",
         f"https://fapi.binance.com/fapi/v1/ticker/24hr?symbol={sym}",
-        f"https://fapi1.binance.com/fapi/v1/ticker/24hr?symbol={sym}",
+        f"https://api.binance.com/fapi/v1/ticker/24hr?symbol={sym}",
     ]
     for url in urls:
-        try:
-            r = requests.get(url, timeout=8, headers=HEADERS)
-            t = _safe_json(r)
-            if t and "lastPrice" in t:
-                last = float(t["lastPrice"])
-                open24h = float(t["openPrice"])
-                change_pct = ((last - open24h) / open24h * 100) if open24h else 0
-                return {
-                    "last": last,
-                    "high24h": float(t["highPrice"]),
-                    "low24h": float(t["lowPrice"]),
-                    "vol24h": float(t["volume"]),
-                    "change_pct": change_pct
-                }
-        except:
-            continue
+        t = _get_via_proxy(url)
+        if t and "lastPrice" in t:
+            last = float(t["lastPrice"])
+            open24h = float(t["openPrice"])
+            change_pct = ((last - open24h) / open24h * 100) if open24h else 0
+            return {
+                "last": last,
+                "high24h": float(t["highPrice"]),
+                "low24h": float(t["lowPrice"]),
+                "vol24h": float(t["volume"]),
+                "change_pct": change_pct
+            }
     return None
 
 def get_binance_trades(symbol="XAUT-USDT", limit=40):
     sym = _to_binance_symbol(symbol)
     urls = [
-        f"https://api.binance.com/fapi/v1/trades?symbol={sym}&limit={limit}",
-        f"https://api1.binance.com/fapi/v1/trades?symbol={sym}&limit={limit}",
         f"https://fapi.binance.com/fapi/v1/trades?symbol={sym}&limit={limit}",
+        f"https://api.binance.com/fapi/v1/trades?symbol={sym}&limit={limit}",
     ]
     for url in urls:
-        try:
-            r = requests.get(url, timeout=8, headers=HEADERS)
-            data = _safe_json(r)
-            if isinstance(data, list):
-                out = []
-                for t in data:
-                    if t.get("isBuyerMaker"):
-                        side = "sell"
-                    else:
-                        side = "buy"
-                    out.append({
-                        "time": datetime.fromtimestamp(int(t["time"]) / 1000).strftime("%H:%M:%S"),
-                        "price": float(t["price"]),
-                        "size": float(t["qty"]),
-                        "side": side
-                    })
-                return out
-        except:
-            continue
+        data = _get_via_proxy(url)
+        if isinstance(data, list):
+            out = []
+            for t in data:
+                if t.get("isBuyerMaker"):
+                    side = "sell"
+                else:
+                    side = "buy"
+                out.append({
+                    "time": datetime.fromtimestamp(int(t["time"]) / 1000).strftime("%H:%M:%S"),
+                    "price": float(t["price"]),
+                    "size": float(t["qty"]),
+                    "side": side
+                })
+            return out
     return []
 
-# >>> FUTURES - Bybit: coba api.bybit.com + api.bytick.com (anti-Cloudflare) <<<
+# >>> FUTURES - Bybit linear via proxy <<<
 def get_bybit_orderbook(symbol="XAUT-USDT", limit=50):
     sym = _to_bybit_symbol(symbol)
     hosts = ["https://api.bybit.com", "https://api.bytick.com"]
-    last_err = ""
     for host in hosts:
-        try:
-            url = f"{host}/v5/market/orderbook?category=linear&symbol={sym}&limit={limit}"
-            r = requests.get(url, timeout=10, headers=HEADERS)
-            data = _safe_json(r)
-            if not data:
-                last_err = "Bybit: respon bukan JSON (rate-limit / Cloudflare, coba Refresh lagi)"
-                continue
-            if data.get("retCode") != 0:
-                last_err = f"Bybit: {data.get('retMsg', 'Bybit Error')}"
-                continue
+        url = f"{host}/v5/market/orderbook?category=linear&symbol={sym}&limit={limit}"
+        data = _get_via_proxy(url)
+        if data and data.get("retCode") == 0:
             book = data["result"]
             bids = [[float(p), float(q)] for p, q in book["b"]]
             asks = [[float(p), float(q)] for p, q in book["a"]]
             return bids, asks, None
-        except Exception as e:
-            last_err = str(e)
-            continue
-    return None, None, last_err or "Bybit error"
+    return None, None, "Bybit: respon bukan JSON (rate-limit / Cloudflare, coba Refresh lagi)"
 
 def get_bybit_ticker(symbol="XAUT-USDT"):
     sym = _to_bybit_symbol(symbol)
     hosts = ["https://api.bybit.com", "https://api.bytick.com"]
     for host in hosts:
-        try:
-            url = f"{host}/v5/market/tickers?category=linear&symbol={sym}"
-            r = requests.get(url, timeout=8, headers=HEADERS)
-            data = _safe_json(r)
-            if not data or data.get("retCode") != 0:
-                continue
+        url = f"{host}/v5/market/tickers?category=linear&symbol={sym}"
+        data = _get_via_proxy(url)
+        if data and data.get("retCode") == 0:
             t = data["result"]["list"][0]
             last = float(t["lastPrice"])
             if t.get("prevPrice24h"):
@@ -557,20 +495,15 @@ def get_bybit_ticker(symbol="XAUT-USDT"):
                 "vol24h": float(t["volume24h"]),
                 "change_pct": change_pct
             }
-        except:
-            continue
     return None
 
 def get_bybit_trades(symbol="XAUT-USDT", limit=40):
     sym = _to_bybit_symbol(symbol)
     hosts = ["https://api.bybit.com", "https://api.bytick.com"]
     for host in hosts:
-        try:
-            url = f"{host}/v5/market/recent-trade?category=linear&symbol={sym}&limit={limit}"
-            r = requests.get(url, timeout=8, headers=HEADERS)
-            data = _safe_json(r)
-            if not data or data.get("retCode") != 0:
-                continue
+        url = f"{host}/v5/market/recent-trade?category=linear&symbol={sym}&limit={limit}"
+        data = _get_via_proxy(url)
+        if data and data.get("retCode") == 0:
             out = []
             for t in data["result"]["list"]:
                 if t.get("side", "").lower() == "buy":
@@ -584,8 +517,6 @@ def get_bybit_trades(symbol="XAUT-USDT", limit=40):
                     "side": side
                 })
             return out
-        except:
-            continue
     return []
 
 def get_combined_orderbook(symbol="XAUT-USDT", limit=400):
